@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # Embedding dimensionality for beliefs.embedding (OpenAI text-embedding-3-small = 1536).
     embedding_dim: int = 1536
 
+    # Phase 2 — OpenAI (NOT Bedrock, per CLAUDE.md). Key lives in the gitignored .env.
+    openai_api_key: str = Field(alias="OPENAI_API_KEY")
+    # text-embedding-3-small emits 1536-dim vectors — matches embedding_dim above.
+    embedding_model: str = "text-embedding-3-small"
+    # The fraud agent's scoring brain. gpt-4o-mini supports strict structured JSON output.
+    chat_model: str = "gpt-4o-mini"
+
     @property
     def async_database_url(self) -> str:
         """URL for the async app engine (SQLAlchemy + psycopg 3 async)."""
