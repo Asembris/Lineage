@@ -82,3 +82,52 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 - CRDB **MVCC time-travel** (AOST) = DB state as of a past *transaction* time. Phase 1 proves this.
 - `formed_at` / `belief_performance.window_*` = app-level columns; they drive the Phase 2/3
   staleness story ("valid then / rotten now"). Different clock. Phase 1 does not touch staleness.
+
+## Phase 2
+
+### Plan (approved)
+- Keep Phase 1 seed + tests intact. Backfill real historical `decisions` (deterministic,
+  OpenAI-FREE) across the belief-holding generations; prove the live spawn once
+  (crimson-7 -> crimson-8) later. Hermetic offline done-test. C-SPANN vector search. No new
+  table (decisions IS the record). 250 belief-driven decisions/window (SE ~0.032 worst case).
+- Integrity line: the WORLD drifts (transaction fraud labels shift over time); the belief and
+  the agent's application are fixed; performance is ALWAYS the aggregation of verdict-vs-fraud.
+  Never write a confidence number. The counterfactual recovery test is the proof.
+
+### Migration 0002 (applied to live cluster, committed)
+- DDL only, OpenAI-free: `CREATE VECTOR INDEX ix_beliefs_embedding ON beliefs (embedding)`
+  (raw op.execute — Alembic can't emit CRDB vector DDL) + btree
+  `ix_decisions_belief_time` on decisions(driving_belief_id, decided_at) = the access path
+  for per-window aggregation. Alembic logs "Will assume non-transactional DDL" — CRDB runs
+  the vector-index create fine outside a txn. Re-embedding the belief with a REAL vector is
+  deferred to the post-gate agent-brain phase (it needs OpenAI; pre-gate stays offline).
+
+### Deterministic backfill (app/sim/transactions.py + seed/backfill_decisions.py)
+- Drift is a 3-layer stochastic process, all seeded (world SEED=20260701, policy seed 7788):
+  hidden logistic trend + per-window Gaussian regime shock + a modeled fraud CAMPAIGN that
+  spikes ~gen5 and recedes gen6 + Bernoulli sampling per txn. Off-pattern background fraud is
+  non-zero & flat. Nothing about performance is written; only labels + verdicts.
+- Decision policy: target-pattern (mcc 5411, <$180, age>6mo) -> approve, driving_belief=origin
+  (the belief-driven subset). Everything else -> generic verdict, driving_belief=NULL (table
+  realism only; excluded from this belief's performance). Window i -> crimson-i; window 5
+  splits ~30% to living branch crimson-5b.
+- **Emergent curve (4000 rows, computed from raw decisions, matches the intent):**
+  conf g0..g7 = .924 .952 .876 .852 .724 .556 **.624** .528 ; fraud% 7.6->47.2 ;
+  frauds_approved 19->118. The gen-6 bump (.556->.624->.528) is the campaign recession dip —
+  a monotone sigmoid could never produce it. fp_rate == 0 across all windows and is HONEST:
+  this belief only ever approves, so its failure mode is approving fraud (false negatives),
+  never false positives. Baseline off-pattern fraud wobbles 1.2%-6.4%, no trend.
+
+### Gotchas
+- `seed/` must be run as a module (`python -m seed.backfill_decisions`), NOT as a file path —
+  running the file puts seed/ on sys.path[0] and shadows the `seed` package self-import.
+- 4000-row ORM `add_all` + commit over CRDB Cloud takes ~60s (server-default UUID PKs force
+  per-row RETURNING). Fine for a one-shot backfill; if it ever needs to be faster, switch to
+  client-side uuid4 ids + a bulk `insert()` executemany.
+- Python block-buffers stdout to a file — a long backfill shows NO output until it exits.
+  Don't mistake a buffered run for a hang.
+
+### DONE so far (pre-gate): migration 0002 committed, backfill committed, curve verified.
+### NEXT (needs approval at gate): agent brain (OpenAI + vector retrieval), lifecycle
+###   spawn_child, app/services/performance.py (writes belief_performance rows), and the
+###   counterfactual staleness done-test. Do NOT start until the gate is approved.
