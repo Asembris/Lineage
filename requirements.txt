@@ -1,0 +1,28 @@
+# Lineage backend — Phase 1 pinned dependencies (Python 3.12)
+# API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# DB access — SQLAlchemy 2.x async + psycopg 3 (no asyncpg)
+SQLAlchemy[asyncio]==2.0.36
+psycopg[binary]==3.2.3
+# Official CockroachDB SQLAlchemy dialect (cockroachdb+psycopg://) — handles CRDB
+# version-string parsing, txn retries, reflection. Runs on psycopg 3.
+sqlalchemy-cockroachdb==2.0.2
+# CA bundle for TLS verify-full (bundled libpq 14 lacks sslrootcert=system)
+certifi==2026.6.17
+
+# Migrations
+alembic==1.14.0
+
+# Config / validation
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# Deterministic placeholder embedding vectors (real embeddings arrive in Phase 2)
+numpy==2.2.1
+
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1

@@ -1,0 +1,5 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+# We drive our own loops via asyncio.run(); this just silences a cosmetic plugin warning.
+asyncio_default_fixture_loop_scope = "function"
