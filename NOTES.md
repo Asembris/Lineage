@@ -127,7 +127,42 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 - Python block-buffers stdout to a file — a long backfill shows NO output until it exits.
   Don't mistake a buffered run for a hang.
 
-### DONE so far (pre-gate): migration 0002 committed, backfill committed, curve verified.
-### NEXT (needs approval at gate): agent brain (OpenAI + vector retrieval), lifecycle
-###   spawn_child, app/services/performance.py (writes belief_performance rows), and the
-###   counterfactual staleness done-test. Do NOT start until the gate is approved.
+### Live agent (app/services/agent_brain.py + openai_client.py + embeddings.py)
+- **AVG antivirus MITMs outbound HTTPS (port 443).** It presents a cert signed by AVG's local
+  root CA (env leaks `SSLKEYLOGFILE=\\.\avgMonFltProxy\...`). That CA is in the Windows trust
+  store but NOT in certifi's bundle -> default httpx/openai fail CERTIFICATE_VERIFY_FAILED.
+  Fix: app/services/openai_client.py builds the AsyncOpenAI with an SSL context from
+  `create_default_context()` + `load_default_certs(SERVER_AUTH)` (Windows ROOT store). CRDB is
+  unaffected (port 26257, not intercepted) and keeps its own certifi handling in app/config.py.
+- Retrieval uses CRDB cosine vector search: `embedding <=> (:qvec)::VECTOR(1536)` ORDER BY,
+  over the agent's active held beliefs. Operators `<->`/`<=>`/`<#>` all work on v25.4.10.
+- Decision brain: gpt-4o-mini, strict json_schema response_format, temperature 0. is_fraud
+  (ground truth) is stored but NEVER put in the prompt. Model returns exact driving_belief_id;
+  we validate it against the retrieved candidates (no dangling refs) before persisting.
+- Live demo verified (scripts/demo_agent.py): crimson-7 APPROVED a window-7 fraud @0.95,
+  citing the origin belief — the stale-belief harm, real API call end to end.
+
+### Lifecycle (app/services/lifecycle.py)
+- spawn_child(parent) = insert child + one belief_inheritance edge per ACTIVE held belief +
+  retire parent, all in ONE `async with s.begin()` transaction (atomic). Child immediately
+  resolves in the Phase-1 lineage CTE with zero changes to it.
+
+### belief_performance (app/services/performance.py)
+- recompute_belief_performance(belief_id, windows): DELETE this belief's rows, then one row
+  per non-empty window from the SAME aggregation the backfill report used. confidence =
+  correct/total; nothing hardcoded. generation_windows() (app/sim/transactions.py) gives the
+  8 gen windows so backfill + performance bucket identically.
+
+### Phase 2 DONE (2026-07-01)
+- All 4 tests pass (2 Phase-1 + 2 Phase-2), Phase 1 untouched:
+  * test_staleness_emerges_and_recovers — COUNTERFACTUAL: seeds controlled decisions (5% fraud
+    early / 55% late) -> early conf 0.95, late 0.45; flip late is_fraud=false -> late RECOVERS
+    to 1.00. Proves staleness is DERIVED, not stored (the Phase-2 kill-shot).
+  * test_spawn_inherits_active_beliefs — spawn crimson-7 -> crimson-8, real inheritance edges,
+    child in lineage, parent retired.
+- Demos: scripts/demo_agent.py (live OpenAI verdict), scripts/demo_staleness.py (visible
+  counterfactual recovery). Both reseed first.
+- Openai==1.59.6 added to requirements. gpt-4o-mini + text-embedding-3-small.
+- NOT YET DONE (deferred / Phase 3): belief_performance is written by an explicit recompute
+  call, not yet auto-driven by a running fleet; no atomic invalidation endpoint / S3 cert /
+  Lambda yet (that's Phase 3). Do not start Phase 3 without approval.

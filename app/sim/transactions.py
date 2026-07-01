@@ -194,3 +194,16 @@ def generate_all() -> list[list[Txn]]:
     """The full seeded world: a list of per-window transaction lists (index == generation)."""
     rng = np.random.default_rng(SEED)
     return [generate_window(w, rng) for w in range(N_WINDOWS)]
+
+
+def generation_windows() -> list[tuple[dt.datetime, dt.datetime]]:
+    """The 8 (start, end) timestamp windows — one per belief-holding generation.
+
+    Shared by the backfill report and app/services/performance.py so the per-window
+    aggregation buckets identically to how the world was generated.
+    """
+    out: list[tuple[dt.datetime, dt.datetime]] = []
+    for w in range(N_WINDOWS):
+        older, newer = _window_bounds_days_ago(w)
+        out.append((BASE - dt.timedelta(days=older), BASE - dt.timedelta(days=newer)))
+    return out
