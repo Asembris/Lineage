@@ -341,11 +341,24 @@ and two AUDIT.md Part A integrity items. Explicitly NOT any of the Part C propos
 deferred). Suite is now 25 tests (18 prior + 3 read-endpoint + 3 certificate + 1 SSE
 single-flight); all 7 new tests pass, and every prior test exercising the changed code
 (atomic-invalidation ×4 with the new pre_state assertion, consistency ×3) passes.
-- **Full-suite flake reminder:** one 10-min serial full run came back 24/25 with
-  `test_arbitrary_nonfleet_actor_is_accepted` failing; it passes in isolation and is the
-  documented shared-cluster TRUNCATE-job-lag flake (Phase 3, Step 7), NOT a regression (the
-  change touches neither seeding nor the accept path). Re-running that test alone → pass. Same
-  advice as before: don't run local tests/demos while a push CI run is live.
+- **Full-suite flake — cause NOT captured, do not assume.** One 10-min serial full run came
+  back 24/25 with `test_arbitrary_nonfleet_actor_is_accepted` failing. The failing traceback
+  was lost (a `tail -20` on the run truncated it), so there is NO captured status/body for it.
+  What was subsequently established:
+    * It does NOT reproduce: passes alone; passed in a partial re-run (12/25 green, killed before
+      reaching it); passed in a targeted tail rerun `test_time_travel + test_validation` (7/7).
+    * The rate limiter is RULED OUT by construction (not by counting): `app/ratelimit.py` is a
+      persistent session-global bucket store with no conftest reset fixture, BUT the window
+      self-resets (`now - start >= window_seconds`) and this test makes exactly ONE HTTP call to
+      the `/beliefs/:id/invalidate` bucket, which sees ~3 lifetime hits across the whole suite,
+      each >60s apart — a 429 is unreachable. (Latent note: the global-with-no-reset IS real
+      test-coupling; harmless today because no route is hit ≥60x within a window, but a future
+      test that does would need an autouse limiter-reset fixture.)
+    * Not a regression from this stream: the change touches neither seeding nor the accept path.
+  Leading (UNCONFIRMED) candidate by elimination is shared-cluster reseed/AOST timing, consistent
+  with the documented TRUNCATE-job-lag gotcha (Phase 3, Step 7) — but this was NOT confirmed with
+  a captured traceback and must not be written down as the cause until it is. If it recurs,
+  capture full `--tb=long` output (never pipe the run through `tail`) before concluding.
 
 ### Read surface for the frontend (app/services/catalog.py + routers)
 - **GET /agents** — full genealogy (id, generation, bloodline, status, spawned_at, retired_at,
