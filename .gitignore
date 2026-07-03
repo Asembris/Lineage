@@ -23,4 +23,8 @@ __pycache__/
 # --- Local diagnostic output / logs ---
 *.log
 
+# --- Lambda build artifacts (rebuilt from build.py; wheels are large) ---
+lambda/*/package/
+lambda/*/*.zip
+
 

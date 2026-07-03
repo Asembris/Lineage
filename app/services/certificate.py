@@ -21,11 +21,13 @@ import hashlib
 import json
 import uuid
 
-from sqlalchemy import text
-
-from app.db import engine
-
 SCHEMA_VERSION = "1.0"
+
+# NOTE: this module is import-safe with ZERO app/SQLAlchemy dependencies at load time, so the
+# certifier Lambda can `import certificate` and reuse build_certificate/verify/storage_bytes
+# without dragging in app.config (which requires DATABASE_URL/OPENAI_API_KEY). The only DB
+# helper, gather_staleness_evidence, imports engine/text lazily inside the function; the Lambda
+# does its own sync staleness query and never calls it.
 
 
 async def gather_staleness_evidence(belief_id: uuid.UUID) -> dict:
@@ -35,6 +37,10 @@ async def gather_staleness_evidence(belief_id: uuid.UUID) -> dict:
     straight from belief_performance. If the table has no rows for this belief, returns
     {available: False} — the certificate is still valid, just without a quantified curve.
     """
+    from sqlalchemy import text
+
+    from app.db import engine
+
     async with engine.connect() as c:
         rows = (
             await c.execute(
@@ -68,10 +74,12 @@ async def gather_staleness_evidence(belief_id: uuid.UUID) -> dict:
     }
 
 
-def build_certificate(inv: dict, staleness: dict) -> dict:
+def build_certificate(inv: dict, staleness: dict, extra: dict | None = None) -> dict:
     """Assemble the certificate dict (with content_hash) from an invalidation result.
 
-    Pure function of its inputs — no I/O — so it is trivially testable.
+    Pure function of its inputs — no I/O — so it is trivially testable. `extra` merges extra
+    top-level fields (e.g. the certifier Lambda's aost_verification stamp) BEFORE hashing, so
+    they are covered by content_hash.
     """
     belief = inv["belief"]
     agents = inv["affected_agents"]
@@ -104,6 +112,8 @@ def build_certificate(inv: dict, staleness: dict) -> dict:
         # Pre-invalidation MVCC version — the AOST cross-check oracle.
         "db_snapshot_hlc": inv["snapshot_hlc"],
     }
+    if extra:
+        cert.update(extra)
     cert["content_hash"] = _digest(cert)
     return cert
 
