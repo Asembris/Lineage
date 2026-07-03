@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     # The fraud agent's scoring brain. gpt-4o-mini supports strict structured JSON output.
     chat_model: str = "gpt-4o-mini"
 
+    # Phase 3 — AWS (S3 audit certificates + Lambda). Optional: locally they come from .env;
+    # on Lambda they are absent and boto3 falls back to the execution role's default chain.
+    aws_access_key_id: str | None = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str | None = Field(default=None, alias="AWS_SECRET_ACCESS_KEY")
+    aws_region: str | None = Field(default=None, alias="AWS_REGION")
+    s3_bucket: str | None = Field(default=None, alias="S3_BUCKET")
+
     @property
     def async_database_url(self) -> str:
         """URL for the async app engine (SQLAlchemy + psycopg 3 async)."""
