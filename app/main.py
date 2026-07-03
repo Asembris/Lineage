@@ -5,6 +5,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 # Windows: psycopg async requires the selector event loop, not the default proactor.
@@ -44,6 +45,20 @@ async def rate_limit(request: Request, call_next):
             headers={"Retry-After": str(retry_after)},
         )
     return await call_next(request)
+
+
+# CORS for the Vite dev server (frontend supervisor console).
+# Registered AFTER the rate_limit middleware above: Starlette inserts each added middleware
+# at the FRONT of the stack, so the last-added is outermost. Adding CORS here therefore makes
+# it wrap the rate limiter — preflight OPTIONS and CORS headers are applied even to requests
+# the limiter would 429. Explicit dev origins (not "*"); no credentials (the API uses none).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 app.include_router(agents.router)
