@@ -26,6 +26,11 @@ numpy==2.2.1
 # scoring brain (chat completions with structured JSON output). NOT Bedrock (per CLAUDE.md).
 openai==1.59.6
 
+# Phase 3 — AWS: S3 audit certificates (real put_object) + Lambda certifier deploy.
+# CA handling for outbound 443 (AVG MITM) lives in app/services/aws_client.py, mirroring
+# the OpenAI SSL fix. Only S3 + Lambda are used, per CLAUDE.md.
+boto3==1.35.71
+
 # Tests
 pytest==8.3.4
 pytest-asyncio==0.25.0
