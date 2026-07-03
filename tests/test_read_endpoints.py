@@ -104,6 +104,32 @@ def test_list_decisions_feed_filter_and_pagination():
     asyncio.run(_run())
 
 
+def test_list_beliefs_returns_the_founding_belief():
+    async def _run():
+        try:
+            await run_seed()
+            async with _client() as client:
+                r = await client.get("/beliefs")
+                r_active = await client.get("/beliefs", params={"status": "active"})
+                r_invalid = await client.get("/beliefs", params={"status": "invalidated"})
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["count"] == 1, body
+            belief = body["beliefs"][0]
+            assert belief["id"] == str(ORIGIN)
+            assert belief["status"] == "active"
+            assert belief["originating_agent_id"] == str(CRIMSON_0)
+            assert belief["invalidated_at"] is None
+
+            # Status filter partitions cleanly (seed has exactly one active belief).
+            assert r_active.json()["count"] == 1
+            assert r_invalid.json()["count"] == 0
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_run())
+
+
 def test_list_agents_returns_full_genealogy_with_parent_edges():
     async def _run():
         try:

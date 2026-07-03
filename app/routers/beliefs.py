@@ -3,12 +3,30 @@
 import asyncio
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import InvalidateRequest, InvalidateResponse, LineageResponse
-from app.services import certificate, invalidation, lineage, s3_audit
+from app.schemas import (
+    BeliefListResponse,
+    BeliefOut,
+    InvalidateRequest,
+    InvalidateResponse,
+    LineageResponse,
+)
+from app.services import catalog, certificate, invalidation, lineage, s3_audit
 
 router = APIRouter(tags=["beliefs"])
+
+
+@router.get("/beliefs", response_model=BeliefListResponse)
+async def list_beliefs(
+    status: str | None = Query(
+        None, description="Filter by status ('active' | 'invalidated')."
+    ),
+) -> BeliefListResponse:
+    """The belief catalog for the investigate view (full list; founding beliefs are few)."""
+    rows = await catalog.list_beliefs(status=status)
+    beliefs = [BeliefOut(**r) for r in rows]
+    return BeliefListResponse(beliefs=beliefs, count=len(beliefs))
 
 
 @router.get("/beliefs/{belief_id}/lineage", response_model=LineageResponse)
