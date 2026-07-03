@@ -1,0 +1,38 @@
+/*
+ * Lineage design tokens — "forensic terminal meets genealogical record."
+ * The palette is carried over verbatim from FRONTEND.md; do not re-derive it.
+ *
+ * Discipline: the world is cold blue-grey and dead by default. Warmth
+ * (--trace / --origin) appears ONLY on an active trace path and its origin
+ * ancestor, so the two orchestrated moments land hard. --alive marks a living
+ * agent; --alert is the invalidation/fraud signal. Everything else stays quiet.
+ *
+ * Phase 1 defines the tokens only; visual design begins in Phase 2.
+ */
+:root {
+  /* Structure — cold, dead by default */
+  --void: #0a0e14; /* page background */
+  --surface: #121821; /* panels */
+  --surface-2: #1a2230; /* raised surfaces */
+  --line: #243040; /* hairline dividers, borders */
+
+  /* Text */
+  --ash: #5a6678; /* muted / disabled */
+  --ghost: #8a94a6; /* secondary text */
+  --bone: #c4cdd8; /* primary text */
+
+  /* Signal — used sparingly, earned by interaction */
+  --alive: #3fe0a8; /* a living agent */
+  --trace: #e0a23f; /* an active trace-path edge */
+  --origin: #e07b3f; /* the origin ancestor of a trace */
+  --alert: #e5484d; /* invalidation / fraud */
+  --alert-dim: #3a1518; /* alert background wash */
+
+  /* Type roles (FRONTEND.md): display sparing, body tight, data always mono.
+     Real web fonts are wired in a later phase; these carry sensible fallbacks
+     so the token names are stable now. */
+  --font-display: "Space Grotesk", "Geist", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo,
+    monospace;
+}
