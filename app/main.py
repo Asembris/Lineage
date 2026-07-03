@@ -13,7 +13,7 @@ if sys.platform == "win32":
 
 from app.db import engine  # noqa: E402
 from app.ratelimit import RateLimiter  # noqa: E402
-from app.routers import agents, beliefs, demo  # noqa: E402
+from app.routers import agents, beliefs, decisions, demo  # noqa: E402
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ async def rate_limit(request: Request, call_next):
 
 app.include_router(agents.router)
 app.include_router(beliefs.router)
+app.include_router(decisions.router)
 app.include_router(demo.router)
 
 

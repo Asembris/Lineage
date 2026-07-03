@@ -33,6 +33,77 @@ def _client() -> httpx.AsyncClient:
     )
 
 
+def _decision_rows(agent_id, n, *, base, merchant, fraud_every=0):
+    """n deterministic decisions for `agent_id`, decided_at spaced 1 minute apart."""
+    return [
+        {
+            "id": uuid.uuid4(),
+            "agent_id": agent_id,
+            "txn_ref": f"feed-{merchant}-{i:03d}",
+            "merchant": merchant,
+            "amount": 50.0 + i,
+            "verdict": "approve",
+            "driving_belief_id": ORIGIN,
+            "confidence": 0.9,
+            "decided_at": base + dt.timedelta(minutes=i),
+            "is_fraud": bool(fraud_every) and i % fraud_every == 0,
+        }
+        for i in range(n)
+    ]
+
+
+def test_list_decisions_feed_filter_and_pagination():
+    async def _run():
+        try:
+            await run_seed()  # leaves decisions empty; we insert a controlled set
+            base = dt.datetime(2026, 6, 1, tzinfo=dt.timezone.utc)
+            crimson_rows = _decision_rows(CRIMSON_7, 30, base=base, merchant="Grocery #7")
+            azure_rows = _decision_rows(
+                aid("azure-7"), 12, base=base, merchant="Fuel #A7"
+            )
+            async with engine.begin() as c:
+                await c.execute(insert(Decision), crimson_rows + azure_rows)
+
+            async with _client() as client:
+                # Fleet-wide feed (no filter): sees both agents, newest first, paginated.
+                r_all = await client.get("/decisions", params={"limit": 10})
+                # Agent-scoped: only crimson-7's history.
+                r_c7 = await client.get(
+                    "/decisions", params={"agent_id": str(CRIMSON_7), "limit": 100}
+                )
+                # Second page of the fleet feed.
+                r_page2 = await client.get(
+                    "/decisions", params={"limit": 10, "offset": 10}
+                )
+                # Out-of-range limit is a 422 (guarded by Query bounds), not a 500.
+                r_bad = await client.get("/decisions", params={"limit": 5000})
+
+            assert r_all.status_code == 200, r_all.text
+            all_body = r_all.json()
+            assert all_body["total"] == 42  # 30 + 12
+            assert all_body["agent_id"] is None
+            assert len(all_body["decisions"]) == 10  # limited page
+            # Newest first: decided_at is non-increasing across the page.
+            times = [d["decided_at"] for d in all_body["decisions"]]
+            assert times == sorted(times, reverse=True), times
+
+            c7_body = r_c7.json()
+            assert c7_body["total"] == 30
+            assert c7_body["agent_id"] == str(CRIMSON_7)
+            assert all(d["agent_id"] == str(CRIMSON_7) for d in c7_body["decisions"])
+
+            # Page 2 is disjoint from page 1 (offset works).
+            page1_ids = {d["id"] for d in all_body["decisions"]}
+            page2_ids = {d["id"] for d in r_page2.json()["decisions"]}
+            assert page1_ids.isdisjoint(page2_ids)
+
+            assert r_bad.status_code == 422, r_bad.text
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_run())
+
+
 def test_list_agents_returns_full_genealogy_with_parent_edges():
     async def _run():
         try:
