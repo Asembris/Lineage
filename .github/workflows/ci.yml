@@ -1,0 +1,45 @@
+name: CI
+
+# Sequential pytest on every push to main — matches local behaviour (no matrix, no xdist).
+# The suite runs against the real CockroachDB Cloud cluster and real S3, so it needs the
+# same secrets the app reads from .env locally (pydantic-settings reads env vars directly;
+# no .env file is needed in CI).
+on:
+  push:
+    branches: [main]
+
+# Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
+# both TRUNCATE ... CASCADE the shared cluster and collide (see NOTES Phase 3, Step 7).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Real secrets (add these in GitHub → Settings → Secrets and variables → Actions):
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      # Required only so app.config imports; NO test makes a real OpenAI call (all 18 are
+      # deterministic). A dummy value is deliberate — do NOT add the real key as a secret.
+      OPENAI_API_KEY: sk-dummy-ci-openai-not-used
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
