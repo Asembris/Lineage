@@ -145,3 +145,34 @@ async def invalidate_belief(belief_id: uuid.UUID, actor_id: uuid.UUID) -> dict:
         "affected_agent_count": len(affected_agents),
         "affected_edge_count": affected_edge_count,
     }
+
+
+async def record_certificate_result(
+    audit_id: uuid.UUID,
+    *,
+    status: str,
+    certificate_id: uuid.UUID | None = None,
+    s3_key: str | None = None,
+    content_hash: str | None = None,
+) -> None:
+    """Stamp the post-commit certificate outcome onto the audit_log row ('written'|'failed').
+
+    Separate from the invalidation txn on purpose: the S3 PUT happens after commit, so its
+    result is recorded in its own small transaction. A 'failed' status is a retriable record,
+    not a rollback of the (already durable) invalidation.
+    """
+    async with SessionLocal() as s:
+        async with s.begin():
+            await s.execute(
+                text(
+                    "UPDATE audit_log SET cert_status=:st, certificate_id=:cid, "
+                    "cert_s3_key=:key, content_hash=:h WHERE id=:id"
+                ),
+                {
+                    "st": status,
+                    "cid": certificate_id,
+                    "key": s3_key,
+                    "h": content_hash,
+                    "id": audit_id,
+                },
+            )
