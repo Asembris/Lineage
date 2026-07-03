@@ -34,6 +34,53 @@ def _parse_sse(chunk: str, buf: dict, events: list):
             buf["data"] = line[len("data:"):].strip()
 
 
+def test_sse_single_flight_rejects_a_concurrent_second_request(monkeypatch):
+    """A near-simultaneous second stream request gets a clean `busy` and does NOT reseed.
+
+    Hermetic: run_seed is patched to park the first stream inside its active section (holding
+    the single-flight flag) so we can deterministically probe with a second request. No cluster
+    access — this proves the guard, not the fan-out (which the live test above covers).
+    """
+    async def _run():
+        from app.routers import demo
+
+        gate = asyncio.Event()
+        seeded = asyncio.Event()
+        calls = {"seed": 0}
+
+        async def fake_seed():
+            calls["seed"] += 1
+            seeded.set()
+            await gate.wait()  # hold the first stream 'active' while we probe
+
+        monkeypatch.setattr(demo, "run_seed", fake_seed)
+
+        gen1 = demo._consistency_events()
+        t1 = asyncio.create_task(gen1.__anext__())
+        await asyncio.wait_for(seeded.wait(), timeout=5)  # gen1 now holds the flag
+
+        # Concurrent second request: must get busy immediately, and must NOT reseed.
+        gen2 = demo._consistency_events()
+        first = await asyncio.wait_for(gen2.__anext__(), timeout=5)
+        assert first["event"] == "busy", first
+        ended = False
+        try:
+            await gen2.__anext__()
+        except StopAsyncIteration:
+            ended = True
+        assert ended, "busy stream must terminate after the busy event"
+        assert calls["seed"] == 1, f"the busy request reseeded: {calls}"
+
+        # Tear down gen1 (still parked in fake_seed) without touching the cluster; the guard
+        # must be released so a fresh stream would be admitted again.
+        t1.cancel()
+        await asyncio.gather(t1, return_exceptions=True)
+        await gen2.aclose()
+        assert demo._stream_active is False
+
+    asyncio.run(_run())
+
+
 def test_sse_streams_real_observer_samples():
     async def _run():
         try:
