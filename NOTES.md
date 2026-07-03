@@ -275,3 +275,60 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 ### PHASE 3 COMPLETE (2026-07-03) — all 8 steps done. 11 tests pass (4 P1/2 + 4 invalidation
 ### + 3 consistency). Money-shots live: atomic closure invalidation endpoint, sha256+AOST
 ### certificate to real S3, measured atomic-vs-eventual consistency proof, certifier Lambda.
+
+## Phase 4 (LEAN) — approved 2026-07-03
+
+Scope: NOT full hardening. Just "nothing 500s embarrassingly in a live demo" + one scoped SSE
+addition + one CI workflow. Approved with an explicit correction (see actor validation below).
+
+### Validation + rate limiting (app/schemas.py, services/time_travel.py, ratelimit.py, main.py)
+- **actor_id on POST /invalidate — do NOT validate against `agents`.** Explicit design call:
+  `agents` = the supervised AI fleet (crimson/azure). The human supervisor doing the
+  invalidation is NOT a fleet agent (invalidation is THE one governed human action). So we
+  only require a well-formed, non-null identifier: `uuid.UUID` already gives well-formed, and
+  a field_validator rejects the all-zeros nil UUID (→422) so a "null identifier" can't produce
+  a dangling audit row. Real non-fleet supervisor UUIDs pass through (test proves 200). Real
+  actor referential integrity would need a dedicated supervisors/actors table — out of scope.
+- **AOST out-of-window → 400, not 500.** A well-formed `as_of` older than the GC TTL (4500s)
+  or in the future fails INSIDE CRDB at `SET TRANSACTION AS OF SYSTEM TIME`. time_travel now
+  catches that DBAPIError, matches known CRDB substrings, and re-raises ValueError → the router
+  maps it to 400. Parse errors were already 400 via normalize_as_of.
+- **Rate limiter: hand-rolled, no new dep (chose over slowapi).** Per-(IP, route-template)
+  fixed window; route template collapses UUID segments so varying the id can't dodge the limit.
+  Concurrency-safe by an `asyncio.Lock` around the read-modify-write with NO await in the
+  critical section — a naive unlocked dict would over-admit under a burst (test fires 200
+  concurrent checks at a budget of 100 and asserts EXACTLY 100 admitted). 60/min/route default,
+  /health exempt, 429 + Retry-After. Middleware in main.py.
+
+### SSE — GET /demo/consistency/stream (sse-starlette; routers/demo.py)
+- Streams the eventual fan-out's REAL observer samples live. Verified via scripts/demo_sse.py:
+  closure drains 8/8 → 7/8 → ... → 0/8 open over ~7s, SPLIT window plainly visible, then
+  ALL_INVALIDATED. Events: start / sample* / summary (+ busy). Summary reports 9 commit points
+  vs the atomic endpoint's 1.
+- **Deliberately NOT on the lineage trace** — the recursive CTE is ms, so streaming it would be
+  fake server-side pacing. The eventual fan-out has genuine multi-second timing worth streaming.
+- observe_closure gained an ADDITIVE `on_sample` callback (return value + 3 consistency tests
+  unchanged). Chose sse-starlette over hand-rolled StreamingResponse: it owns the event-stream
+  wire format, keep-alive pings, and disconnect cleanup — not worth risking a protocol bug on
+  camera.
+- **This endpoint MUTATES demo state** (reseeds, runs the fan-out to invalidation). A
+  module-level asyncio.Lock serializes concurrent streams so two reseeds can't collide on
+  TRUNCATE CASCADE; a `busy` event is sent if one is already in flight. try/finally reaps the
+  observer/fanout tasks on client disconnect (GeneratorExit). Repeatable — every run reseeds.
+
+### CI — .github/workflows/ci.yml (push to main, sequential pytest)
+- Single ubuntu job, Python 3.12, `pip install -r requirements.txt`, `pytest`. No matrix, no
+  xdist (matches local; each test reseeds, so intra-run is serial and safe).
+- **GitHub secrets required:** DATABASE_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+  AWS_REGION, S3_BUCKET. OPENAI_API_KEY is a DUMMY literal in the workflow env (needed only for
+  app.config import; no test makes a real OpenAI call) — do NOT add the real key as a secret.
+- **`concurrency: cancel-in-progress`** cancels an in-flight run when a newer push lands →
+  prevents CI-vs-CI double-TRUNCATE collision.
+- **CI-vs-LOCAL collision: DOCUMENTED, not engineered around.** There is ONE Cloud cluster, so
+  if you run tests/demos LOCALLY while a push CI run is live, both reseed the same cluster and
+  can collide (the "indexes being dropped" TRUNCATE gotcha) → a flaky run. Don't do both at
+  once. Full isolation would need a separate CI database on the cluster (a distinct
+  DATABASE_URL secret) — available if flakes ever appear, but beyond lean scope. No test-code
+  changes were needed either way.
+
+### Phase 4 (lean) status: 18 tests pass (11 prior + 6 validation/rate-limit + 1 SSE).
