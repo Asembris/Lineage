@@ -31,6 +31,11 @@ openai==1.59.6
 # the OpenAI SSL fix. Only S3 + Lambda are used, per CLAUDE.md.
 boto3==1.35.71
 
+# Phase 4 — SSE: stream the consistency proof's real observer samples live (the eventual
+# fan-out has genuine multi-second timing). sse-starlette handles the text/event-stream wire
+# format, keep-alive pings, and client-disconnect cleanup so we don't hand-roll the protocol.
+sse-starlette==2.1.3
+
 # Tests
 pytest==8.3.4
 pytest-asyncio==0.25.0

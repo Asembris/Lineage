@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -81,6 +82,7 @@ async def observe_closure(
     stop: asyncio.Event,
     interval: float = 0.01,
     ready: asyncio.Event | None = None,
+    on_sample: Callable[[str, int, int], None] | None = None,
 ) -> ObserverResult:
     """Sample the closure repeatedly until `stop`, classifying each read.
 
@@ -91,21 +93,32 @@ async def observe_closure(
     `ready` (if given) is set AFTER the connection is live and the first sample is taken — so
     a caller can gate its mutation on the observer actually sampling, not on a guessed sleep
     (CRDB Cloud's TLS handshake can outlast a short pre-delay and hide a fast strong commit).
+
+    `on_sample` (if given) is called with (classification, total, open_edges) for EVERY sample
+    as it is taken — the hook the SSE endpoint uses to stream samples live. It is additive:
+    the accumulated ObserverResult return value is unchanged, so existing callers are unaffected.
     """
     result = ObserverResult()
+
+    def _record(total: int, open_edges: int) -> None:
+        classification = classify(total, open_edges)
+        result.samples.append(classification)
+        if on_sample is not None:
+            on_sample(classification, total, open_edges)
+
     async with engine.connect() as conn:
         total, open_edges = await _closure_counts(conn, belief_id)
-        result.samples.append(classify(total, open_edges))
+        _record(total, open_edges)
         await conn.rollback()
         if ready is not None:
             ready.set()
         while not stop.is_set():
             await asyncio.sleep(interval)
             total, open_edges = await _closure_counts(conn, belief_id)
-            result.samples.append(classify(total, open_edges))
+            _record(total, open_edges)
             await conn.rollback()
         total, open_edges = await _closure_counts(conn, belief_id)
-        result.samples.append(classify(total, open_edges))
+        _record(total, open_edges)
     return result
 
 
