@@ -312,9 +312,10 @@ addition + one CI workflow. Approved with an explicit correction (see actor vali
   wire format, keep-alive pings, and disconnect cleanup — not worth risking a protocol bug on
   camera.
 - **This endpoint MUTATES demo state** (reseeds, runs the fan-out to invalidation). A
-  module-level asyncio.Lock serializes concurrent streams so two reseeds can't collide on
+  module-level single-flight guard serializes concurrent streams so two reseeds can't collide on
   TRUNCATE CASCADE; a `busy` event is sent if one is already in flight. try/finally reaps the
   observer/fanout tasks on client disconnect (GeneratorExit). Repeatable — every run reseeds.
+  (Guard hardened post-audit — see "Post-audit integrity fixes" below.)
 
 ### CI — .github/workflows/ci.yml (push to main, sequential pytest)
 - Single ubuntu job, Python 3.12, `pip install -r requirements.txt`, `pytest`. No matrix, no
@@ -332,3 +333,59 @@ addition + one CI workflow. Approved with an explicit correction (see actor vali
   changes were needed either way.
 
 ### Phase 4 (lean) status: 18 tests pass (11 prior + 6 validation/rate-limit + 1 SSE).
+
+## Pre-frontend increment (2026-07-03) — read surface + 2 post-audit integrity fixes
+
+Tightly-scoped increment before the frontend build. Addresses AUDIT.md §8 (missing read routes)
+and two AUDIT.md Part A integrity items. Explicitly NOT any of the Part C proposals (C1–C4
+deferred). Suite is now 25 tests (18 prior + 3 read-endpoint + 3 certificate + 1 SSE
+single-flight); all 7 new tests pass, and every prior test exercising the changed code
+(atomic-invalidation ×4 with the new pre_state assertion, consistency ×3) passes.
+- **Full-suite flake reminder:** one 10-min serial full run came back 24/25 with
+  `test_arbitrary_nonfleet_actor_is_accepted` failing; it passes in isolation and is the
+  documented shared-cluster TRUNCATE-job-lag flake (Phase 3, Step 7), NOT a regression (the
+  change touches neither seeding nor the accept path). Re-running that test alone → pass. Same
+  advice as before: don't run local tests/demos while a push CI run is live.
+
+### Read surface for the frontend (app/services/catalog.py + routers)
+- **GET /agents** — full genealogy (id, generation, bloodline, status, spawned_at, retired_at,
+  parent_id). NO pagination: the tree needs every node and the genealogy is bounded-small by the
+  data model. Optional `?bloodline=` / `?status=` filters. Envelope `{agents, count}`.
+- **GET /decisions** — the decision feed. `?agent_id` is OPTIONAL (design correction from the
+  approver): default is the FLEET-WIDE feed across all agents (newest first) — what the decision
+  panel renders; passing agent_id narrows to one agent's history for the investigate flow.
+  PAGINATED (decisions grows to thousands of rows): `?limit` (default 50, max 200, `Query(le=200)`
+  → guarded 422, never 500) + `?offset`, returns `{decisions, total, limit, offset, agent_id}`.
+- **GET /beliefs** — belief catalog, full list (bounded-small), optional `?status=`. Envelope
+  `{beliefs, count}`. Added `invalidated_at` (optional) to BeliefOut so the frontend can flag
+  invalidated beliefs; deposition/lineage SELECTs that don't fetch it default to null.
+- All three are current-state reads (NO AOST — that stays the deposition path), raw SQL on
+  `engine.connect()`, filters always bind params (no string interpolation). New reusable
+  `app/services/catalog.py` (list_agents / list_decisions / list_beliefs), not diagnostic scripts.
+- **Seed gotcha for tests:** `seed.seed()` leaves `decisions` EMPTY (Phase-1 genealogy only), so
+  the /decisions test inserts a controlled set via `insert(Decision)` before asserting. Also both
+  spine heads live (crimson-7 AND azure-7) + branch leaf crimson-5b = 3 alive agents; only the
+  crimson belief is seeded.
+
+### Post-audit integrity fixes
+- **Self-contained certificate (closes the undocumented 75-min gc.ttlseconds exposure — AUDIT §6
+  / Part B #3).** The cert body now carries `pre_invalidation_state`: the MEASURED "belief active,
+  whole closure open" fact, captured INSIDE the invalidation txn BEFORE the flip (endpoint path,
+  source='issue-time-read') or from the certifier Lambda's independent AOST replay
+  (source='aost-replay'). It is hash-covered, so the document proves the pre-kill world on its own.
+  AS OF SYSTEM TIME replay drops from SOLE integrity mechanism to a BONUS freshness cross-check —
+  it no longer silently loses its guarantee once the MVCC snapshot ages past the GC TTL. Mechanics:
+  invalidation.invalidate_belief captures pre-kill edge total/open in-txn and returns `pre_state`;
+  certificate.build_certificate embeds it (falls back to deriving from affected counts if a caller
+  omits it, source='derived', so the field is ALWAYS present). Hermetic test_certificate.py (pure
+  build_certificate, ZERO cluster/S3) proves present + hash-covered + tamper-evident; the live S3
+  round-trip test asserts it survives GET + hash re-verify.
+- **SSE single-flight guard (closes the _stream_lock TOCTOU — AUDIT §2).** Old guard was
+  `if _stream_lock.locked(): busy` THEN `async with _stream_lock` — two near-simultaneous requests
+  could both see the lock free, fall through, and the second would BLOCK on acquire then run a
+  surprise second reseed. Replaced with a module-level bool `_stream_active` test-and-set: a
+  synchronous read-then-write with NO await between them → atomic on the single-threaded event loop,
+  so a concurrent second request ALWAYS gets a clean `busy` and never queues a reseed. Outer
+  try/finally releases the flag on completion, run_seed error, or client disconnect. The bool
+  subsumes the old lock's reseed-serialization (only one stream runs). Hermetic test parks the first
+  stream (patched run_seed on a gate) and probes with a second, asserting busy + seed called once.
