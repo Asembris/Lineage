@@ -130,6 +130,7 @@ def lambda_handler(event: dict, context) -> dict:
 
         # 4. build + write the certificate
         staleness = _staleness(perf)
+        living = [a for a in agents if a["status"] == "alive"]
         inv = {
             "audit_id": audit["id"],
             "belief": belief,
@@ -137,9 +138,20 @@ def lambda_handler(event: dict, context) -> dict:
             "invalidated_at": belief["invalidated_at"],
             "snapshot_hlc": hlc,
             "affected_agents": agents,
-            "living_holders": [a for a in agents if a["status"] == "alive"],
+            "living_holders": living,
             "affected_agent_count": len(agents),
             "affected_edge_count": edge_count,
+            # Self-contained pre-kill record, measured INDEPENDENTLY via this Lambda's AOST
+            # replay (source='aost-replay') — the certifier's own oracle, not the app's word.
+            "pre_state": {
+                "belief_status": past_status,
+                "closure_edge_total": int(past_total),
+                "closure_edge_open": int(past_open),
+                "affected_agent_count": len(agents),
+                "living_holder_count": len(living),
+                "snapshot_hlc": hlc,
+                "source": "aost-replay",
+            },
         }
         extra = {
             "issued_by": "aws-lambda:lineage-certifier",
