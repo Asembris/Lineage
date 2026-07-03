@@ -24,6 +24,8 @@ from functools import lru_cache
 import boto3
 import certifi
 
+from app.config import get_settings
+
 
 @lru_cache(maxsize=1)
 def ca_bundle_path() -> str:
@@ -52,8 +54,21 @@ def ca_bundle_path() -> str:
 
 
 def session(region: str | None = None) -> boto3.Session:
-    """A boto3 Session pinned to AWS_REGION (or the given region)."""
-    return boto3.Session(region_name=region or os.environ.get("AWS_REGION"))
+    """A boto3 Session for this environment.
+
+    Locally, credentials come from .env via Settings (pydantic doesn't export them to
+    os.environ, so we pass them explicitly). On Lambda they are None and boto3 falls back to
+    the execution role's default credential chain.
+    """
+    s = get_settings()
+    region = region or s.aws_region or os.environ.get("AWS_REGION")
+    if s.aws_access_key_id and s.aws_secret_access_key:
+        return boto3.Session(
+            aws_access_key_id=s.aws_access_key_id,
+            aws_secret_access_key=s.aws_secret_access_key,
+            region_name=region,
+        )
+    return boto3.Session(region_name=region)
 
 
 def client(service: str, region: str | None = None):
