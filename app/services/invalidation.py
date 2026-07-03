@@ -94,6 +94,25 @@ async def invalidate_belief(belief_id: uuid.UUID, actor_id: uuid.UUID) -> dict:
             affected_agents = [dict(r) for r in closure]
             living = [a for a in affected_agents if a["status"] == "alive"]
 
+            # 2b. Snapshot the pre-kill closure edge counts, MEASURED before the flip. These
+            #     become the certificate's self-contained pre_invalidation_state — the "belief
+            #     active, whole closure open" fact recorded in the document body (hash-covered),
+            #     so the cert stands on its own even after the AOST snapshot ages past the GC
+            #     TTL. AOST replay then becomes a bonus freshness check, not the sole integrity
+            #     mechanism. (belief_status is 'active' by the guard above.)
+            edge_counts = (
+                await s.execute(
+                    text(
+                        "SELECT count(*) AS total, "
+                        "count(*) - count(invalidated_at) AS open "
+                        "FROM belief_inheritance WHERE belief_id=:b"
+                    ),
+                    {"b": belief_id},
+                )
+            ).mappings().one()
+            pre_edge_total = int(edge_counts["total"])
+            pre_edge_open = int(edge_counts["open"])
+
             # 3. Flip the belief (guarded so a lost race is a no-op, not a double write).
             await s.execute(
                 text(
@@ -144,6 +163,16 @@ async def invalidate_belief(belief_id: uuid.UUID, actor_id: uuid.UUID) -> dict:
         "living_holders": living,
         "affected_agent_count": len(affected_agents),
         "affected_edge_count": affected_edge_count,
+        # Self-contained pre-kill record for the certificate (measured before the flip).
+        "pre_state": {
+            "belief_status": "active",
+            "closure_edge_total": pre_edge_total,
+            "closure_edge_open": pre_edge_open,
+            "affected_agent_count": len(affected_agents),
+            "living_holder_count": len(living),
+            "snapshot_hlc": snapshot_hlc,
+            "source": "issue-time-read",
+        },
     }
 
 

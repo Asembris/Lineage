@@ -4,14 +4,21 @@ A certificate is a self-contained JSON document proving WHAT was invalidated, WH
 staleness evidence from belief_performance — "valid then / rotten now", never asserted), WHO
 did it, WHEN, and the full affected closure. It is PUT to S3 by s3_audit.py.
 
-Two realness proofs, no HMAC (per plan):
-  1. content_hash = sha256 over the canonical (sorted-key) JSON of every field except the hash
-     itself. The round-trip test re-reads the object from S3 and re-derives this hash.
-  2. db_snapshot_hlc pins the pre-invalidation MVCC version. Anyone can replay the cluster
-     `AS OF SYSTEM TIME db_snapshot_hlc` and independently reproduce the exact world the
-     certificate claims (belief active, this closure, this staleness). The certificate cannot
-     lie about history — CockroachDB's own time-travel is the oracle. This is why HMAC is
-     unnecessary here: the claim is externally reproducible, not merely signed.
+Integrity model (no HMAC, per plan):
+  1. SELF-CONTAINED pre-kill record. The certificate body carries pre_invalidation_state — the
+     MEASURED "belief active, whole closure open" fact captured at issue-time (inside the
+     invalidation txn, before the flip; or, for the certifier Lambda, from its independent AOST
+     replay). It is hash-covered, so the document proves what the world was immediately before
+     the kill WITHOUT depending on any external lookup. This is the primary integrity mechanism.
+  2. content_hash = sha256 over the canonical (sorted-key) JSON of every field except the hash
+     itself. The round-trip test re-reads the object from S3 and re-derives this hash — any
+     tampering with the pre-kill record (or anything else) breaks it.
+  3. db_snapshot_hlc pins the pre-invalidation MVCC version as a BONUS freshness cross-check:
+     within CockroachDB's GC window (gc.ttlseconds, ~75 min) anyone can replay the cluster
+     `AS OF SYSTEM TIME db_snapshot_hlc` and independently reproduce the same world. Once the
+     snapshot ages past the GC TTL this replay no longer resolves — which is exactly why the
+     self-contained record in (1) exists: the certificate does not silently lose its integrity
+     guarantee after 75 minutes.
 """
 
 from __future__ import annotations
@@ -84,6 +91,18 @@ def build_certificate(inv: dict, staleness: dict, extra: dict | None = None) -> 
     belief = inv["belief"]
     agents = inv["affected_agents"]
     living = inv["living_holders"]
+    # Self-contained pre-kill record (hash-covered). Callers supply it measured (endpoint:
+    # issue-time read inside the txn; Lambda: AOST replay). Fall back to deriving it from the
+    # affected counts so the field is always present and the document is never GC-dependent.
+    pre_state = inv.get("pre_state") or {
+        "belief_status": "active",
+        "closure_edge_total": inv["affected_edge_count"],
+        "closure_edge_open": inv["affected_edge_count"],
+        "affected_agent_count": inv["affected_agent_count"],
+        "living_holder_count": len(living),
+        "snapshot_hlc": inv["snapshot_hlc"],
+        "source": "derived",
+    }
     cert = {
         "schema_version": SCHEMA_VERSION,
         "certificate_id": str(uuid.uuid4()),
@@ -101,6 +120,8 @@ def build_certificate(inv: dict, staleness: dict, extra: dict | None = None) -> 
             "invalidated_at": inv["invalidated_at"],
         },
         "staleness_evidence": staleness,
+        # The self-contained pre-kill world (see module docstring, integrity mechanism #1).
+        "pre_invalidation_state": pre_state,
         "affected_closure": {
             "agent_count": inv["affected_agent_count"],
             "edge_count": inv["affected_edge_count"],

@@ -183,6 +183,13 @@ def test_certificate_round_trips_from_s3_and_hash_verifies():
             assert ev["confidence_now"] < 0.6, ev          # rotten now
             assert ev["frauds_approved_last_window"] == 110, ev
             assert fetched["affected_closure"]["agent_count"] == 9
+
+            # Self-contained pre-kill record survives the S3 round-trip (hash-covered): the
+            # cert proves the belief was active + closure fully open WITHOUT needing AOST.
+            pre = fetched["pre_invalidation_state"]
+            assert pre["belief_status"] == "active", pre
+            assert pre["closure_edge_total"] == 8 and pre["closure_edge_open"] == 8, pre
+            assert pre["source"] == "issue-time-read", pre
         finally:
             await engine.dispose()
 
