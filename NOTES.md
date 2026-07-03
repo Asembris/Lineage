@@ -245,14 +245,33 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 
 ### Full regression: 11 tests pass (4 Phase-1/2 + 4 atomic-invalidation + 3 consistency).
 
-### Step 8 — certifier Lambda: BLOCKED on the execution-role ARN (see step 1 gate)
-- Needs the account owner to create `lineage-certifier-role` (trust: lambda.amazonaws.com;
-  policies: AWSLambdaBasicExecutionRole + inline s3:PutObject/GetObject on the bucket) and
-  hand back the ARN. lineage-app can then create/update the FUNCTION against that role without
-  new IAM perms. Scope: certifier re-verifies the closure AS OF SYSTEM TIME db_snapshot_hlc
-  from AWS compute + writes the signed cert to S3. Plain-zip deploy; MUST build psycopg on
-  manylinux (Windows .venv wheels won't run on Lambda) — Docker public.ecr.aws/lambda/python:
-  3.12. No VPC (public egress to 26257). DB creds default: DATABASE_URL as encrypted Lambda
-  env var. Do NOT route around the IAM gap — it's a console fix.
+### Step 8 — certifier Lambda DONE (2026-07-03)
+- Role provided by owner: `arn:aws:iam::265243686715:role/lineage-certifier-role`
+  (AWSLambdaBasicExecutionRole + inline s3:PutObject/GetObject on the bucket). lineage-app
+  created the FUNCTION against it with no new IAM perms — the gate fix worked as planned.
+- **Standalone independent auditor** (endpoint UNTOUCHED): invoke with {belief_id}; reads
+  audit_log for snapshot_hlc, replays AS OF SYSTEM TIME to confirm belief active + closure
+  8/8 open BEFORE the kill, builds the cert (+ hash-covered aost_verification stamp), PUTs to
+  S3, stamps audit_log cert_status='written'. lambda/certifier/{handler,build,deploy}.py.
+- **certificate.py made import-safe**: top-level app/SQLAlchemy imports moved lazily inside
+  gather_staleness_evidence, so the Lambda can `import certificate` with zero app deps
+  (app.config requires OPENAI_API_KEY/DATABASE_URL — would crash on Lambda). build_certificate
+  gained `extra` (merged BEFORE hashing). Endpoint path unchanged, still tested.
+- **Packaging (no Docker):** pip install --platform manylinux2014_x86_64 --only-binary=:all:
+  --python-version 3.12 --implementation cp psycopg[binary]==3.2.3 certifi. Pulls the
+  cp312-manylinux2014_x86_64 psycopg-binary wheel; zip carries real x86_64-linux-gnu .so
+  (4.7 MB, direct upload). boto3 NOT packed (in the runtime). Docker was the named fallback,
+  not needed. AWS CLI absent -> boto3 deploy (create_function / update_function_code+config).
+- **TLS verify-full from Lambda worked FIRST TRY** — the flagged risk (Linux libpq finding a
+  CA for CRDB Cloud) was pre-empted by packaging certifi + passing sslrootcert=certifi.where()
+  to psycopg.connect (mirrors the app's Windows fix). No sslmode downgrade.
+- Handler is SYNC psycopg 3 (no asyncio); AOST via autocommit=False + first-statement
+  SET TRANSACTION AS OF SYSTEM TIME {hlc} (hlc inlined, validated numeric — our own value).
+- Real invocation (scripts/demo_certifier.py): aost_verified=true, cert in S3, sha256
+  re-verified after GET, audit_log.cert_status=written. DATABASE_URL/S3_BUCKET = encrypted
+  Lambda env vars. Build artifacts (package/, *.zip) gitignored — rebuild via build.py.
+- Redeploy: `python lambda/certifier/build.py && python lambda/certifier/deploy.py`.
 
-### Step 9 — docs (this section + CLAUDE.md phase marker).
+### PHASE 3 COMPLETE (2026-07-03) — all 8 steps done. 11 tests pass (4 P1/2 + 4 invalidation
+### + 3 consistency). Money-shots live: atomic closure invalidation endpoint, sha256+AOST
+### certificate to real S3, measured atomic-vs-eventual consistency proof, certifier Lambda.
