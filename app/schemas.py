@@ -21,6 +21,9 @@ class BeliefOut(BaseModel):
     status: str
     originating_agent_id: uuid.UUID
     formed_at: dt.datetime
+    # Optional so read paths that don't select it (deposition / lineage) default cleanly;
+    # GET /beliefs selects it so the frontend can flag invalidated beliefs.
+    invalidated_at: dt.datetime | None = None
 
 
 class AgentBeliefsResponse(BaseModel):
@@ -79,3 +82,57 @@ class InvalidateResponse(BaseModel):
     certificate_s3_key: str | None
     certificate_status: str  # 'written' | 'failed'
     content_hash: str | None
+
+
+# --- Frontend read surface (list endpoints) -----------------------------------
+
+
+class AgentGenealogyOut(BaseModel):
+    """One agent with the genealogy fields the frontend needs to render the tree.
+
+    `parent_id` is the tree edge; generation/bloodline/status drive node rendering.
+    """
+
+    id: uuid.UUID
+    generation: int
+    bloodline: str
+    status: str
+    spawned_at: dt.datetime
+    retired_at: dt.datetime | None
+    parent_id: uuid.UUID | None
+
+
+class AgentListResponse(BaseModel):
+    # Full list, no pagination: the genealogy is bounded-small by design and the tree
+    # needs every node at once.
+    agents: list[AgentGenealogyOut]
+    count: int
+
+
+class DecisionOut(BaseModel):
+    id: uuid.UUID
+    agent_id: uuid.UUID
+    txn_ref: str
+    merchant: str
+    amount: float
+    verdict: str
+    driving_belief_id: uuid.UUID | None
+    confidence: float
+    decided_at: dt.datetime
+    is_fraud: bool
+
+
+class DecisionListResponse(BaseModel):
+    # Paginated: decisions grows to thousands of rows. `agent_id` filter is OPTIONAL —
+    # default is the fleet-wide feed (all agents), narrowing to one agent when provided.
+    decisions: list[DecisionOut]
+    total: int
+    limit: int
+    offset: int
+    agent_id: uuid.UUID | None
+
+
+class BeliefListResponse(BaseModel):
+    # Full list, no pagination: founding beliefs are bounded-small by the data model.
+    beliefs: list[BeliefOut]
+    count: int
