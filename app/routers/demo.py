@@ -9,8 +9,9 @@ Deliberately NOT applied to the lineage trace: that recursive CTE returns in mil
 streaming it would be fake server-side pacing. The trace stays a single request.
 
 This endpoint MUTATES demo state (it reseeds, then runs the eventual fan-out to invalidation).
-A module-level lock serializes concurrent stream requests so two reseeds can't collide on
-TRUNCATE ... CASCADE (see NOTES Phase 3, Step 7). Every run reseeds first, so it is repeatable.
+A module-level single-flight guard admits only one stream at a time so two reseeds can't
+collide on TRUNCATE ... CASCADE (see NOTES Phase 3, Step 7). Every run reseeds first, so it is
+repeatable.
 """
 
 from __future__ import annotations
@@ -31,9 +32,14 @@ router = APIRouter(tags=["demo"])
 ORIGIN = bid("origin")
 ACTOR = aid("crimson-7")  # a living holder standing in as the invalidating supervisor
 
-# Serialize concurrent stream requests: each one reseeds, and two overlapping TRUNCATE CASCADE
-# reseeds collide on CRDB (indexes being dropped). One stream at a time is the right demo model.
-_stream_lock = asyncio.Lock()
+# Single-flight guard: each stream reseeds, and two overlapping TRUNCATE CASCADE reseeds
+# collide on CRDB (indexes being dropped). One stream at a time is the right demo model.
+# A plain module-level bool, NOT an asyncio.Lock: the test-and-set below is a synchronous
+# read-then-write with no await between them, so it is atomic on the single-threaded event
+# loop. A near-simultaneous second request therefore ALWAYS sees the flag set and gets a
+# clean `busy` — it can never fall through and queue behind the lock (the TOCTOU an
+# `if lock.locked(): ... ; async with lock:` pair leaves open).
+_stream_active = False
 
 
 def _sse(event: str, payload: dict) -> dict:
@@ -41,13 +47,15 @@ def _sse(event: str, payload: dict) -> dict:
 
 
 async def _consistency_events():
-    # If a stream is already running, don't queue behind it (and don't reseed under it) —
-    # tell the client cleanly and stop. Tiny TOCTOU is harmless for a single-operator demo.
-    if _stream_lock.locked():
+    global _stream_active
+    # Single-flight test-and-set (see the _stream_active note above). If a stream is already
+    # running, tell the client cleanly and stop — never queue behind it, never reseed under it.
+    if _stream_active:
         yield _sse("busy", {"detail": "a consistency stream is already running; retry shortly"})
         return
+    _stream_active = True
 
-    async with _stream_lock:
+    try:
         await run_seed()
 
         queue: asyncio.Queue = asyncio.Queue()
@@ -138,6 +146,10 @@ async def _consistency_events():
                         await task
                     except (asyncio.CancelledError, Exception):  # noqa: BLE001
                         pass
+    finally:
+        # Release the single-flight guard so the next stream can run (also on run_seed error
+        # or client disconnect before the inner try was entered).
+        _stream_active = False
 
 
 @router.get("/demo/consistency/stream")
