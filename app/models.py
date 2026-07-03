@@ -87,6 +87,10 @@ class BeliefInheritance(Base):
         Uuid, ForeignKey("agents.id"), nullable=False
     )
     inherited_at: Mapped[dt.datetime] = mapped_column(_TS, nullable=False)
+    # Phase 3 — per-holder closure revocation. The atomic invalidation flips every edge
+    # of a belief in ONE set-based UPDATE. NULL = the holder still holds it (active).
+    invalidated_at: Mapped[dt.datetime | None] = mapped_column(_TS, nullable=True)
+    invalidated_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
 
 
 class Decision(Base):
@@ -124,3 +128,31 @@ class BeliefPerformance(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     false_positive_rate: Mapped[float] = mapped_column(Float, nullable=False)
     frauds_approved: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class AuditLog(Base):
+    """Phase 3 — every consequential action logged (who invalidated what, when).
+
+    Written atomically with the invalidation. The S3 certificate pointer/hash are filled in
+    after the post-commit PUT; commit_hlc pins the MVCC version the certificate re-verifies
+    against with AS OF SYSTEM TIME.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, **_UUID_PK)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    actor: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    belief_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("beliefs.id"), nullable=True
+    )
+    affected_agent_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    affected_edge_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    commit_hlc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    certificate_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    cert_s3_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cert_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'pending'")
+    )
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(_TS, nullable=False)
