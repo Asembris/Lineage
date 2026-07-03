@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class AgentOut(BaseModel):
@@ -49,7 +49,19 @@ class LineageResponse(BaseModel):
 
 
 class InvalidateRequest(BaseModel):
-    actor_id: uuid.UUID  # the supervisor / agent authorizing the invalidation
+    # The human supervisor authorizing the invalidation. NOT a fleet agent (agents = the
+    # supervised AI fleet), so it is intentionally NOT checked against the agents table.
+    # Lean Phase 4 only requires a well-formed, non-null identifier: the uuid.UUID type gives
+    # well-formed/non-null, and this validator rejects the all-zeros nil UUID sentinel so a
+    # "null identifier" cannot masquerade as a real actor and produce a dangling audit row.
+    actor_id: uuid.UUID
+
+    @field_validator("actor_id")
+    @classmethod
+    def _reject_nil(cls, v: uuid.UUID) -> uuid.UUID:
+        if v.int == 0:
+            raise ValueError("actor_id must be a non-nil identifier")
+        return v
 
 
 class InvalidateResponse(BaseModel):
