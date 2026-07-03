@@ -1,13 +1,28 @@
-"""GET /agents/{id}/beliefs?as_of=  — real AS OF SYSTEM TIME deposition."""
+"""Agent endpoints — genealogy list + AS OF SYSTEM TIME deposition."""
 
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import AgentBeliefsResponse
-from app.services import time_travel
+from app.schemas import AgentBeliefsResponse, AgentGenealogyOut, AgentListResponse
+from app.services import catalog, time_travel
 
 router = APIRouter(tags=["agents"])
+
+
+@router.get("/agents", response_model=AgentListResponse)
+async def list_agents(
+    bloodline: str | None = Query(None, description="Filter to one bloodline."),
+    status: str | None = Query(None, description="Filter by status ('alive' | 'dead')."),
+) -> AgentListResponse:
+    """The full genealogy — every agent with its parent edge — for the tree view.
+
+    Returned in full (no pagination): rendering the tree needs every node, and the
+    genealogy is bounded-small by the data model.
+    """
+    rows = await catalog.list_agents(bloodline=bloodline, status=status)
+    agents = [AgentGenealogyOut(**r) for r in rows]
+    return AgentListResponse(agents=agents, count=len(agents))
 
 
 @router.get("/agents/{agent_id}/beliefs", response_model=AgentBeliefsResponse)
