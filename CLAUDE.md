@@ -48,7 +48,7 @@ We are building in phases. **Do not implement future-phase work.** Ask before cr
   - `GET /beliefs/{id}/lineage` — traverse `belief_inheritance` backward to the origin, return ordered path.
   Phase 1 is DONE when both endpoints return real data from a real cluster and a test proves the time-travel query returns different results before vs after a state change.
 - **Phase 2 (LATER) — agents.** OpenAI/LangGraph fraud agent, lifecycle (spawn→inherit→act→retire), `belief_performance` populated from real outcomes. Do not start until Phase 1 is verified.
-- **Phase 3 (LATER) — money-shots.** Atomic invalidation endpoint + S3 certificate, consistency-vs-eventual-consistency proof, Lambda.
+- **Phase 3 (IN PROGRESS) — money-shots.** Atomic invalidation endpoint + S3 certificate, consistency-vs-eventual-consistency proof, Lambda. Steps 1-7 DONE & pushed (migration 0003 closure state + audit_log; POST /beliefs/{id}/invalidate = one serializable txn closing the whole belief_inheritance closure; sha256+AOST-reproducible S3 certificate with real staleness evidence; measured atomic-vs-eventual proof + deterministic leaked-fraud). 11 tests pass. Step 8 (certifier Lambda) BLOCKED on the account owner creating the Lambda execution role — the scoped IAM user is denied iam:CreateRole (see NOTES.md "Phase 3 / Step 8"). Step 9 = docs.
 - **Phase 4 (LATER) — hardening.** DTO validation, rate limiting, audit completeness, observability.
 - **Phases 5–7 (LATER) — frontend, integration, 3-min video.**
 
