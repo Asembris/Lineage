@@ -166,3 +166,93 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 - NOT YET DONE (deferred / Phase 3): belief_performance is written by an explicit recompute
   call, not yet auto-driven by a running fleet; no atomic invalidation endpoint / S3 cert /
   Lambda yet (that's Phase 3). Do not start Phase 3 without approval.
+
+## Phase 3
+
+### Plan (approved 2026-07-03)
+- Approved: reuse belief_inheritance for the closure state (per-edge revocation — the
+  constitution's own wording says the closure is "via belief_inheritance"; NOT a new fleet
+  table, NOT a single-row belief flip which wouldn't exercise cross-key atomic txns).
+  Certifier-only Lambda. Cert integrity = sha256 + AOST-reproducibility (no HMAC — the AOST
+  cross-check is the stronger proof). Leaked-fraud proof uses the Phase-2 DETERMINISTIC
+  predicate (matches_target), not live OpenAI (avoids flaky API calls in a timing test).
+  Plain-zip Lambda deploy, no IaC. Sequenced steps 1-9, gate hard at step 1.
+
+### Step 1 — AWS probe GATE (scripts/probe_aws.py)
+- **AVG antivirus MITMs boto3 too** (same 443 interception as OpenAI in Phase 2). Fix lives
+  in app/services/aws_client.py: merge certifi + the Windows ROOT store (which holds AVG's
+  installed CA) into one PEM bundle, point botocore's `verify` at it. Real TLS verification,
+  never verify=False. No-op on Linux (Lambda) — enum_certificates is Windows-only there.
+- **Gate result:** creds OK (arn user/lineage-app, acct 265243686715); S3 head-bucket +
+  PUT/GET/DELETE round-trip OK; lambda:ListFunctions OK; **iam:CreateRole DENIED**. So the
+  Lambda EXECUTION ROLE cannot be created from this IAM user — needs a console-level fix by
+  the account owner. This blocks ONLY step 8. Steps 2-7 use the S3 creds directly, unblocked.
+- AWS config flows through Settings (pydantic reads .env but does NOT export to os.environ, so
+  boto3 couldn't see the creds); aws_client passes them explicitly when present, else falls
+  back to the default chain (for Lambda's execution role). Optional fields, default None.
+- boto3==1.35.71 added to requirements.
+
+### Step 2 — migration 0003 (applied to live cluster, committed)
+- belief_inheritance.invalidated_at / invalidated_by (per-holder closure revocation — the
+  MULTI-ROW target that makes the atomic txn load-bearing). + audit_log table (actor,
+  affected counts, commit_hlc, cert pointer/status/hash, created_at). Lineage CTE stays
+  UNFILTERED so provenance/trace still fully resolve (annotate revocation, never delete).
+
+### Step 3 — atomic invalidation (app/services/invalidation.py)
+- invalidate_belief(): ONE serializable txn. FOR UPDATE the belief (idempotency guard ->
+  AlreadyInvalidated), then SET-BASED UPDATEs (beliefs + `UPDATE belief_inheritance ... WHERE
+  belief_id=X`) — all holders at once, NO per-holder loop. audit_log written in the same txn.
+- **Snapshot-HLC subtlety:** cluster_logical_timestamp() is captured on a SEPARATE read
+  connection BEFORE the write txn opens. HLC is monotonic => strictly earlier than the commit
+  ts. If captured INSIDE the write txn it could equal the commit ts (MVCC reads at exactly ts
+  see writes at ts) and the certificate's "belief was active before" AOST proof would be
+  circular. Verified: AOST @ snapshot_hlc shows active / all-8-edges-open.
+
+### Step 4 — certificate + S3 (certificate.py, s3_audit.py)
+- Cert JSON: belief before/after, staleness_evidence pulled from REAL belief_performance
+  (first vs last window confidence + last-window frauds_approved — valid-then/rotten-now,
+  never asserted), affected_closure, db_snapshot_hlc, content_hash = "sha256:" + hexdigest
+  over canonical (sorted-key) JSON minus the hash. verify() re-derives it.
+- s3_audit put/get via real boto3 (asyncio.to_thread from the async endpoint). POST-COMMIT
+  side effect: a failed PUT marks audit_log.cert_status='failed', never rolls back the durable
+  invalidation. Smoke: PUT->GET round-trip re-verifies the hash; AOST@db_snapshot_hlc active.
+
+### Step 5 — POST /beliefs/{id}/invalidate (routers/beliefs.py)
+- Orchestrates invalidate -> gather staleness -> build cert -> put (to_thread) -> stamp
+  audit_log. BeliefNotFound->404, AlreadyInvalidated->409. Response carries the cert outcome.
+
+### Step 6 — tests/test_atomic_invalidation.py (4 pass, ~132s, live cluster + real S3)
+- atomic closure (all 8 edges flip, 0 open, audit counts right) / idempotent (2nd raises,
+  1 audit row) / cert S3 round-trip + hash re-verify / **AOST reproducibility**: cert's
+  db_snapshot_hlc replays AS OF SYSTEM TIME to reproduce the pre-kill world (active,
+  all-open) — CRDB time-travel is the oracle, so the cert can't lie about history.
+
+### Step 7 — consistency proof (app/services/consistency.py, test + demo)
+- eventual_invalidate = per-holder fan-out baseline (N+1 separate commits, per-holder delay
+  models fan-out latency). observe_closure = concurrent sampler classifying ALL_ACTIVE /
+  SPLIT / ALL_INVALIDATED. Measured: strong = 1 commit / 0 split samples (transition still
+  witnessed); eventual = 9 commits / split samples observed. Delay-FREE fact: 1 vs 9 commit
+  points => split state unreachable vs reachable. Leaked-fraud (deterministic matches_target,
+  per-holder edge view): a committed mid-fan-out state => crimson-7 APPROVES the fraud while
+  crimson-5b BLOCKS; the atomic correction erases that state. 3 tests pass.
+- **Observer flake fixed:** observer sets a `ready` event after its connection is live + first
+  sample; the strategy gates on it. Otherwise CRDB Cloud's ~1s TLS handshake outlasts a
+  guessed pre-delay and the observer misses a fast strong commit (all samples ALL_INVALIDATED).
+- **CRDB gotcha:** two concurrent `TRUNCATE ... CASCADE` (I accidentally double-ran the demo)
+  -> "cannot perform TRUNCATE on decisions which has indexes being dropped" (TRUNCATE drops/
+  recreates indexes; overlapping jobs collide). Transient; clears when the schema-change job
+  settles. Don't run two reseeds at once.
+
+### Full regression: 11 tests pass (4 Phase-1/2 + 4 atomic-invalidation + 3 consistency).
+
+### Step 8 — certifier Lambda: BLOCKED on the execution-role ARN (see step 1 gate)
+- Needs the account owner to create `lineage-certifier-role` (trust: lambda.amazonaws.com;
+  policies: AWSLambdaBasicExecutionRole + inline s3:PutObject/GetObject on the bucket) and
+  hand back the ARN. lineage-app can then create/update the FUNCTION against that role without
+  new IAM perms. Scope: certifier re-verifies the closure AS OF SYSTEM TIME db_snapshot_hlc
+  from AWS compute + writes the signed cert to S3. Plain-zip deploy; MUST build psycopg on
+  manylinux (Windows .venv wheels won't run on Lambda) — Docker public.ecr.aws/lambda/python:
+  3.12. No VPC (public egress to 26257). DB creds default: DATABASE_URL as encrypted Lambda
+  env var. Do NOT route around the IAM gap — it's a console fix.
+
+### Step 9 — docs (this section + CLAUDE.md phase marker).
