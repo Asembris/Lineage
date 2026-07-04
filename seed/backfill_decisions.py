@@ -25,6 +25,7 @@ Run:  PYTHONPATH=. .venv/Scripts/python.exe seed/backfill_decisions.py
 import asyncio
 import datetime as dt
 import sys
+import time
 from decimal import Decimal
 
 import numpy as np
@@ -123,16 +124,38 @@ async def backfill() -> None:
 
     world = generate_all()
     rng = np.random.default_rng(_POLICY_SEED)
-    decisions: list[Decision] = []
+
+    # Insert per generation-window with a FLUSHED heartbeat. Rationale: the bulk insert is
+    # the slow, silent phase (server-default UUID PKs force per-row INSERT...RETURNING over
+    # the Cloud link — minutes, not seconds), and Python block-buffers stdout, so a single
+    # big commit looks identical whether it's crawling or dead. A per-window line with
+    # flush=True gives a visible pulse; each window is its own small commit so a stall is
+    # localized and its progress survives. RNG draw order is unchanged (window-major, same
+    # inner txn order), so the deterministic decay curve is byte-for-byte identical.
+    total = 0
+    n_windows = len(world)
+    t0 = time.perf_counter()
+    print(
+        f"\n=== INSERTING decisions across {n_windows} windows "
+        f"(per-window heartbeat; bulk insert over Cloud is slow, this is normal) ===",
+        flush=True,
+    )
     for w, txns in enumerate(world):
-        for txn in txns:
-            decisions.append(_decision_from(txn, w, rng))
+        window_decisions = [_decision_from(txn, w, rng) for txn in txns]
+        t_win = time.perf_counter()
+        async with SessionLocal() as s:
+            s.add_all(window_decisions)
+            await s.commit()
+        total += len(window_decisions)
+        print(
+            f"  window {w}/{n_windows - 1}: +{len(window_decisions):>4} rows"
+            f" (total {total:>4})  window {time.perf_counter() - t_win:5.1f}s"
+            f"  elapsed {time.perf_counter() - t0:6.1f}s",
+            flush=True,
+        )
 
-    async with SessionLocal() as s:
-        s.add_all(decisions)
-        await s.commit()
-
-    await report(len(decisions))
+    print(f"=== insert phase done: {total} rows in {time.perf_counter() - t0:.1f}s ===", flush=True)
+    await report(total)
 
 
 async def report(total: int) -> None:
