@@ -402,3 +402,69 @@ single-flight); all 7 new tests pass, and every prior test exercising the change
   try/finally releases the flag on completion, run_seed error, or client disconnect. The bool
   subsumes the old lock's reseed-serialization (only one stream runs). Hermetic test parks the first
   stream (patched run_seed on a gate) and probes with a second, asserting busy + seed called once.
+
+## Frontend Phase 2 — the console shell (2026-07-04)
+
+NOTE: "Frontend Phase 2" is the FRONTEND phase ladder in FRONTEND.md (scaffold → shell →
+interactions → …), NOT the backend's Phase 2 (agents/OpenAI) above. Different ladders; do
+not conflate the numbers. Backend is frozen this phase except nothing — no backend changes.
+
+### Scope
+- The three-region console shell (decision feed / genealogy tree / inspector), populated with
+  REAL data from GET /agents, /decisions, /beliefs. Purely presentational: NO interactions
+  (investigate/trace/time-travel/invalidate are Frontend Phase 3), no motion, no color warmth
+  (warmth stays reserved for the Phase-3 trace so it lands hard). Tokens reused from tokens.css,
+  not re-derived. No new frontend dependencies (framer-motion/lenis/r3f are later phases).
+- Built in 3 stages, committed each: A shell+data layer, B the SVG tree (checkpoint), C feed+
+  inspector.
+
+### Stage A — shell + data layer (committed)
+- `src/hooks/useConsoleData.ts` fires the 3 reads in PARALLEL as independent Loadable slots
+  (loading|error|ready) so one slow/failed source degrades locally instead of blanking the shell.
+- `src/App.tsx` = CSS-grid shell: header (fleet summary "N alive / N agents") + 3 regions
+  `[feed | tree | inspector]`, `height:100vh; overflow:hidden`, each panel scrolls its own body.
+  `src/components/Panel.tsx` = shared chrome (`Panel` + `Loaded<T>` render-prop for the states).
+- Replaced the Phase-1 throwaway proof in App.tsx/App.css.
+
+### Stage B — genealogy SVG tree (committed; CHECKPOINT stage)
+- `src/lib/treeLayout.ts` = pure, React-free layout. gen→x (col), bloodline→band, main line on
+  lane 0 with offshoots below. **Lane rule is data-driven, no name parsing:** the "main child" =
+  child with the MOST descendants keeps the parent's lane (so the spine reaching gen 7 stays on
+  lane 0); other children drop to the first free lane (tracked by (lane,gen) occupancy so
+  offshoots at distinct gens share lane 1). Bands ordered most-alive-first (crimson on top: 2
+  living holders vs azure's 1). Edges = every real parent→child link; branch = lane-changing edge.
+- **The API has NO agent-name field** (AgentGenealogy = id/generation/bloodline/status/parent_id).
+  So a node's identity is its real generation digit (in the circle) + a real 6-char UUID fragment
+  below. We do NOT print the seed's "crimson-5b" — that string isn't in any API response, and
+  FRONTEND.md forbids fabricated labels.
+- `GenealogyTree.tsx` + `.css`: SVG scales to the region via `viewBox`+`preserveAspectRatio
+  =xMidYMid meet` → fits without scrolling at 1280/1440/1920. Dead = hollow --ash circle; alive =
+  --alive ring + halo + brightened gen/id. Bloodlines distinguished by band+label ONLY (no color —
+  keeps the world cold). Branch edges dashed, spine edges solid. HTML legend overlay (alive/dead/
+  branch). Gen axis 0..7 at the bottom.
+
+### Stage B self-critique vs FRONTEND.md (screenshots at 1280/1440/1920, headless chromium)
+- PASS: forensic/clinical/cold (mono ids on a cold grid, banded records); warmth-free (only
+  --alive on the 3 living nodes); static SVG; dead-vs-alive strongly distinct; generational and
+  no-scroll at all three widths; topology correct (crimson spine 0-7 + offshoots @2,3,5,6 with the
+  living branch at gen5; azure mirror, all azure offshoots dead).
+- **crimson-5b (the 2nd living belief-holder) reads clearly in the secondary lane** — user's flagged
+  concern. It gets the SAME alive emphasis (ring+halo+bright label) as the gen-7 spine tips, so it
+  never reads as a minor branch. Verified in all 3 shots.
+- Minor/accepted: (1) vertical whitespace — the wide-short tree centers in a tall column, leaving
+  calm negative space; kept centered (reads more balanced than top-anchored). More prominent at
+  1920. (2) branch edges are faint cold dashed; the edge to the living crimson-5b is subtle by
+  design — Phase-3 trace warmth is the right place to emphasize it, not Phase 2. (3) fonts are the
+  token FALLBACK stack (Space Grotesk/Inter/JetBrains Mono not yet self-hosted) — FRONTEND.md
+  defers real web fonts to a later phase.
+
+### Cluster/tooling notes
+- **/decisions is EMPTY on the cluster right now** (agents=24, beliefs=1, decisions=0). seed.seed()
+  leaves decisions empty; the Phase-2/3 backfill wasn't re-run. The feed renders an honest "no
+  decisions" empty state. Rerun `python -m seed.backfill_decisions` before evaluating Stage C.
+- **Vite dev server binds to `localhost` (IPv6 ::1), NOT 127.0.0.1** — curl/playwright must use
+  `http://localhost:5173`. Backend CORS allowlist is exactly localhost:5173 + 127.0.0.1:5173
+  (app/main.py), so the dev server MUST be on 5173 or fetches CORS-fail.
+- Screenshots: no repo dep added. Playwright installed in the scratchpad (`--no-save`); full
+  chromium via `chromium.launch({ channel: 'chromium' })` (the default headless path wanted the
+  chrome-headless-shell build which wasn't present). Script: scratchpad/shot.mjs.

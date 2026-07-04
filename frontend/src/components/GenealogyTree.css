@@ -1,0 +1,151 @@
+/*
+ * Genealogy tree — SVG styling via classes so every color stays a token. Cold
+ * palette throughout; --alive is the only signal, reserved for living agents.
+ */
+
+.tree {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 0.75rem 1rem 0.5rem;
+}
+
+.tree__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* --- Edges ---------------------------------------------------------------- */
+
+.tree__edge {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.tree__edge--branch {
+  stroke: var(--line);
+  stroke-dasharray: 3 4;
+}
+
+/* --- Nodes ---------------------------------------------------------------- */
+
+.tree__dot {
+  fill: var(--surface-2);
+  stroke: var(--ash);
+  stroke-width: 1.5;
+}
+
+.tree__gen {
+  fill: var(--ash);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.tree__id {
+  fill: var(--ghost);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-anchor: middle;
+}
+
+/* Living agents — the only warmth-free signal color in the cold tree. Halo +
+   brighter ring + brighter label make an alive node pop regardless of its lane,
+   so a living off-line belief-holder never reads as a minor branch. */
+.tree__node--alive .tree__dot {
+  fill: var(--surface-2);
+  stroke: var(--alive);
+  stroke-width: 2.5;
+}
+
+.tree__halo {
+  fill: none;
+  stroke: var(--alive);
+  stroke-width: 1.5;
+  opacity: 0.4;
+}
+
+.tree__node--alive .tree__gen {
+  fill: var(--alive);
+}
+
+.tree__node--alive .tree__id {
+  fill: var(--bone);
+}
+
+/* --- Band labels + axis --------------------------------------------------- */
+
+.tree__band-label {
+  fill: var(--ash);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.tree__axis-rule {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.tree__axis-caption {
+  fill: var(--ash);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-anchor: start;
+}
+
+.tree__axis-label {
+  fill: var(--ash);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* --- Legend (HTML overlay, crisp text) ------------------------------------ */
+
+.tree__legend {
+  position: absolute;
+  top: 0.9rem;
+  right: 1.1rem;
+  display: flex;
+  gap: 1rem;
+  font-size: 0.72rem;
+  color: var(--ghost);
+  font-family: var(--font-mono);
+}
+
+.tree__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tree__key {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.tree__key--alive {
+  border: 2px solid var(--alive);
+  background: var(--surface-2);
+}
+
+.tree__key--dead {
+  border: 1.5px solid var(--ash);
+  background: var(--surface-2);
+}
+
+.tree__key--branch {
+  width: 16px;
+  height: 0;
+  border-radius: 0;
+  border-top: 1.5px dashed var(--ash);
+}
