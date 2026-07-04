@@ -1,94 +1,149 @@
-/* Phase 1 connectivity proof — deliberately plain. Tokens only, no design pass
-   (that's Phase 2). Just legible enough to read the real data on --void. */
+/*
+ * Console shell — Frontend Phase 2. The three-region layout chrome only.
+ * Cold by default (--void ground, --surface panels, --line hairlines); no warmth,
+ * no motion (both reserved for Phase 3). Full viewport, no page scroll — each panel
+ * scrolls its own body. All values come from tokens.css; nothing re-derived here.
+ */
 
-.proof {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem;
+.console {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--void);
 }
 
-.proof__head {
+/* --- Header bar ----------------------------------------------------------- */
+
+.console__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
+  background: var(--surface);
 }
 
-.proof__title {
+.console__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.console__title {
   font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
   margin: 0;
-}
-
-.proof__sub {
-  color: var(--ghost);
-  margin: 0.25rem 0 0;
-  font-size: 0.9rem;
-}
-
-.proof__status {
-  color: var(--ghost);
-  margin: 0 0 1rem;
-}
-
-.proof__error {
-  background: var(--alert-dim);
-  border: 1px solid var(--alert);
-  border-radius: 6px;
-  padding: 1rem 1.25rem;
   color: var(--bone);
 }
 
-.proof__error strong {
-  color: var(--alert);
-}
-
-.proof__hint {
-  color: var(--ghost);
-  font-size: 0.85rem;
-}
-
-.proof__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.proof__table th {
-  text-align: left;
-  color: var(--ash);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.console__tagline {
   font-size: 0.72rem;
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid var(--line);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ash);
 }
 
-.proof__table td {
-  padding: 0.4rem 0.75rem;
-  border-bottom: 1px solid var(--surface-2);
-}
-
-.mono,
-.proof code {
+.console__fleet {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
   font-family: var(--font-mono);
-}
-
-.proof code {
-  color: var(--bone);
-  font-size: 0.85em;
-}
-
-.mono {
+  font-size: 0.78rem;
   color: var(--ghost);
-  font-size: 0.8rem;
 }
 
-.is-alive {
+.console__fleet .alive {
   color: var(--alive);
 }
 
-.is-dead {
+.console__fleet-sep {
+  color: var(--line);
+}
+
+/* --- Three-region body ---------------------------------------------------- */
+
+.console__body {
+  display: grid;
+  grid-template-columns: minmax(280px, 22rem) 1fr minmax(300px, 24rem);
+  min-height: 0; /* let children shrink so their bodies can scroll */
+}
+
+.console__region {
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+.console__region:last-child {
+  border-right: none;
+}
+
+/* --- Panel chrome (shared by all three regions) --------------------------- */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--surface);
+}
+
+.panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+
+.panel__title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
   color: var(--ash);
+  margin: 0;
+}
+
+.panel__count {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ghost);
+}
+
+.panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Shared quiet states for loading / error / empty panels. */
+
+.panel__note {
+  padding: 1.25rem 1rem;
+  color: var(--ghost);
+  font-size: 0.82rem;
+}
+
+.panel__note--error {
+  color: var(--bone);
+}
+
+.panel__note--error strong {
+  color: var(--alert);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.panel__note code {
+  font-family: var(--font-mono);
+  color: var(--ghost);
 }

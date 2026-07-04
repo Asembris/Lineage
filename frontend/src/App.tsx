@@ -1,106 +1,79 @@
-import { useEffect, useState } from "react";
-import { ApiError, API_BASE, listAgents } from "./api/client";
-import type { AgentGenealogy } from "./api/types";
+import { useConsoleData } from "./hooks/useConsoleData";
+import { Loaded, Panel } from "./components/Panel";
+import { DecisionFeed } from "./components/DecisionFeed";
+import { GenealogyTree } from "./components/GenealogyTree";
+import { Inspector } from "./components/Inspector";
 import "./App.css";
 
 /*
- * Phase 1 connectivity proof — NOT the console. This bare layout exists only to
- * prove the whole chain works end to end: CORS → fetch → typed client → real
- * cluster data. It fetches GET /agents live and lists the real genealogy. No
- * design system, no tree, no interactions — those are Phase 2+.
+ * The Lineage supervisor console shell — Frontend Phase 2.
+ *
+ * Three regions (decision feed / genealogy tree / inspector), each fed real data
+ * from the backend via useConsoleData. Presentational only: NO interactions this
+ * phase (investigate/trace/time-travel/invalidate are Phase 3), NO motion, NO
+ * color warmth (warmth is reserved for the Phase-3 trace so it lands hard).
  */
 
-type LoadState =
-  | { phase: "loading" }
-  | { phase: "error"; message: string; status: number }
-  | { phase: "ready"; agents: AgentGenealogy[]; count: number };
+function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["agents"] }) {
+  if (agents.status !== "ready") {
+    return <span className="console__fleet">fleet · —</span>;
+  }
+  const total = agents.data.count;
+  const alive = agents.data.agents.filter((a) => a.status === "alive").length;
+  return (
+    <div className="console__fleet">
+      <span>
+        <span className="alive">{alive}</span> alive
+      </span>
+      <span className="console__fleet-sep">/</span>
+      <span>{total} agents</span>
+    </div>
+  );
+}
 
 function App() {
-  const [state, setState] = useState<LoadState>({ phase: "loading" });
+  const { agents, decisions, beliefs } = useConsoleData();
 
-  useEffect(() => {
-    let cancelled = false;
-    listAgents()
-      .then((res) => {
-        if (!cancelled) {
-          setState({ phase: "ready", agents: res.agents, count: res.count });
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const status = err instanceof ApiError ? err.status : -1;
-        const message = err instanceof Error ? err.message : String(err);
-        setState({ phase: "error", message, status });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const decisionCount =
+    decisions.status === "ready" ? decisions.data.total : undefined;
+  const beliefCount = beliefs.status === "ready" ? beliefs.data.count : undefined;
 
   return (
-    <main className="proof">
-      <header className="proof__head">
-        <h1 className="proof__title">Lineage</h1>
-        <p className="proof__sub">
-          Phase 1 connectivity proof · <code>GET /agents</code> from{" "}
-          <code>{API_BASE}</code>
-        </p>
+    <div className="console">
+      <header className="console__header">
+        <div className="console__brand">
+          <h1 className="console__title">LINEAGE</h1>
+          <span className="console__tagline">supervisor console</span>
+        </div>
+        <FleetSummary agents={agents} />
       </header>
 
-      {state.phase === "loading" && (
-        <p className="proof__status">Fetching genealogy…</p>
-      )}
-
-      {state.phase === "error" && (
-        <div className="proof__error" role="alert">
-          <strong>Could not reach the API.</strong>
-          <p>
-            {state.status > 0 ? `HTTP ${state.status}: ` : ""}
-            {state.message}
-          </p>
-          <p className="proof__hint">
-            Is the backend running on <code>{API_BASE}</code>? Is CORS allowing
-            this origin?
-          </p>
+      <div className="console__body">
+        <div className="console__region">
+          <Panel title="Decision feed" count={decisionCount}>
+            <Loaded state={decisions} loadingLabel="Loading decisions…">
+              {(data) => <DecisionFeed data={data} />}
+            </Loaded>
+          </Panel>
         </div>
-      )}
 
-      {state.phase === "ready" && (
-        <section>
-          <p className="proof__status">
-            {state.count} agents live from the cluster.
-          </p>
-          <table className="proof__table">
-            <thead>
-              <tr>
-                <th>gen</th>
-                <th>bloodline</th>
-                <th>status</th>
-                <th>id</th>
-                <th>parent</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.agents.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.generation}</td>
-                  <td>{a.bloodline}</td>
-                  <td
-                    className={
-                      a.status === "alive" ? "is-alive" : "is-dead"
-                    }
-                  >
-                    {a.status}
-                  </td>
-                  <td className="mono">{a.id}</td>
-                  <td className="mono">{a.parent_id ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-    </main>
+        <div className="console__region">
+          <Panel title="Genealogy">
+            <Loaded state={agents} loadingLabel="Loading genealogy…">
+              {(data) => <GenealogyTree data={data} />}
+            </Loaded>
+          </Panel>
+        </div>
+
+        <div className="console__region">
+          <Panel title="Inspector" count={beliefCount}>
+            <Loaded state={beliefs} loadingLabel="Loading beliefs…">
+              {(data) => <Inspector data={data} />}
+            </Loaded>
+          </Panel>
+        </div>
+      </div>
+    </div>
   );
 }
 
