@@ -555,3 +555,170 @@
     justify-self: start;
   }
 }
+
+/* --- Frontend Phase 5: strategy selector, 2D/3D toggle, r3f scene ---------- */
+
+/* Title row now carries the render-mode toggle on the right. */
+.cx__intro-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cx__intro-head .cx__title {
+  margin-bottom: 0.6rem;
+}
+
+/* Segmented 2D/3D control — a quiet cold toggle, no warmth. */
+.cx__render-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.cx__seg {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  color: var(--ash);
+  border: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.cx__seg + .cx__seg {
+  border-left: 1px solid var(--line);
+}
+
+.cx__seg:hover {
+  color: var(--bone);
+}
+
+.cx__seg[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--bone);
+}
+
+.cx__seg:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
+}
+
+/* Idle preview of the closure at rest (so the 2D/3D toggle has visible effect before a run). */
+.cx__preview {
+  margin: 0 0 1.3rem;
+}
+
+.cx__preview-cap {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ash);
+  margin-top: 0.3rem;
+}
+
+/* Strategy selector. */
+.cx__strat {
+  margin: 0 0 1.3rem;
+  padding: 0;
+  border: none;
+  display: grid;
+  gap: 0.6rem;
+  max-width: 44rem;
+}
+
+.cx__strat-legend {
+  padding: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ash);
+  margin-bottom: 0.5rem;
+}
+
+.cx__strat-opt {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.cx__strat-opt:hover {
+  border-color: var(--ash);
+}
+
+.cx__strat-opt.is-on {
+  border-color: var(--bone);
+  background: var(--surface-2);
+}
+
+.cx__strat-opt input {
+  grid-row: 1 / span 2;
+  align-self: center;
+  accent-color: var(--bone);
+}
+
+.cx__strat-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.cx__strat-desc {
+  grid-column: 2;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--ash);
+}
+
+.cx__strat-desc code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--ghost);
+  word-break: break-word;
+}
+
+.cx__strat-opt:focus-within {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+/* The r3f scene container. The Canvas fills this box, so it MUST have an explicit height. */
+.cx3d {
+  width: 100%;
+  height: 22rem;
+  margin: 0.25rem 0 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--void);
+}
+
+.cx__preview .cx3d {
+  height: 15rem;
+}
+
+/* Strong strategy escalates the confirm gate visually — thicker rule, unmistakably grave. */
+.cx__gate--strong {
+  border-width: 2px;
+  box-shadow: 0 0 0 1px var(--alert) inset;
+}
+
+.cx__gate-flag {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.92rem;
+  color: var(--alert);
+  font-weight: 700;
+}

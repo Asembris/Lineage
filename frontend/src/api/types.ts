@@ -137,6 +137,11 @@ export interface InvalidateResponse {
 
 /* --- SSE: GET /demo/consistency/stream event payloads --------------------- */
 
+/** Which invalidation the stream runs (the `?strategy=` query param, echoed in `start`).
+ *  `eventual` = the per-holder fan-out baseline (a real SPLIT window); `strong` = the REAL
+ *  atomic endpoint function (invalidate_belief) — one serializable commit, 0 split reads. */
+export type ConsistencyStrategy = "eventual" | "strong";
+
 /** The closure classification the observer emits (consistency.classify). */
 export type ConsistencyState = "ALL_ACTIVE" | "SPLIT" | "ALL_INVALIDATED";
 

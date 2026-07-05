@@ -812,3 +812,105 @@ single chain never lit — and both correct together atomically.
   new `pre_invalidation_state` (its OpenAPI carried it — a --reload instance had picked up the edit),
   so the existing 5173→8000 stack was current and used directly. Redundant self-started 8001/5175
   were killed. Do NOT run two backfills at once (the documented TRUNCATE-CASCADE collision).
+
+## Frontend Phase 5 — 3D consistency scene (react-three-fiber) (2026-07-05)
+
+The ONE sanctioned r3f use in the whole project (FRONTEND.md Phase 5): a 3D rendering of the SAME
+real `GET /demo/consistency/stream` samples the Phase-4 2D view consumes. Additive only — the 2D
+view is the shipped fallback and was not weakened. Genealogy tree stays SVG; no r3f anywhere else.
+
+### The atomic-observability question — resolved by reading code, then the minimal real backend add
+- **Finding (cited):** NO route streamed a live ATOMIC invalidation before this phase. `observe_closure`
+  (app/services/consistency.py) is strategy-BLIND — it just samples the closure and classifies each
+  read. The Phase-4 SSE endpoint (app/routers/demo.py) HARD-CODED `strategy:"eventual"` + kicked off
+  `eventual_invalidate(...)`. The "strong = 1 commit / 0 split" fact existed ONLY inside
+  `tests/test_consistency_window.py::test_strong_invalidation_has_no_split_window`, which runs the REAL
+  `invalidate_belief` (the production endpoint fn) concurrently with the SAME observer. So the observer
+  machinery already streamed; only the mutation task was eventual-locked.
+- **Minimal real backend addition (the "where explicitly noted" change):** added `?strategy=eventual|strong`
+  (`Literal`, default `eventual`) to the SSE route. `strong` swaps the fanout task to the REAL
+  `invalidate_belief(ORIGIN, ACTOR)`; everything else (observer, queue, sample/summary plumbing,
+  single-flight guard, reseed) is reused verbatim. The no-arg call is byte-for-byte the Phase-4 path,
+  so the 2D view is untouched. FastAPI 422s a bad `strategy` BEFORE any reseed. NOT a fabrication:
+  `split_samples:0` is MEASURED by the observer against the real atomic commit; only `commit_points:1`
+  is structural (symmetric with eventual's computed `len(edges)+1`).
+- **Observer interval:** `0.02` for strong (vs `0.1` eventual). Empirically the ~180ms closure-read
+  round-trip to Frankfurt is the real sampling floor, so `0.02` just means "as fast as the cluster
+  answers" — tightening further would not help, and can't expose a split (snapshot isolation makes 0
+  structural). `saw_transition` is guaranteed regardless of interval: the ready-gate's first sample is
+  pre-flip ALL_ACTIVE and the observer's post-stop final sample is ALL_INVALIDATED.
+
+### Live strong capture — reproduced 5× (scratchpad/sse_strong_run{1..5}.txt)
+- Every run: `split_samples:0`, `saw_transition:true`, `commit_points:1`. open_edges jumps 8→0 in ONE
+  sample (no SPLIT ever). 5–6 ALL_ACTIVE samples then 1–3 ALL_INVALIDATED. The pre-flip active window
+  is REAL: it's the `invalidate_belief` Cloud round-trip latency (snapshot-HLC read + write txn), not an
+  artificial sleep. Consistent — this is the honest live atomic measurement, not a replay of old numbers.
+
+### Strong mid-run abort — verified transport AND real UI (short window is where races hide)
+- Transport probe (scratchpad/probe_strong_abort.py): abort mid ALL_ACTIVE window → fresh strong stream
+  gets `start`, not `busy`; strong→eventual alternation clean. Guard releases.
+- **Real frontend (scratchpad/abort_strong_ui.mjs, Playwright):** (A) Stop button mid-run → Stopped state
+  → fresh strong run ACCEPTED (not busy). (B) leave the view mid-run (ConsistencyDemo UNMOUNT) → return →
+  fresh strong run ACCEPTED. Both PASS, zero page errors. So the client abort (fetch AbortController → TCP
+  close) releases the backend `_stream_active` in practice for the strong path too, not just eventual.
+  NOTE: unmount resets ConsistencyDemo's local state (strategy → eventual default, render → 2d) — expected;
+  a returning operator re-selects Strong.
+
+### Dependencies (exact, no kitchen sink)
+- `@react-three/fiber@^9.6.1` (v9 = the React-19 line; peer `react >=19 <19.3`, our 19.2.7 satisfies it),
+  `three@^0.185.1`, `@types/three@^0.185.0` (dev). **NO drei** — its helpers (OrbitControls/loaders/HDRI)
+  are exactly what scope + reduced-motion forbid; the scene is a static camera + hand-written meshes/lights.
+- **Bundle cost:** three pushes the prod bundle to ~1.25 MB (348 KB gzip) with a Vite >500 KB chunk warning.
+  Acceptable for one gated demo feature; not code-split (single-page demo console). Noted, not fixed.
+
+### The 3D scene (src/components/ConsistencyScene3D.tsx)
+- Renders the SAME derived state as the 2D DrainMeter — `total_edges` holder nodes on a deterministic
+  fibonacci shell (no Math.random → stable screenshots) around a central --ghost wireframe belief core,
+  thin --line edges. Counts only, never labelled as specific agents (same honesty note as the 2D meter).
+- Kind per node = 2D semantics exactly: closed → --alive (corrected); open+SPLIT → --alert (laggard still
+  live on the dead belief); open+rest → --ash. EVENTUAL drains one-by-one (real elapsed_ms, visible torn
+  red+green SPLIT frame); STRONG flips all nodes to --alive together (open 8→0 in one sample, never red).
+- Motion = per-node emissive/color `useFrame` lerp + a one-shot scale pulse on flip (transforms/opacity per
+  CLAUDE.md). **reduced-motion SNAPS** each node to its current-sample state (no lerp, no pulse); camera is
+  STATIC in BOTH modes (no orbit/flythrough ever). Verified the torn state renders statically under reduce.
+- Tokens only: --alive/--alert/--ash/--void/--line, plus --ghost core. NO amber/orange (Trace's --trace/
+  --origin untouched). WebGL renders in headless chromium (channel:chromium) with zero page errors.
+- Camera `[0,0.6,7.4]` fov 42, RADIUS 2.05 — pulled back from a first pass that crowded the frame bottom;
+  frames all 8 nodes with margin at 1280 (short 15rem preview canvas is the worst case) through 1920.
+
+### Placement + UI (src/components/ConsistencyDemo.tsx — extended, not replaced)
+- A 2D/3D render toggle in the view header (default **2d** = Phase-4 look) + a strategy selector
+  (Eventual/Strong, default **eventual**) in the idle panel, with an idle PREVIEW of the resting closure so
+  the toggle has visible effect before a run. Chose a toggle INSIDE the existing Consistency-demo view over
+  a third header mode: same phenomenon, same wire, and it reuses the already-audited destructive lifecycle
+  (arm→confirm gate, reseeding/streaming/done/busy/error/stopped, Stop+unmount abort) verbatim — only the
+  closure VISUAL swaps. render mode can flip any time, even on a finished run's stored samples.
+- **Summary made strategy-aware:** whichever strategy ran is "measured this run" (numbers off `summary`);
+  the OTHER is the cited structural contrast ("switch strategy to X to measure it live"). eventual run =
+  9 measured / 1 cited (Phase-4 wording preserved); strong run = 1 measured (real endpoint) / 9 cited. Keeps
+  the honesty rule symmetric — the atomic "1/0" is a live measurement ONLY when strong actually ran.
+- **Heavier strong confirm-gate (per the approval):** distinct copy + thicker double-ruled --alert border.
+  "This is the real governed write, not a preview." — states it executes the same atomic fleet-wide
+  invalidation as the supervisor Invalidate action, "genuinely invalidated across every holder in one
+  irreversible commit; there is no rollback." Button: "Confirm — invalidate fleet-wide for real." Not
+  mistakable for a lower-stakes preview.
+- lib/consistencyStream.ts gained an optional `strategy` arg (default eventual) → appends `?strategy=`; all
+  the Phase-4 lifecycle guarantees (fetch not EventSource, run-once/never-reconnect, 20s stall watchdog,
+  stop() on Stop+unmount) are unchanged.
+
+### Verification (Playwright @1280/1440/1920, channel:chromium, live 5173→8000 stack)
+- Scripts: scratchpad/shot_idle (non-destructive 2D/3D previews all widths), shot_strong (strong 3D done +
+  gate, motion + reduced-motion, summary cross-checks), shot_eventual (3D SPLIT frame caught at 5/8 & 6/8
+  open, done, summary; 2D done = Phase-4 untouched; reduced-motion torn frame), abort_strong_ui.
+- Rendered numbers cross-checked vs the wire: strong summary = atomic 1 measured / 0 split / saw_transition
+  true / eventual 9 cited; eventual summary = 9 measured / 1 cited / N split reads. ZERO page errors in every
+  run (motion + reduced-motion). `tsc -b` clean, oxlint clean, `vite build` OK.
+- **2D (Phase 4) confirmed untouched:** eventual+2d done renders the identical meter + log + 9-vs-1 summary
+  as Phase 4 (only additive change: a truthful "switch to Strong to measure it live" pointer).
+- 5 backend regression tests pass (test_sse_stream ×2 + test_consistency_window ×3, 146s) — the additive
+  strategy param regressed nothing; both SSE tests call with no strategy → eventual → unchanged.
+- **Cluster restored:** the session ran many destructive strong+eventual invalidations, so a final
+  `python -m seed.backfill_decisions` (via .venv) restores belief=active + 4000 decisions + 8 perf windows.
+- **The payoff:** the eventual SPLIT frame shows 3 --alive + 5 --alert nodes ("5 still live on the invalidated
+  belief") vs strong's all-flip-together-no-red — the split state made VISIBLE, directly targeting the audit's
+  worst-ranked criticism (atomic-across-regions argued-not-demonstrated).
