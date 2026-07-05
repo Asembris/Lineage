@@ -1,0 +1,125 @@
+/*
+ * Decision feed — banded forensic records, cold by default. Every value is mono
+ * (it's all data). The only signal is --alert on labelled-fraud rows: a thin left
+ * rule + a small dot, deliberately minimal so it stays a flag, not noise, even at
+ * the high fraud density of the latest generation windows.
+ */
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+  padding: 0.5rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  /* transparent rule reserves the space so fraud rows don't shift horizontally */
+  border-left: 2px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+/* The one signal in the feed: a labelled-fraud decision. */
+.feed__row--fraud {
+  border-left-color: var(--alert);
+}
+
+/* --- Line 1: time (left) · amount (right) --------------------------------- */
+
+.feed__time {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.feed__date {
+  color: var(--ash);
+}
+
+.feed__clock {
+  color: var(--bone);
+}
+
+.feed__amount {
+  justify-self: end;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Line 2: merchant · txn (left) · tags (right) ------------------------- */
+
+.feed__where {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.feed__merchant {
+  color: var(--ghost);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed__txn {
+  color: var(--ash);
+  font-size: 0.68rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed__tags {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+/* Belief-driven subset marker — quiet, cold. (The inherited/not tag and the
+   belief detail itself are the Phase-3 investigate flow; this only flags that a
+   real driving_belief_id is present.) */
+.feed__belief {
+  color: var(--ash);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0.02rem 0.28rem;
+}
+
+.feed__fraud-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--alert);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.feed__verdict {
+  color: var(--ghost);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Verdicts stay cold — no warmth in the feed. 'blocked' is the fleet stopping a
+   txn; a slightly brighter tone distinguishes it without spending a signal color. */
+.feed__verdict--blocked {
+  color: var(--bone);
+}
+
+.feed__conf {
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
