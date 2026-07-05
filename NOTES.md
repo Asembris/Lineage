@@ -478,8 +478,18 @@ not conflate the numbers. Backend is frozen this phase except nothing — no bac
 - **DecisionFeed** (`components/DecisionFeed.{tsx,css}`): fleet-wide feed, newest-first. Bounded
   live window, NOT a table dump — hook already fetches the backend max page (limit=200, offset 0);
   no offset paging / "load more" (that's a Phase-3 interaction). Header count is honest: `200 / 4000`
-  (loaded / cluster total). Because newest-first, all 200 rows are window-7 (the DENSEST fraud gen,
-  ~28% fraud across the page) — so the rendered feed is the worst-case density by construction.
+  (loaded / cluster total). Because newest-first, all 200 rows are window-7 (the DENSEST fraud gen) —
+  so the rendered feed is the worst-case density by construction.
+- **TWO fraud rates, different denominators — NOT a conflict (they live near each other, so state it):**
+  * **~47% (this file's Phase-2 curve, w7 = 47.2%)** = fraud among the BELIEF-DRIVEN-ONLY subset
+    (`driving_belief_id = origin belief`) — the population `belief_performance`/the confidence curve
+    aggregates over. The belief only ever approves, so this IS its staleness signal. (The 200-row page
+    catches 105 of these and measures ~48.6% — same rate, small-sample wobble.)
+  * **~28% (the feed's rendered density)** = the BLENDED rate over ALL window-7 rows on the page
+    (belief-driven + off-pattern baseline). The red accent flags every `is_fraud` row regardless of
+    driver, so this is the right number for "how much of the visible feed is flagged." Lower because
+    the off-pattern baseline (~5% fraud over the ~95 non-belief rows here) dilutes it.
+    Arithmetic: 51 belief-driven frauds + 5 baseline frauds = 56 / 200 = 28%.
 - **Fraud accent** = the one signal in the feed: `--alert` (fraud is the palette's designated alert
   meaning, distinct from the reserved amber/orange trace warmth — approved). Kept minimal: a 2px left
   rule + a 6px dot, NO "FRAUD" text word (a red word on ~28% of rows would be noise). Verified at real
