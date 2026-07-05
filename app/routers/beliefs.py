@@ -13,6 +13,7 @@ from app.schemas import (
     InvalidateRequest,
     InvalidateResponse,
     LineageResponse,
+    PreInvalidationState,
 )
 from app.services import catalog, certificate, invalidation, lineage, s3_audit
 
@@ -98,6 +99,9 @@ async def invalidate(belief_id: uuid.UUID, body: InvalidateRequest) -> Invalidat
         living_holder_count=len(inv["living_holders"]),
         db_snapshot_hlc=inv["snapshot_hlc"],
         audit_id=inv["audit_id"],
+        # Same dict that build_certificate embedded + hashed above (inv["pre_state"]) — one
+        # source of truth, so the response and the S3 certificate can never disagree.
+        pre_invalidation_state=PreInvalidationState(**inv["pre_state"]),
         certificate_id=cert_id,
         certificate_s3_key=s3_key,
         certificate_status=cert_status,
