@@ -133,11 +133,12 @@ export function invalidateBelief(
 
 /* --- SSE ------------------------------------------------------------------ */
 
-/**
- * GET /demo/consistency/stream — open the SSE stream of real observer samples.
- * Returns a native EventSource; consumers attach listeners for the named events
- * ('start', 'sample', 'summary', 'busy'). Remember to close() it.
+/*
+ * The consistency stream is consumed by `lib/consistencyStream.ts` — a fetch +
+ * ReadableStream reader, NOT a native EventSource. This is deliberate: this endpoint
+ * is DESTRUCTIVE (it truncates + reseeds the cluster and runs a real invalidation to
+ * completion), and a bare `new EventSource(url)` auto-reconnects both on error AND
+ * after the server closes the stream on `summary` — which would silently re-trigger the
+ * wipe on a loop (the failure mode NOTES.md documents happening once). The fetch reader
+ * runs exactly once and never reconnects. See lib/consistencyStream.ts.
  */
-export function openConsistencyStream(): EventSource {
-  return new EventSource(`${API_BASE}/demo/consistency/stream`);
-}

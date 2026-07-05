@@ -137,6 +137,9 @@ export interface InvalidateResponse {
 
 /* --- SSE: GET /demo/consistency/stream event payloads --------------------- */
 
+/** The closure classification the observer emits (consistency.classify). */
+export type ConsistencyState = "ALL_ACTIVE" | "SPLIT" | "ALL_INVALIDATED";
+
 export interface ConsistencyStartEvent {
   belief_id: UUID;
   strategy: string;
@@ -145,7 +148,7 @@ export interface ConsistencyStartEvent {
 
 export interface ConsistencySampleEvent {
   seq: number;
-  state: string; // 'ALL_ACTIVE' | 'SPLIT' | 'ALL_INVALIDATED'
+  state: ConsistencyState;
   open_edges: number;
   total_edges: number;
   elapsed_ms: number;
