@@ -67,6 +67,25 @@ class InvalidateRequest(BaseModel):
         return v
 
 
+class PreInvalidationState(BaseModel):
+    """The self-contained "belief active, whole closure open" record captured INSIDE the
+    invalidation txn immediately before the flip (invalidation.invalidate_belief → pre_state).
+
+    This is the SAME dict embedded and hash-covered in the S3 certificate's
+    `pre_invalidation_state` — serialized here so the console can display the pre-kill proof
+    without a second computation path that could silently disagree (the round-trip test asserts
+    byte-identity with the certificate). Not re-derived; the value already exists at issue time.
+    """
+
+    belief_status: str  # 'active' by the invalidation guard
+    closure_edge_total: int
+    closure_edge_open: int
+    affected_agent_count: int
+    living_holder_count: int
+    snapshot_hlc: str
+    source: str  # 'issue-time-read' (endpoint) | 'aost-replay' (Lambda) | 'derived'
+
+
 class InvalidateResponse(BaseModel):
     belief_id: uuid.UUID
     status: str  # 'invalidated'
@@ -77,6 +96,8 @@ class InvalidateResponse(BaseModel):
     living_holder_count: int
     db_snapshot_hlc: str  # AOST cross-check oracle for the certificate
     audit_id: uuid.UUID
+    # The self-contained pre-kill record (same dict embedded + hashed in the certificate).
+    pre_invalidation_state: PreInvalidationState
     # Certificate outcome (post-commit S3 side effect; never gates the invalidation).
     certificate_id: uuid.UUID | None
     certificate_s3_key: str | None

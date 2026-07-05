@@ -190,6 +190,13 @@ def test_certificate_round_trips_from_s3_and_hash_verifies():
             assert pre["belief_status"] == "active", pre
             assert pre["closure_edge_total"] == 8 and pre["closure_edge_open"] == 8, pre
             assert pre["source"] == "issue-time-read", pre
+
+            # The response's pre_invalidation_state is the SAME value that is embedded and
+            # hash-covered in the certificate — not an independently reconstructed look-alike.
+            # Round-trip equality (fetched from S3, so it's the actually-hashed document) holds
+            # the response to the same "proven identical, not looks-right" standard as every
+            # other proof here: any drift between the two computation paths fails this.
+            assert body["pre_invalidation_state"] == pre, (body["pre_invalidation_state"], pre)
         finally:
             await engine.dispose()
 
