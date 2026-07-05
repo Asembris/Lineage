@@ -37,6 +37,7 @@ from sqlalchemy import text
 
 from app.db import SessionLocal, engine
 from app.models import Decision
+from app.services.performance import recompute_belief_performance
 from app.sim.transactions import (
     BASE,
     N_WINDOWS,
@@ -155,6 +156,22 @@ async def backfill() -> None:
         )
 
     print(f"=== insert phase done: {total} rows in {time.perf_counter() - t0:.1f}s ===", flush=True)
+
+    # PERSIST the measured staleness curve into belief_performance from the SAME per-window
+    # aggregation the report prints (confidence = correct/total; nothing hardcoded). Before this,
+    # only test_staleness ever populated the table, so a real invalidation / the new
+    # GET /beliefs/{id}/performance read on a freshly-seeded cluster saw zero rows. Now every
+    # reseed leaves belief_performance consistent with decisions — one source of truth shared by
+    # the certificate's staleness_evidence and the frontend Time-travel curve.
+    # NOTE: only the origin belief exists today; if a second belief is ever seeded, loop this
+    # recompute over all beliefs (recompute is idempotent per belief_id).
+    windows = [_window_ts(w) for w in range(N_WINDOWS)]
+    persisted = await recompute_belief_performance(ORIGIN_BELIEF, windows)
+    print(
+        f"=== belief_performance persisted: {len(persisted)} windows for origin belief ===",
+        flush=True,
+    )
+
     await report(total)
 
 

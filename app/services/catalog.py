@@ -74,6 +74,37 @@ async def list_decisions(
     return [dict(r) for r in page], int(total)
 
 
+async def list_belief_performance(belief_id: uuid.UUID) -> list[dict] | None:
+    """The ordered belief_performance windows for one belief — the measured staleness curve.
+
+    Returns None if the belief does not exist (router → 404). Returns a (possibly empty) list
+    of windows if the belief exists: an empty list is honest ("no measured windows yet"), not a
+    404. Windows are generation-ordered by window_start; the caller reads first vs. last as
+    "valid then / rotten now". Current-state read (no AOST — belief_performance is app-level
+    measured data on a different clock than MVCC time-travel; see NOTES §"Time concepts").
+    """
+    async with engine.connect() as conn:
+        exists = (
+            await conn.execute(
+                text("SELECT 1 FROM beliefs WHERE id = :b"), {"b": belief_id}
+            )
+        ).first()
+        if exists is None:
+            return None
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT window_start, window_end, confidence, "
+                    "false_positive_rate, frauds_approved "
+                    "FROM belief_performance WHERE belief_id = :b "
+                    "ORDER BY window_start"
+                ),
+                {"b": belief_id},
+            )
+        ).mappings().all()
+    return [dict(r) for r in rows]
+
+
 async def list_beliefs(status: str | None = None) -> list[dict]:
     """Beliefs to investigate (optionally filtered by status), oldest first."""
     where = " WHERE status = :status" if status is not None else ""
