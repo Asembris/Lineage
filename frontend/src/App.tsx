@@ -4,6 +4,7 @@ import { Loaded, Panel } from "./components/Panel";
 import { DecisionFeed } from "./components/DecisionFeed";
 import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
+import { ConsistencyDemo } from "./components/ConsistencyDemo";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -84,8 +85,16 @@ function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["a
   );
 }
 
+/** Which surface fills the console body. "consistency" is the standalone fleet-level demo
+ *  (Frontend Phase 4) — it takes over the whole body rather than hanging off a selected row,
+ *  because it is fleet-scoped, not per-decision/per-agent like the four supervisor interactions.
+ *  A plain view flag (no router, no new dep); the demo's own destructive lifecycle lives inside
+ *  ConsistencyDemo, and leaving the view unmounts it (which aborts any live stream). */
+type View = "console" | "consistency";
+
 function App() {
   const { agents, decisions, beliefs } = useConsoleData();
+  const [view, setView] = useState<View>("console");
 
   // Investigate: which decision is under investigation (null = none). Clicking a
   // selected row again clears it. State lives here because the feed (left) and the
@@ -224,48 +233,68 @@ function App() {
           <h1 className="console__title">LINEAGE</h1>
           <span className="console__tagline">supervisor console</span>
         </div>
+        <nav className="console__views" aria-label="Console view">
+          <button
+            className="console__view"
+            aria-pressed={view === "console"}
+            onClick={() => setView("console")}
+          >
+            Console
+          </button>
+          <button
+            className="console__view"
+            aria-pressed={view === "consistency"}
+            onClick={() => setView("consistency")}
+          >
+            Consistency demo
+          </button>
+        </nav>
         <FleetSummary agents={agents} />
       </header>
 
-      <div className="console__body">
-        <div className="console__region">
-          <Panel title="Decision feed" count={decisionCount}>
-            <Loaded state={decisions} loadingLabel="Loading decisions…">
-              {(data) => (
-                <DecisionFeed data={data} selectedId={selectedId} onSelect={onSelect} />
-              )}
-            </Loaded>
-          </Panel>
-        </div>
+      {view === "consistency" ? (
+        <ConsistencyDemo />
+      ) : (
+        <div className="console__body">
+          <div className="console__region">
+            <Panel title="Decision feed" count={decisionCount}>
+              <Loaded state={decisions} loadingLabel="Loading decisions…">
+                {(data) => (
+                  <DecisionFeed data={data} selectedId={selectedId} onSelect={onSelect} />
+                )}
+              </Loaded>
+            </Panel>
+          </div>
 
-        <div className="console__region">
-          <Panel title="Genealogy">
-            <Loaded state={agents} loadingLabel="Loading genealogy…">
-              {(data) => (
-                <GenealogyTree data={data} trace={treeTrace} invalidation={treeInvalidation} />
-              )}
-            </Loaded>
-          </Panel>
-        </div>
+          <div className="console__region">
+            <Panel title="Genealogy">
+              <Loaded state={agents} loadingLabel="Loading genealogy…">
+                {(data) => (
+                  <GenealogyTree data={data} trace={treeTrace} invalidation={treeInvalidation} />
+                )}
+              </Loaded>
+            </Panel>
+          </div>
 
-        <div className="console__region">
-          <Panel title="Inspector" count={beliefCount}>
-            <Inspector
-              agents={agents}
-              decisions={decisions}
-              beliefs={beliefs}
-              investigation={investigation}
-              onClear={() => setSelectedId(null)}
-              traceHandlers={{
-                trace: traceUi,
-                onStartTrace: startTrace,
-                onReplay: replayTrace,
-              }}
-              invalidateHandlers={invalidateHandlers}
-            />
-          </Panel>
+          <div className="console__region">
+            <Panel title="Inspector" count={beliefCount}>
+              <Inspector
+                agents={agents}
+                decisions={decisions}
+                beliefs={beliefs}
+                investigation={investigation}
+                onClear={() => setSelectedId(null)}
+                traceHandlers={{
+                  trace: traceUi,
+                  onStartTrace: startTrace,
+                  onReplay: replayTrace,
+                }}
+                invalidateHandlers={invalidateHandlers}
+              />
+            </Panel>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
