@@ -12,6 +12,7 @@
 import type { Investigation as InvestigationData } from "../lib/investigation";
 import type { UUID } from "../api/types";
 import { fragId, formatAmount, formatConfidence, formatDate, splitInstant } from "../lib/format";
+import { TimeTravel } from "./TimeTravel";
 import "./Investigation.css";
 
 /** UI-facing view of the App's trace state (App owns the real state/animation). */
@@ -203,6 +204,7 @@ function DrivingBelief({ inv, handlers }: { inv: InvestigationData; handlers: Tr
       </div>
       <InheritedBadge inv={inv} />
       <TraceBlock inv={inv} handlers={handlers} />
+      <TimeTravel inv={inv} />
     </>
   );
 }

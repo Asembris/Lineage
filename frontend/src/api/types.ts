@@ -51,6 +51,22 @@ export interface AgentBeliefsResponse {
   beliefs: Belief[];
 }
 
+/** One measured performance window (BeliefPerformanceWindow). Windows are
+ *  generation-ordered by window_start — ordinal position IS the generation. */
+export interface BeliefPerformanceWindow {
+  window_start: ISODateTime;
+  window_end: ISODateTime;
+  confidence: number;
+  false_positive_rate: number;
+  frauds_approved: number;
+}
+
+export interface BeliefPerformanceResponse {
+  belief_id: UUID;
+  windows: BeliefPerformanceWindow[];
+  count: number;
+}
+
 export interface LineageNode {
   depth: number;
   agent_id: UUID;

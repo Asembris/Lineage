@@ -1,0 +1,279 @@
+/*
+ * TimeTravel — the third Investigation interaction. Cold chrome; the only signal
+ * colors are --alive (healthy, "when formed") and --alert (stale, "present day"),
+ * both already in the console's vocabulary. NO amber/orange — that warmth belongs
+ * to Trace alone. Reuses .panel__note from the shared chrome.
+ */
+
+.tt {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.tt__note {
+  padding: 0.2rem 0 0;
+}
+
+/* Trigger — cold, like the Trace button (matches .inv__trace-btn spacing). */
+.tt__open-btn {
+  margin-top: 0.55rem;
+  appearance: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.tt__open-btn:hover:not(:disabled) {
+  border-color: var(--ash);
+}
+
+.tt__open-btn:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: 1px;
+}
+
+.tt__open-btn:disabled {
+  color: var(--ash);
+  cursor: default;
+}
+
+/* --- The WHEN FORMED / PRESENT DAY toggle --------------------------------- */
+
+.tt__toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.tt__toggle-btn {
+  appearance: none;
+  background: var(--surface);
+  border: 0;
+  color: var(--ash);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.42rem 0.5rem;
+  cursor: pointer;
+}
+
+.tt__toggle-btn + .tt__toggle-btn {
+  border-left: 1px solid var(--line);
+}
+
+.tt__toggle-btn:hover {
+  color: var(--ghost);
+}
+
+.tt__toggle-btn:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
+/* The active end takes its state color — healthy left, stale right. */
+.tt__toggle-btn--on {
+  color: var(--bone);
+  background: var(--surface-2);
+}
+
+/* --- Measured readout for the selected end -------------------------------- */
+
+.tt__readout {
+  border: 1px solid var(--line);
+  border-left-width: 2px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.tt__readout--alive {
+  border-left-color: var(--alive);
+}
+
+.tt__readout--alert {
+  border-left-color: var(--alert);
+}
+
+.tt__conf {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tt__conf-val {
+  font-family: var(--font-mono);
+  font-size: 1.55rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tt__hot-alive {
+  color: var(--alive);
+}
+
+.tt__hot-alert {
+  color: var(--alert);
+}
+
+.tt__conf-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ash);
+}
+
+.tt__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.22rem;
+  text-align: right;
+}
+
+.tt__window {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt__frauds {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ash);
+}
+
+.tt__frauds-n {
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Confidence curve ----------------------------------------------------- */
+
+.tt__curve {
+  width: 100%;
+  height: 42px;
+  display: block;
+}
+
+.tt__curve-line {
+  fill: none;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tt__dot {
+  fill: var(--ash);
+  stroke: var(--void);
+  stroke-width: 0.5;
+}
+
+.tt__dot--alive {
+  fill: var(--alive);
+}
+
+.tt__dot--alert {
+  fill: var(--alert);
+}
+
+.tt__dot--active {
+  stroke: var(--bone);
+  stroke-width: 0.8;
+}
+
+.tt__derivation {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.4;
+  color: var(--ash);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- MVCC deposition (proof it's real + the row is immutable) -------------- */
+
+.tt__depo {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+}
+
+.tt__depo-head {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ghost);
+}
+
+.tt__depo-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.tt__depo-ts {
+  color: var(--ghost);
+}
+
+.tt__depo-arrow {
+  color: var(--ash);
+}
+
+.tt__depo-status {
+  color: var(--ghost);
+}
+
+.tt__depo-status--absent {
+  color: var(--ash);
+}
+
+.tt__depo-badge {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--alive);
+}
+
+.tt__depo-badge--invalidated {
+  color: var(--alert);
+}
+
+.tt__depo-note {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.45;
+  color: var(--ash);
+}
+
+.tt__mono {
+  font-family: var(--font-mono);
+  color: var(--ghost);
+}
