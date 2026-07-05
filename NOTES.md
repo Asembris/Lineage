@@ -593,3 +593,46 @@ tree, igniting the origin. **framer-motion 12.42.2 installed** (first phase need
   origin ignition, not exact pacing). Main spine, branch hop, reduced-motion, and Replay all captured,
   zero page errors, `tsc -b` + oxlint clean. Timing constants (STAGGER/EDGE_DUR/IGNITE_DUR in
   TraceOverlay.tsx) are the tuning knobs if the real-time feel needs adjustment after live viewing.
+
+### Time-travel (2026-07-05) — the two-signal staleness reveal
+
+Third interaction. A "Time-travel ⟲" control in the Investigation surface (sibling to Trace, only for a
+resolved belief) opens a panel fusing the project's TWO real time signals — kept on SEPARATE clocks, the
+NOTES §"Time concepts" discipline. The thesis it makes visible (user's verbatim framing, worth keeping):
+*"the belief is the same immutable row — MVCC proves it never changed — yet it rotted, because staleness
+is measured performance against a drifting world, not a mutated field."*
+
+- **New backend read endpoint `GET /beliefs/{id}/performance`** (committed separately, backend piece):
+  `catalog.list_belief_performance` returns the ordered belief_performance windows; None→404 unknown
+  belief, `[]`→200 for a known-but-unmeasured belief (not-measured != not-found). DTOs
+  BeliefPerformanceWindow/Response (the 5 real columns; NO synthetic generation field — ordinal position
+  IS generation). No migration.
+- **Closed a real AUDIT gap (Option A, approved):** belief_performance was populated ONLY by
+  test_staleness — a plain backfill left it empty, so the Phase-3 cert's staleness_evidence AND this read
+  saw zero rows on a fresh cluster. `seed/backfill_decisions.py` now calls recompute_belief_performance at
+  the end (same aggregation the report prints), so every reseed leaves the table consistent with
+  decisions. One source of truth. NOTE left to generalize the recompute over all beliefs if a second is
+  ever seeded. Verified live after backfill: 8 windows, conf 0.924 (when formed) → 0.528 (present day),
+  frauds_approved 19→118, gen-6 recession dip intact. test_belief_performance (404 / 200-empty / measured
+  curve through the real HTTP surface) passes.
+- **Signal 1 — real MVCC deposition** (`TimeTravel.tsx`): TWO genuine `?as_of=` calls — a within-GC past
+  instant (`Date.now()-20s`, the deepest AOST can honestly reach) + present. Both return the belief
+  `held · ACTIVE` → proves time-travel is real AND the row is immutable. AOST is GC-bounded (~75 min), so
+  it CANNOT reach the formation date; the panel states this explicitly rather than mislabelling the read
+  as "when formed" (that trap is why the two clocks stay separate).
+- **Signal 2 — real measured curve**: `getBeliefPerformance` drives a WHEN FORMED / PRESENT DAY toggle
+  (first vs last window) — big confidence number `--alive` 0.92 healthy → `--alert` 0.53 stale, real
+  window dates, frauds_approved. An SVG sparkline draws the FULL 8-window curve with an `--alive`→`--alert`
+  gradient (fixed [0,1] domain so the decay is true-scale, never auto-fit-exaggerated); the active endpoint
+  dot is ringed. This is the healthy→stale shift, derived not asserted.
+- **Placement:** inside the Investigation take-over (the "one evolving surface"), after the Trace block.
+  Self-contained state (closed→loading→ready/error) owned by the component — unlike Trace it needs no
+  cross-region coordination, so it does NOT lift state to App. Resets to closed when the investigated
+  belief/agent changes (effect on beliefId/agentId) so a stale curve never lingers.
+- **Colors:** `--alive` (healthy) / `--alert` (stale) ONLY. NO amber/orange — `--trace`/`--origin` stay
+  reserved for Trace. Motion is opacity/pathLength only (CLAUDE.md); `useReducedMotion` → curve draws
+  instantly, readout appears without slide.
+- **Verification (Playwright @1440, live cluster):** zero page errors in BOTH motion + reduced-motion.
+  Rendered data checks: present-day conf 0.53 (`--alert`), when-formed 0.92 (`--alive`), derivation
+  "0.92 → 0.53 across 8 measured windows", both deposition rows `held · ACTIVE` at a real AOST timestamp +
+  present. Reduced-motion collapses to the identical final state. `tsc -b` + oxlint clean.

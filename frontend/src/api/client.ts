@@ -9,6 +9,7 @@ import type {
   AgentBeliefsResponse,
   AgentListResponse,
   BeliefListResponse,
+  BeliefPerformanceResponse,
   DecisionListResponse,
   InvalidateResponse,
   LineageResponse,
@@ -107,6 +108,13 @@ export function getAgentBeliefs(
 /** GET /beliefs/{id}/lineage — trace a belief origin → current. */
 export function getBeliefLineage(beliefId: UUID): Promise<LineageResponse> {
   return request<LineageResponse>(`/beliefs/${beliefId}/lineage`);
+}
+
+/** GET /beliefs/{id}/performance — the measured staleness curve (ordered windows). */
+export function getBeliefPerformance(
+  beliefId: UUID,
+): Promise<BeliefPerformanceResponse> {
+  return request<BeliefPerformanceResponse>(`/beliefs/${beliefId}/performance`);
 }
 
 /* --- The governed write --------------------------------------------------- */
