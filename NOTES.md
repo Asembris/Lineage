@@ -507,3 +507,43 @@ not conflate the numbers. Backend is frozen this phase except nothing — no bac
   exactly what the cluster stored). `tsc -b` clean, oxlint clean, no page errors at any width.
 - Belief `ACTIVE` status reuses `--alive` green (active/healthy) — a deliberate reuse of the existing
   cold+green vocabulary, no new color, not warmth.
+
+## Frontend Phase 3 — Investigate (2026-07-05)
+
+First of the four supervisor interactions. Selecting a decision in the feed TAKES OVER the Inspector
+(approved: one evolving surface, not an accreting stack, so Trace/Time-travel/Invalidate reuse the
+same space) to show the belief that drove it, tagged inherited / formed-here. ✕ returns to the
+default fleet+catalog. Still cold + motionless — warmth/motion stay reserved for the Trace step.
+
+- **NO new fetch, NO new endpoint (pure frontend).** Both facts resolve from data useConsoleData
+  already loaded: the driving belief is looked up in the loaded `/beliefs` catalog by
+  `driving_belief_id` (full, unfiltered, bounded list — always resolves; there is no GET
+  /beliefs/{id}, and calling `/beliefs/{id}/lineage` here would be starting Trace early); the
+  inherited flag is `decision.agent_id !== belief.originating_agent_id`. That comparison is
+  DEFINITIONALLY exact — an agent either formed a belief (originating==agent) or holds it via a
+  `belief_inheritance` edge (!=); no third way. belief_inheritance is the ground truth Trace walks;
+  here the comparison yields the same verdict without the traversal. `lib/investigation.ts` is the
+  pure resolver (degrades per-slot; beliefState none|pending|missing|resolved).
+- **Cross-panel coherence is real, not staged:** the inherited shot's `origin 108cf7` == the crimson
+  gen-0 tree node; deciding `3fb55c` == the gen-7 node. The generations shown ("formed by gen 0 ·
+  acted on by gen 7 / 7 generations downstream") are looked up in the loaded `/agents` genealogy.
+- **Three branches, each on REAL cluster data (screenshots @1440, zero page errors):** inherited
+  (crimson-7 on the active belief), formed-here (crimson-0 == originating agent → "FORMED HERE"),
+  not-belief-driven (off-pattern row, driving_belief_id null → honest "cited no belief", no badge).
+  Cold styling throughout: inherited badge = `--bone` left bar, formed-here = `--ash`; fraud reuses
+  `--alert`, active belief reuses `--alive`. NO amber/orange anywhere.
+- **Feed rows are now real `<button>`s** (keyboard-reachable, `aria-pressed`, focus-visible outline).
+  Selection = raised `--surface-2` + a `--bone` inset left bar via box-shadow, which sits INSIDE the
+  border box so a selected fraud row still shows its red `border-left` rule alongside it. Clicking a
+  selected row again clears it (toggle in App).
+- **KNOWN, EXPECTED reachability gap (flagged, not a bug):** the "formed-here" branch is real code but
+  NOT reachable from the default newest-first feed — that page is all window-7 (crimson-7, a
+  descendant → always inherited). crimson-0's own decisions are the oldest rows; reaching them needs
+  offset paging (a later interaction) or an agent drill-in. The branch exists so it's correct WHEN
+  reached. For the verification screenshot only, the shot script pointed the feed at crimson-0's real
+  `/decisions?agent_id=` page via Playwright route-fulfill (all data real; no app hack shipped).
+- `tsc -b` clean, oxlint clean. Backfill was re-run first (cluster `decisions` was empty + the belief
+  left invalidated by a prior demo; `python -m seed.backfill_decisions` via `.venv` — NOT the Roaming
+  Python, which lacks the cockroachdb dialect — reseeded belief=active + 4000 rows, emergent curve
+  reproduced). One mid-insert connection drop on the first attempt (CRDB Cloud closed the conn);
+  per-window commits meant a clean re-run fixed it. Do NOT run the backfill from the global Python.
