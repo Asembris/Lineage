@@ -1,17 +1,28 @@
 /*
  * GenealogyTree — the center region. A static SVG of the agent genealogy from
  * GET /agents: generation across, bloodlines banded, main line on lane 0 with
- * offshoots below. Cold by default (no warmth — that's the Phase-3 trace); the
- * only signal color is --alive on the (few) living agents, so a living
- * belief-holder reads at a glance even when it sits off the main line.
+ * offshoots below. Cold by default; the only always-on signal color is --alive on
+ * the (few) living agents, so a living belief-holder reads at a glance even off
+ * the main line.
  *
- * Presentational only — no interactions this phase.
+ * The one place warmth appears is the Trace overlay (Frontend Phase 3): when a
+ * `trace` chain is passed, TraceOverlay animates warmth backward along that real
+ * inheritance chain to the igniting origin. Geometry (reversed edge paths + node
+ * positions) is derived here from the layout; playback lives in TraceOverlay.
  */
 
 import { useMemo } from "react";
 import type { AgentsData } from "../hooks/useConsoleData";
-import { computeTreeLayout, type TreeEdge } from "../lib/treeLayout";
+import type { UUID } from "../api/types";
+import { computeTreeLayout, type TreeEdge, type TreeLayout } from "../lib/treeLayout";
+import { TraceOverlay, type TraceGeo } from "./TraceOverlay";
 import "./GenealogyTree.css";
+
+export interface TreeTrace {
+  chain: UUID[]; // ordered leaf (investigated agent) → origin
+  playToken: number;
+  onComplete: () => void;
+}
 
 function edgePath(e: TreeEdge): string {
   if (!e.isBranch) {
@@ -25,9 +36,55 @@ function edgePath(e: TreeEdge): string {
   return `M ${e.x1} ${e.y1} C ${c1} ${e.y1}, ${c2} ${e.y2}, ${e.x2} ${e.y2}`;
 }
 
-export function GenealogyTree({ data }: { data: AgentsData }) {
+/** Reverse an edge so it draws child→parent (the backward trace direction). */
+function reversedEdgePath(e: TreeEdge): string {
+  if (!e.isBranch) {
+    return `M ${e.x2} ${e.y2} L ${e.x1} ${e.y1}`;
+  }
+  const dx = e.x2 - e.x1;
+  const c1 = e.x1 + dx * 0.5;
+  const c2 = e.x2 - dx * 0.4;
+  return `M ${e.x2} ${e.y2} C ${c2} ${e.y2}, ${c1} ${e.y1}, ${e.x1} ${e.y1}`;
+}
+
+/** Map a real inheritance chain onto tree geometry (edges + node positions). */
+function computeTraceGeo(layout: TreeLayout, chain: UUID[]): TraceGeo {
+  const nodeById = new Map(layout.nodes.map((n) => [n.agent.id, n]));
+  const edgeByKey = new Map(layout.edges.map((e) => [e.key, e]));
+
+  const edges: TraceGeo["edges"] = [];
+  for (let i = 0; i < chain.length - 1; i++) {
+    const child = chain[i];
+    const parent = chain[i + 1];
+    const edge = edgeByKey.get(`${parent}->${child}`);
+    if (!edge) continue; // no such genealogy edge — skip honestly
+    edges.push({ key: edge.key, d: reversedEdgePath(edge), index: i });
+  }
+
+  const nodes: TraceGeo["nodes"] = [];
+  chain.forEach((id, index) => {
+    const n = nodeById.get(id);
+    if (!n) return;
+    nodes.push({
+      id,
+      x: n.x,
+      y: n.y,
+      gen: n.agent.generation,
+      index,
+      isOrigin: index === chain.length - 1,
+    });
+  });
+
+  return { edges, nodes };
+}
+
+export function GenealogyTree({ data, trace }: { data: AgentsData; trace?: TreeTrace | null }) {
   const layout = useMemo(() => computeTreeLayout(data.agents), [data.agents]);
   const alive = layout.nodes.filter((n) => n.isAlive).length;
+  const traceGeo = useMemo(
+    () => (trace ? computeTraceGeo(layout, trace.chain) : null),
+    [layout, trace],
+  );
 
   return (
     <div className="tree">
@@ -83,6 +140,11 @@ export function GenealogyTree({ data }: { data: AgentsData }) {
             </g>
           ))}
         </g>
+
+        {/* trace overlay — warmth on top of the cold tree, only when tracing */}
+        {trace && traceGeo && (
+          <TraceOverlay geo={traceGeo} playToken={trace.playToken} onComplete={trace.onComplete} />
+        )}
 
         {/* generation axis */}
         <g>

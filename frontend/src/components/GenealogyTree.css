@@ -77,6 +77,54 @@
   fill: var(--bone);
 }
 
+/* --- Trace overlay (the one place warmth appears) ------------------------- */
+
+/* Warm edge drawn over its cold counterpart; a soft --trace glow makes it read
+   as a hot wire igniting backward through the dead tree. */
+.tree__trace-edge {
+  fill: none;
+  stroke: var(--trace);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(224, 162, 63, 0.55));
+}
+
+/* Chain nodes tint from --ash toward --trace as warmth reaches them. */
+.tree__trace-dot {
+  fill: var(--surface-2);
+  stroke: var(--trace);
+  stroke-width: 2.5;
+}
+
+.tree__trace-gen {
+  fill: var(--trace);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+/* The origin ancestor ignites: hotter --origin + a blurred glow. */
+.tree__trace-glow {
+  fill: var(--origin);
+  filter: blur(7px);
+}
+
+.tree__trace-origin-dot {
+  fill: var(--surface-2);
+  stroke: var(--origin);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px rgba(224, 123, 63, 0.75));
+}
+
+.tree__trace-origin-gen {
+  fill: var(--origin);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
 /* --- Band labels + axis --------------------------------------------------- */
 
 .tree__band-label {

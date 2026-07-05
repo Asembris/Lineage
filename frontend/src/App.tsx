@@ -1,23 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConsoleData } from "./hooks/useConsoleData";
 import { Loaded, Panel } from "./components/Panel";
 import { DecisionFeed } from "./components/DecisionFeed";
 import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
+import type { InvestigationTrace } from "./components/Investigation";
 import { resolveInvestigation } from "./lib/investigation";
+import { deriveChain } from "./lib/trace";
+import { getBeliefLineage } from "./api/client";
 import { formatCount } from "./lib/format";
-import type { UUID } from "./api/types";
+import type { LineageResponse, UUID } from "./api/types";
 import "./App.css";
 
 /*
  * The Lineage supervisor console shell.
  *
  * Three regions (decision feed / genealogy tree / inspector), each fed real data
- * from the backend via useConsoleData. Frontend Phase 3 wires the first
- * interaction — Investigate: selecting a decision in the feed takes over the
- * Inspector to show the belief that drove it, tagged inherited / formed-here.
- * Still cold and motionless (warmth/motion are reserved for the Trace step).
+ * from the backend via useConsoleData. Frontend Phase 3 wires the supervisor
+ * interactions: Investigate (select a decision → its driving belief, tagged
+ * inherited/formed-here) and Trace (walk that belief backward through the tree to
+ * its igniting origin, via the real GET /beliefs/{id}/lineage). App owns the trace
+ * state because three regions coordinate: the trigger is in the Inspector, the
+ * animation is in the tree, and the resolved conclusion returns to the Inspector.
  */
+
+/** The trace lifecycle. `chain` is the real leaf→origin inheritance chain; `phase`
+ *  flips to "done" when the tree reports the origin has ignited. */
+type TraceState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "empty"; lineage: LineageResponse } // agent isn't a holder — nothing to trace
+  | {
+      status: "ready";
+      lineage: LineageResponse;
+      chain: UUID[];
+      playToken: number;
+      phase: "animating" | "done";
+    };
 
 function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["agents"] }) {
   if (agents.status !== "ready") {
@@ -46,6 +66,49 @@ function App() {
   const onSelect = (id: UUID) =>
     setSelectedId((cur) => (cur === id ? null : id));
   const investigation = resolveInvestigation(selectedId, decisions, agents, beliefs);
+
+  // Trace state. Changing the investigated decision resets any active trace so a
+  // stale warm path never lingers over a new investigation.
+  const [trace, setTrace] = useState<TraceState>({ status: "idle" });
+  useEffect(() => setTrace({ status: "idle" }), [selectedId]);
+
+  const startTrace = async (beliefId: UUID, agentId: UUID) => {
+    setTrace({ status: "loading" });
+    try {
+      const lineage = await getBeliefLineage(beliefId);
+      const chain = deriveChain(lineage, agentId);
+      if (chain.length === 0) {
+        setTrace({ status: "empty", lineage });
+      } else {
+        setTrace({ status: "ready", lineage, chain, playToken: 0, phase: "animating" });
+      }
+    } catch (err) {
+      setTrace({ status: "error", message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+  const replayTrace = () =>
+    setTrace((t) =>
+      t.status === "ready" ? { ...t, playToken: t.playToken + 1, phase: "animating" } : t,
+    );
+  const onTraceComplete = () =>
+    setTrace((t) => (t.status === "ready" ? { ...t, phase: "done" } : t));
+
+  // View projections for the two consumers.
+  const treeTrace =
+    trace.status === "ready"
+      ? { chain: trace.chain, playToken: trace.playToken, onComplete: onTraceComplete }
+      : null;
+
+  const traceUi: InvestigationTrace =
+    trace.status === "ready"
+      ? { status: "active", phase: trace.phase, chainLength: trace.chain.length }
+      : trace.status === "error"
+        ? { status: "error", message: trace.message }
+        : trace.status === "loading"
+          ? { status: "loading" }
+          : trace.status === "empty"
+            ? { status: "empty" }
+            : { status: "idle" };
 
   // Feed header count is honest about the bounding: loaded / cluster total. The
   // feed shows the most-recent page (limit 200), not every row.
@@ -82,7 +145,7 @@ function App() {
         <div className="console__region">
           <Panel title="Genealogy">
             <Loaded state={agents} loadingLabel="Loading genealogy…">
-              {(data) => <GenealogyTree data={data} />}
+              {(data) => <GenealogyTree data={data} trace={treeTrace} />}
             </Loaded>
           </Panel>
         </div>
@@ -95,6 +158,11 @@ function App() {
               beliefs={beliefs}
               investigation={investigation}
               onClear={() => setSelectedId(null)}
+              traceHandlers={{
+                trace: traceUi,
+                onStartTrace: startTrace,
+                onReplay: replayTrace,
+              }}
             />
           </Panel>
         </div>
