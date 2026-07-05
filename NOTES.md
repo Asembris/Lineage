@@ -316,6 +316,18 @@ addition + one CI workflow. Approved with an explicit correction (see actor vali
   TRUNCATE CASCADE; a `busy` event is sent if one is already in flight. try/finally reaps the
   observer/fanout tasks on client disconnect (GeneratorExit). Repeatable — every run reseeds.
   (Guard hardened post-audit — see "Post-audit integrity fixes" below.)
+- **OPERATIONAL RISK (address before any public/shared deployment):** this endpoint's blast
+  radius is a FULL cluster wipe (run_seed → TRUNCATE CASCADE of all five tables), and nothing
+  distinguishes "someone is deliberately watching the demo" from "a browser tab was left open."
+  A stale tab's auto-reconnecting EventSource re-triggers the reseed every ~10-15s, silently
+  destroying any backfilled state (observed 2026-07-05: it had wiped the 4,000-row backfill +
+  8 perf windows; recovery required killing uvicorn so the endpoint couldn't refire, then a full
+  reseed+backfill). Not a bug in the endpoint — the reseed-per-request behavior is correct — but
+  the coupling of "casual GET" to "irreversible wipe" is unsafe outside a single-operator laptop.
+  Fix before deploy: gate reseed behind an explicit intent (POST + confirm token, or an operator
+  flag), and/or isolate demo runs to a throwaway database. Ties into the reset/isolation gap
+  already flagged for CI (see "CI-vs-LOCAL collision" below) — same root cause: one shared cluster,
+  no demo/CI isolation.
 
 ### CI — .github/workflows/ci.yml (push to main, sequential pytest)
 - Single ubuntu job, Python 3.12, `pip install -r requirements.txt`, `pytest`. No matrix, no
