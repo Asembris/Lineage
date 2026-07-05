@@ -8,6 +8,8 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas import (
     BeliefListResponse,
     BeliefOut,
+    BeliefPerformanceResponse,
+    BeliefPerformanceWindow,
     InvalidateRequest,
     InvalidateResponse,
     LineageResponse,
@@ -27,6 +29,20 @@ async def list_beliefs(
     rows = await catalog.list_beliefs(status=status)
     beliefs = [BeliefOut(**r) for r in rows]
     return BeliefListResponse(beliefs=beliefs, count=len(beliefs))
+
+
+@router.get("/beliefs/{belief_id}/performance", response_model=BeliefPerformanceResponse)
+async def get_belief_performance(belief_id: uuid.UUID) -> BeliefPerformanceResponse:
+    """The measured staleness curve for a belief — ordered belief_performance windows.
+
+    Real measured data only (confidence = correct/total per window, never asserted). Unknown
+    belief → 404; a known belief with no measured windows → 200 with an empty list.
+    """
+    rows = await catalog.list_belief_performance(belief_id)
+    if rows is None:
+        raise HTTPException(status_code=404, detail="belief not found")
+    windows = [BeliefPerformanceWindow(**r) for r in rows]
+    return BeliefPerformanceResponse(belief_id=belief_id, windows=windows, count=len(windows))
 
 
 @router.get("/beliefs/{belief_id}/lineage", response_model=LineageResponse)

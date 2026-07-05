@@ -136,3 +136,26 @@ class BeliefListResponse(BaseModel):
     # Full list, no pagination: founding beliefs are bounded-small by the data model.
     beliefs: list[BeliefOut]
     count: int
+
+
+class BeliefPerformanceWindow(BaseModel):
+    """One measured performance window for a belief — the real belief_performance columns.
+
+    No synthetic 'generation' field: the table stores none. Windows are generation-ordered
+    by window_start, so a window's ordinal position in the list IS its generation.
+    """
+
+    window_start: dt.datetime
+    window_end: dt.datetime
+    confidence: float
+    false_positive_rate: float
+    frauds_approved: int
+
+
+class BeliefPerformanceResponse(BaseModel):
+    # The ordered staleness curve for one belief — the "valid then / rotten now" signal,
+    # MEASURED from belief_performance (never asserted). An empty `windows` for a real belief
+    # means it has no measured windows yet (not an error); an unknown belief is a 404.
+    belief_id: uuid.UUID
+    windows: list[BeliefPerformanceWindow]
+    count: int
