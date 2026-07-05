@@ -11,22 +11,63 @@
   padding: 0;
 }
 
+.feed__item {
+  display: block;
+}
+
+/* The row is a real button so Investigate is keyboard-reachable; the reset keeps
+   it visually identical to the Phase-2 record, then adds interaction states. */
 .feed__row {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: baseline;
   gap: 0.2rem 0.6rem;
+  width: 100%;
   padding: 0.5rem 0.85rem;
+  border: none;
   border-bottom: 1px solid var(--line);
   /* transparent rule reserves the space so fraud rows don't shift horizontally */
   border-left: 2px solid transparent;
+  background: transparent;
   font-family: var(--font-mono);
   font-size: 0.76rem;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
 }
 
-/* The one signal in the feed: a labelled-fraud decision. */
+@media (prefers-reduced-motion: no-preference) {
+  .feed__row {
+    transition: background-color 120ms ease;
+  }
+}
+
+.feed__row:hover {
+  background: var(--surface-2);
+}
+
+.feed__row:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
+/* The one always-on signal in the feed: a labelled-fraud decision. */
 .feed__row--fraud {
   border-left-color: var(--alert);
+}
+
+/* Selection — a raised surface + a cold --bone inset bar. Kept cold on purpose:
+   warmth is reserved for Trace. The inset bar sits inside the border box, so a
+   selected fraud row still shows its red border-left rule alongside it. */
+.feed__row--selected,
+.feed__row--selected:hover {
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 0 var(--bone);
+}
+
+.feed__row--selected .feed__merchant {
+  color: var(--bone);
 }
 
 /* --- Line 1: time (left) · amount (right) --------------------------------- */

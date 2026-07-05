@@ -1,0 +1,277 @@
+/*
+ * Investigation view — the Inspector's take-over surface for a selected decision.
+ * Cold and quiet by design: no warmth (reserved for Trace), no motion. Signal
+ * colors limited to --alert (fraud) and --alive (active belief), both already in
+ * the console's vocabulary. Reuses .inspector__section / .inspector__heading /
+ * .panel__note from the shared Inspector chrome.
+ */
+
+.inv {
+  display: flex;
+  flex-direction: column;
+}
+
+.inv__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.inv__heading {
+  margin: 0;
+}
+
+.inv__close {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ghost);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+}
+
+.inv__close:hover {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+.inv__close:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: 1px;
+}
+
+.inv__note {
+  padding: 0.2rem 0 0;
+}
+
+/* --- The selected decision ------------------------------------------------ */
+
+.inv__decision {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.inv__decision-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.inv__merchant {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--bone);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inv__amount {
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.inv__decision-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.inv__verdict {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ghost);
+}
+
+.inv__verdict--blocked {
+  color: var(--bone);
+}
+
+.inv__conf {
+  color: var(--ash);
+  font-variant-numeric: tabular-nums;
+}
+
+.inv__fraud {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--alert);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.inv__fraud-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--alert);
+  display: inline-block;
+}
+
+/* key/value grid: txn · agent · decided */
+.inv__kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.32rem 0.7rem;
+}
+
+.inv__kv > div {
+  display: contents;
+}
+
+.inv__kv dt {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ash);
+  align-self: baseline;
+}
+
+.inv__kv dd {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ghost);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inv__mono {
+  font-family: var(--font-mono);
+  color: var(--ghost);
+}
+
+.inv__agent {
+  font-family: var(--font-mono);
+  color: var(--bone);
+}
+
+.inv__agent--unknown {
+  color: var(--ash);
+}
+
+/* --- The driving belief --------------------------------------------------- */
+
+.inv__belief {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  padding: 0.6rem 0.7rem;
+}
+
+.inv__belief--invalidated {
+  border-color: var(--alert);
+}
+
+.inv__belief-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.inv__belief-status {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--alive);
+}
+
+.inv__belief-status--invalidated {
+  color: var(--alert);
+}
+
+.inv__belief-origin {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ghost);
+}
+
+.inv__belief-rule {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--bone);
+}
+
+.inv__belief-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.8rem;
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ash);
+}
+
+.inv__invalidated {
+  color: var(--alert);
+}
+
+/* --- The inherited / formed-here tag (the centrepiece) -------------------- */
+
+.inv__tag {
+  margin-top: 0.7rem;
+  border: 1px solid var(--line);
+  border-left-width: 2px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+/* Both variants stay COLD — the finding is emphasised by weight and a left rule,
+   never by warmth (warmth is Trace's alone). */
+.inv__tag--inherited {
+  border-left-color: var(--bone);
+}
+
+.inv__tag--formed {
+  border-left-color: var(--ash);
+}
+
+.inv__tag-label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--bone);
+}
+
+.inv__tag-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--ghost);
+}
+
+.inv__gap {
+  color: var(--bone);
+}

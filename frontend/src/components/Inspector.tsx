@@ -1,6 +1,10 @@
 /*
- * Inspector — the right region. With no selection (interactions are Phase 3), it
- * shows a real default: a fleet summary stat block over the belief catalog.
+ * Inspector — the right region. It is one evolving surface, not an accreting
+ * stack: with no selection it shows the default (a fleet summary stat block over
+ * the belief catalog); when a decision is investigated it is TAKEN OVER by the
+ * Investigation view (the fleet counts persist in the app header, so nothing
+ * critical is lost). ✕ in that view returns here. This keeps the region free for
+ * Trace / Time-travel / Invalidate to occupy the same space in later steps.
  *
  * The fleet summary reads counts from all three console slots (agents / decisions
  * / beliefs), each defensively — a slot that isn't ready yet shows "—" rather than
@@ -13,7 +17,9 @@
 import type { Loadable } from "../hooks/useConsoleData";
 import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsoleData";
 import type { Belief } from "../api/types";
+import type { Investigation as InvestigationData } from "../lib/investigation";
 import { Loaded } from "./Panel";
+import { Investigation } from "./Investigation";
 import { fragId, formatCount, formatDate } from "../lib/format";
 import "./Inspector.css";
 
@@ -97,7 +103,14 @@ export function Inspector(props: {
   agents: Loadable<AgentsData>;
   decisions: Loadable<DecisionsData>;
   beliefs: Loadable<BeliefsData>;
+  investigation: InvestigationData | null;
+  onClear: () => void;
 }) {
+  // A selected decision takes over the whole Inspector surface.
+  if (props.investigation) {
+    return <Investigation inv={props.investigation} onClear={props.onClear} />;
+  }
+
   return (
     <div className="inspector">
       <FleetSummary
