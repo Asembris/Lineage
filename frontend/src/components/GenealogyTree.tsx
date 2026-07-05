@@ -16,12 +16,21 @@ import type { AgentsData } from "../hooks/useConsoleData";
 import type { UUID } from "../api/types";
 import { computeTreeLayout, type TreeEdge, type TreeLayout } from "../lib/treeLayout";
 import { TraceOverlay, type TraceGeo } from "./TraceOverlay";
+import { InvalidateOverlay, type InvalGeo } from "./InvalidateOverlay";
 import "./GenealogyTree.css";
 
 export interface TreeTrace {
   chain: UUID[]; // ordered leaf (investigated agent) → origin
   playToken: number;
   onComplete: () => void;
+}
+
+/** The living holders of the belief being invalidated + the phase to render them in.
+ *  livingHolders are the closure's alive agents (the fork: > 1 — the reveal). */
+export interface TreeInvalidation {
+  livingHolders: UUID[];
+  phase: "armed" | "corrected";
+  playToken: number;
 }
 
 function edgePath(e: TreeEdge): string {
@@ -78,12 +87,35 @@ function computeTraceGeo(layout: TreeLayout, chain: UUID[]): TraceGeo {
   return { edges, nodes };
 }
 
-export function GenealogyTree({ data, trace }: { data: AgentsData; trace?: TreeTrace | null }) {
+function computeInvalGeo(layout: TreeLayout, livingHolders: UUID[]): InvalGeo {
+  const nodeById = new Map(layout.nodes.map((n) => [n.agent.id, n]));
+  const holders: InvalGeo["holders"] = [];
+  for (const id of livingHolders) {
+    const n = nodeById.get(id);
+    if (!n) continue; // holder not in the rendered layout — skip honestly
+    holders.push({ id, x: n.x, y: n.y, gen: n.agent.generation });
+  }
+  return { holders };
+}
+
+export function GenealogyTree({
+  data,
+  trace,
+  invalidation,
+}: {
+  data: AgentsData;
+  trace?: TreeTrace | null;
+  invalidation?: TreeInvalidation | null;
+}) {
   const layout = useMemo(() => computeTreeLayout(data.agents), [data.agents]);
   const alive = layout.nodes.filter((n) => n.isAlive).length;
   const traceGeo = useMemo(
     () => (trace ? computeTraceGeo(layout, trace.chain) : null),
     [layout, trace],
+  );
+  const invalGeo = useMemo(
+    () => (invalidation ? computeInvalGeo(layout, invalidation.livingHolders) : null),
+    [layout, invalidation],
   );
 
   return (
@@ -144,6 +176,12 @@ export function GenealogyTree({ data, trace }: { data: AgentsData; trace?: TreeT
         {/* trace overlay — warmth on top of the cold tree, only when tracing */}
         {trace && traceGeo && (
           <TraceOverlay geo={traceGeo} playToken={trace.playToken} onComplete={trace.onComplete} />
+        )}
+
+        {/* invalidate overlay — both living holders marked (--alert) then corrected
+            (--alive) together at one commit; the closure reveal + atomic correction */}
+        {invalidation && invalGeo && (
+          <InvalidateOverlay geo={invalGeo} phase={invalidation.phase} playToken={invalidation.playToken} />
         )}
 
         {/* generation axis */}

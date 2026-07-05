@@ -636,3 +636,63 @@ is measured performance against a drifting world, not a mutated field."*
   Rendered data checks: present-day conf 0.53 (`--alert`), when-formed 0.92 (`--alive`), derivation
   "0.92 → 0.53 across 8 measured windows", both deposition rows `held · ACTIVE` at a real AOST timestamp +
   present. Reduced-motion collapses to the identical final state. `tsc -b` + oxlint clean.
+
+### Invalidate (2026-07-05) — the one governed write, and the closure reveal
+
+Fourth and final supervisor interaction. From a resolved belief, a confirmation-gated "Invalidate
+belief fleet-wide" corrects the belief AND its whole inherited closure at ONE commit. This is the
+step deliberately reserved (since the Trace plan) to reveal the FORK: the belief has TWO living
+holders — the spine tip crimson-7 (`3fb55c`) AND the branch crimson-5b (`cd75b3`), which Trace's
+single chain never lit — and both correct together atomically.
+
+- **Backend contract (verified against code, not memory) + the one additive change.** POST
+  /beliefs/{id}/invalidate takes `{actor_id}` (non-nil uuid → 422 on nil; NOT checked against
+  `agents` — the human supervisor is not a fleet agent). 404 unknown / 409 already-invalidated.
+  Response `InvalidateResponse` carried the certificate OUTCOME (certificate_id, content_hash,
+  certificate_s3_key, certificate_status, db_snapshot_hlc, affected/living counts, audit_id) but
+  NOT the cert body — and there is no GET route for the cert. **Approved change: serialize
+  `pre_invalidation_state` onto the response** (the self-contained "belief active, closure fully
+  open" record). It is the SAME `inv["pre_state"]` dict `build_certificate` already embeds and
+  hash-covers — one source of truth, no re-derivation, no new query, no migration. Rationale
+  (approver): a client-side reconstruction would be a second computation path that can silently
+  disagree — the same risk rejected when choosing the /performance data source. **Round-trip test**
+  (tests/test_atomic_invalidation.py) now asserts `response.pre_invalidation_state ==` the value
+  fetched from S3 and hash-verified — proven identical, not look-alike. 4 atomic-invalidation tests
+  pass (~136s, live cluster + real S3). Deliberately NOT duplicated into the response:
+  living-holder IDENTITIES (come from the lineage closure) and staleness_evidence (the /performance
+  endpoint) — each stays sourced where it already lives.
+- **Frontend architecture mirrors Trace.** App owns `InvalidateState`
+  (idle→arming→confirming→invalidating→done|error) because the confirm gate is in the Inspector
+  while the closure-reveal + atomic-correction animation is in the genealogy tree (two regions
+  coordinate). Arming fetches `GET /beliefs/{id}/lineage`; `deriveClosure` = alive nodes
+  (livingHolders) + non-origin nodes (edgeCount). Confirm → real POST; 409 → honest "already
+  invalidated" branch. Supervisor actor = a fixed non-nil constant `lib/supervisor.ts` (non-fleet,
+  per the backend design).
+- **Tree `InvalidateOverlay`** (additive `<g>`, like TraceOverlay): "armed" pulses both holders
+  `--alert`; "corrected" flips both to `--alive` in ONE shared transition (no per-node stagger —
+  the simultaneity IS the single-commit message). Azure's gen-7 stays green (different bloodline,
+  not a holder) — the overlay marks only real closure holders. transforms/opacity only;
+  prefers-reduced-motion collapses each phase to its static final state.
+- **Cert outcome shown honestly** (`Invalidate.tsx`, not a generic toast): the sealed pre-kill
+  state (`belief active · closure 8/8 open · 2 living holders · issue-time-read`), certificate
+  status, full sha256, S3 key, snapshot HLC, audit id. `certificate_status:"failed"` is surfaced as
+  "invalidation durable, S3 write retriable". Belief card reflects the just-done invalidation
+  (status→invalidated from the authoritative response) so the header never contradicts the outcome.
+- **Colors: `--alert` (consequential action) + `--alive` (correction) ONLY.** No amber/orange —
+  `--trace`/`--origin` stay Trace's. Motion is the tree's; the Inspector outcome just fades in.
+- **Cluster state finding (flagged before building).** The belief was ACTIVE (no reseed needed for
+  the write) BUT `decisions`/`belief_performance` were EMPTY (Phase-1 genealogy only) — the feed was
+  empty and the cert staleness would be unavailable. So a backfill was required regardless. Each real
+  invalidation consumes the active belief, so this stream ran `python -m seed.backfill_decisions`
+  (via `.venv`, ~228s each) THREE times: before the motion run, before the reduced-motion run, and a
+  final handoff reseed leaving the belief ACTIVE + 4000 decisions + 8 perf windows for the user to
+  test the whole flow.
+- **Verification (Playwright @1440, live 5173→8000 stack).** Motion + reduced-motion both:
+  2 holders armed → 2 corrected, `certificate_status=written`, real pre-state
+  `belief active · closure 8/8 open · 2 living holders (issue-time-read)`, real sha256, ZERO page
+  errors. Reduced-motion collapses straight to the final corrected state. `tsc -b` + oxlint clean.
+- **Env gotcha:** stale uvicorn (8000) + vite (5173/5174) from prior sessions were already up; a new
+  vite landed on 5175 (CORS only allows 5173). Confirmed the running 8000 server already served the
+  new `pre_invalidation_state` (its OpenAPI carried it — a --reload instance had picked up the edit),
+  so the existing 5173→8000 stack was current and used directly. Redundant self-started 8001/5175
+  were killed. Do NOT run two backfills at once (the documented TRUNCATE-CASCADE collision).

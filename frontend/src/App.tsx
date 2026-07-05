@@ -5,11 +5,14 @@ import { DecisionFeed } from "./components/DecisionFeed";
 import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
 import type { InvestigationTrace } from "./components/Investigation";
+import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
+import type { TreeInvalidation } from "./components/GenealogyTree";
 import { resolveInvestigation } from "./lib/investigation";
 import { deriveChain } from "./lib/trace";
-import { getBeliefLineage } from "./api/client";
+import { SUPERVISOR_ACTOR } from "./lib/supervisor";
+import { ApiError, getBeliefLineage, invalidateBelief } from "./api/client";
 import { formatCount } from "./lib/format";
-import type { LineageResponse, UUID } from "./api/types";
+import type { InvalidateResponse, LineageResponse, UUID } from "./api/types";
 import "./App.css";
 
 /*
@@ -38,6 +41,31 @@ type TraceState =
       playToken: number;
       phase: "animating" | "done";
     };
+
+/** The belief's real inheritance closure, derived from GET /beliefs/{id}/lineage. The
+ *  living holders are the closure's alive agents — the fork Invalidate reveals (> 1 here)
+ *  and corrects at one commit. edgeCount is the number of inheritance edges (non-origin nodes). */
+interface Closure {
+  livingHolders: UUID[];
+  edgeCount: number;
+}
+
+/** The invalidate lifecycle. App owns it (like TraceState) because the confirm gate is in the
+ *  Inspector while the closure-reveal + atomic-correction animation is in the genealogy tree. */
+type InvalidateState =
+  | { status: "idle" }
+  | { status: "arming"; beliefId: UUID } // fetching the closure to populate the confirm scope
+  | { status: "confirming"; beliefId: UUID; closure: Closure }
+  | { status: "invalidating"; beliefId: UUID; closure: Closure }
+  | { status: "done"; beliefId: UUID; closure: Closure; result: InvalidateResponse; playToken: number }
+  | { status: "error"; beliefId: UUID; message: string; alreadyInvalidated: boolean; closure: Closure | null };
+
+function deriveClosure(lineage: LineageResponse): Closure {
+  return {
+    livingHolders: lineage.path.filter((n) => n.status === "alive").map((n) => n.agent_id),
+    edgeCount: lineage.path.filter((n) => n.from_agent_id !== null).length,
+  };
+}
 
 function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["agents"] }) {
   if (agents.status !== "ready") {
@@ -93,11 +121,79 @@ function App() {
   const onTraceComplete = () =>
     setTrace((t) => (t.status === "ready" ? { ...t, phase: "done" } : t));
 
-  // View projections for the two consumers.
+  // Invalidate state — the one governed write. Also reset when the investigated decision
+  // changes, so a completed/armed kill never lingers over a fresh investigation.
+  const [inval, setInval] = useState<InvalidateState>({ status: "idle" });
+  useEffect(() => setInval({ status: "idle" }), [selectedId]);
+
+  const armInvalidate = async (beliefId: UUID) => {
+    setInval({ status: "arming", beliefId });
+    try {
+      const lineage = await getBeliefLineage(beliefId);
+      setInval({ status: "confirming", beliefId, closure: deriveClosure(lineage) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setInval({ status: "error", beliefId, message, alreadyInvalidated: false, closure: null });
+    }
+  };
+  const cancelInvalidate = () => setInval({ status: "idle" });
+  const confirmInvalidate = async () => {
+    if (inval.status !== "confirming") return; // Confirm is only reachable from the gate.
+    const { beliefId, closure } = inval;
+    setInval({ status: "invalidating", beliefId, closure });
+    try {
+      const result = await invalidateBelief(beliefId, SUPERVISOR_ACTOR);
+      setInval({ status: "done", beliefId, closure, result, playToken: 1 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const alreadyInvalidated = err instanceof ApiError && err.status === 409;
+      setInval({ status: "error", beliefId, message, alreadyInvalidated, closure });
+    }
+  };
+
+  // View projections for the tree + inspector consumers.
   const treeTrace =
     trace.status === "ready"
       ? { chain: trace.chain, playToken: trace.playToken, onComplete: onTraceComplete }
       : null;
+
+  // Tree overlay: mark the living holders --alert while armed, then --alive on correction.
+  const treeInvalidation: TreeInvalidation | null =
+    inval.status === "confirming" || inval.status === "invalidating"
+      ? { livingHolders: inval.closure.livingHolders, phase: "armed", playToken: 0 }
+      : inval.status === "done"
+        ? { livingHolders: inval.closure.livingHolders, phase: "corrected", playToken: inval.playToken }
+        : inval.status === "error" && inval.closure
+          ? { livingHolders: inval.closure.livingHolders, phase: "armed", playToken: 0 }
+          : null;
+
+  const invalidateUi: InvalidateUi =
+    inval.status === "arming"
+      ? { status: "arming" }
+      : inval.status === "confirming"
+        ? {
+            status: "confirming",
+            livingHolderCount: inval.closure.livingHolders.length,
+            edgeCount: inval.closure.edgeCount,
+          }
+        : inval.status === "invalidating"
+          ? {
+              status: "invalidating",
+              livingHolderCount: inval.closure.livingHolders.length,
+              edgeCount: inval.closure.edgeCount,
+            }
+          : inval.status === "done"
+            ? { status: "done", result: inval.result }
+            : inval.status === "error"
+              ? { status: "error", message: inval.message, alreadyInvalidated: inval.alreadyInvalidated }
+              : { status: "idle" };
+
+  const invalidateHandlers: InvalidateHandlers = {
+    ui: invalidateUi,
+    onArm: armInvalidate,
+    onConfirm: confirmInvalidate,
+    onCancel: cancelInvalidate,
+  };
 
   const traceUi: InvestigationTrace =
     trace.status === "ready"
@@ -145,7 +241,9 @@ function App() {
         <div className="console__region">
           <Panel title="Genealogy">
             <Loaded state={agents} loadingLabel="Loading genealogy…">
-              {(data) => <GenealogyTree data={data} trace={treeTrace} />}
+              {(data) => (
+                <GenealogyTree data={data} trace={treeTrace} invalidation={treeInvalidation} />
+              )}
             </Loaded>
           </Panel>
         </div>
@@ -163,6 +261,7 @@ function App() {
                 onStartTrace: startTrace,
                 onReplay: replayTrace,
               }}
+              invalidateHandlers={invalidateHandlers}
             />
           </Panel>
         </div>

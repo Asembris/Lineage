@@ -20,6 +20,7 @@ import type { Belief } from "../api/types";
 import type { Investigation as InvestigationData } from "../lib/investigation";
 import { Loaded } from "./Panel";
 import { Investigation, type TraceHandlers } from "./Investigation";
+import type { InvalidateHandlers } from "./Invalidate";
 import { fragId, formatCount, formatDate } from "../lib/format";
 import "./Inspector.css";
 
@@ -106,6 +107,7 @@ export function Inspector(props: {
   investigation: InvestigationData | null;
   onClear: () => void;
   traceHandlers: TraceHandlers;
+  invalidateHandlers: InvalidateHandlers;
 }) {
   // A selected decision takes over the whole Inspector surface.
   if (props.investigation) {
@@ -114,6 +116,7 @@ export function Inspector(props: {
         inv={props.investigation}
         onClear={props.onClear}
         handlers={props.traceHandlers}
+        invalidateHandlers={props.invalidateHandlers}
       />
     );
   }
