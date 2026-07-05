@@ -104,6 +104,20 @@ export interface DecisionListResponse {
   agent_id: UUID | null;
 }
 
+/** The self-contained pre-kill record (PreInvalidationState) — captured inside the
+ *  invalidation txn before the flip. This is the SAME dict embedded and hash-covered in
+ *  the S3 certificate (the backend serializes one value into both; a round-trip test
+ *  asserts byte-identity), so the console can surface the proof without reconstructing it. */
+export interface PreInvalidationState {
+  belief_status: string; // 'active' by the invalidation guard
+  closure_edge_total: number;
+  closure_edge_open: number;
+  affected_agent_count: number;
+  living_holder_count: number;
+  snapshot_hlc: string;
+  source: string; // 'issue-time-read' | 'aost-replay' | 'derived'
+}
+
 export interface InvalidateResponse {
   belief_id: UUID;
   status: string; // 'invalidated'
@@ -114,6 +128,7 @@ export interface InvalidateResponse {
   living_holder_count: number;
   db_snapshot_hlc: string;
   audit_id: UUID;
+  pre_invalidation_state: PreInvalidationState;
   certificate_id: UUID | null;
   certificate_s3_key: string | null;
   certificate_status: string; // 'written' | 'failed'

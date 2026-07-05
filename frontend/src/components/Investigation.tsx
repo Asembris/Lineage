@@ -13,6 +13,7 @@ import type { Investigation as InvestigationData } from "../lib/investigation";
 import type { UUID } from "../api/types";
 import { fragId, formatAmount, formatConfidence, formatDate, splitInstant } from "../lib/format";
 import { TimeTravel } from "./TimeTravel";
+import { InvalidateBlock, type InvalidateHandlers } from "./Invalidate";
 import "./Investigation.css";
 
 /** UI-facing view of the App's trace state (App owns the real state/animation). */
@@ -161,7 +162,15 @@ function TraceBlock({ inv, handlers }: { inv: InvestigationData; handlers: Trace
   );
 }
 
-function DrivingBelief({ inv, handlers }: { inv: InvestigationData; handlers: TraceHandlers }) {
+function DrivingBelief({
+  inv,
+  handlers,
+  invalidateHandlers,
+}: {
+  inv: InvestigationData;
+  handlers: TraceHandlers;
+  invalidateHandlers: InvalidateHandlers;
+}) {
   if (inv.beliefState === "none") {
     return (
       <p className="panel__note inv__note">
@@ -183,13 +192,17 @@ function DrivingBelief({ inv, handlers }: { inv: InvestigationData; handlers: Tr
   }
 
   const b = inv.belief;
+  // If THIS session just invalidated the belief, reflect that in the card immediately — the
+  // invalidation response is authoritative, so the header never contradicts the outcome block
+  // below it (the loaded catalog, fetched at page load, would otherwise still read "active").
+  const done = invalidateHandlers.ui.status === "done" ? invalidateHandlers.ui.result : null;
+  const status = done ? "invalidated" : b.status;
+  const invalidatedAt = done ? done.invalidated_at : b.invalidated_at;
   return (
     <>
-      <div className={`inv__belief${b.status !== "active" ? " inv__belief--invalidated" : ""}`}>
+      <div className={`inv__belief${status !== "active" ? " inv__belief--invalidated" : ""}`}>
         <div className="inv__belief-head">
-          <span className={`inv__belief-status inv__belief-status--${b.status}`}>
-            {b.status}
-          </span>
+          <span className={`inv__belief-status inv__belief-status--${status}`}>{status}</span>
           <span className="inv__belief-origin" title={`originating agent ${b.originating_agent_id}`}>
             origin {fragId(b.originating_agent_id)}
           </span>
@@ -197,14 +210,15 @@ function DrivingBelief({ inv, handlers }: { inv: InvestigationData; handlers: Tr
         <p className="inv__belief-rule">{b.rule_text}</p>
         <div className="inv__belief-meta">
           <span>formed {formatDate(b.formed_at)}</span>
-          {b.invalidated_at && (
-            <span className="inv__invalidated">invalidated {formatDate(b.invalidated_at)}</span>
+          {invalidatedAt && (
+            <span className="inv__invalidated">invalidated {formatDate(invalidatedAt)}</span>
           )}
         </div>
       </div>
       <InheritedBadge inv={inv} />
       <TraceBlock inv={inv} handlers={handlers} />
       <TimeTravel inv={inv} />
+      <InvalidateBlock belief={b} handlers={invalidateHandlers} />
     </>
   );
 }
@@ -213,10 +227,12 @@ export function Investigation({
   inv,
   onClear,
   handlers,
+  invalidateHandlers,
 }: {
   inv: InvestigationData;
   onClear: () => void;
   handlers: TraceHandlers;
+  invalidateHandlers: InvalidateHandlers;
 }) {
   const d = inv.decision;
   const { date, time } = splitInstant(d.decided_at);
@@ -270,7 +286,7 @@ export function Investigation({
       {/* The belief that drove it */}
       <section className="inspector__section inv__section">
         <h3 className="inspector__heading">Driving belief</h3>
-        <DrivingBelief inv={inv} handlers={handlers} />
+        <DrivingBelief inv={inv} handlers={handlers} invalidateHandlers={invalidateHandlers} />
       </section>
     </div>
   );

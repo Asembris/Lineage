@@ -125,6 +125,52 @@
   text-anchor: middle;
 }
 
+/* --- Invalidate overlay (the one governed write) -------------------------- */
+
+/* Living holders of the belief under invalidation. --alert while armed (acting on
+   the stale belief), --alive once corrected (the atomic fleet-wide fix). No amber —
+   that warmth is the Trace overlay's alone. */
+.tree__inval-halo--alert {
+  fill: none;
+  stroke: var(--alert);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(229, 72, 77, 0.55));
+}
+
+.tree__inval-halo--alive {
+  fill: none;
+  stroke: var(--alive);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 5px rgba(63, 224, 168, 0.6));
+}
+
+.tree__inval-dot--alert {
+  fill: var(--surface-2);
+  stroke: var(--alert);
+  stroke-width: 2.5;
+}
+
+.tree__inval-dot--alive {
+  fill: var(--surface-2);
+  stroke: var(--alive);
+  stroke-width: 2.5;
+}
+
+.tree__inval-gen {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.tree__inval-gen--alert {
+  fill: var(--alert);
+}
+
+.tree__inval-gen--alive {
+  fill: var(--alive);
+}
+
 /* --- Band labels + axis --------------------------------------------------- */
 
 .tree__band-label {
