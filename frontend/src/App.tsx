@@ -3,6 +3,7 @@ import { Loaded, Panel } from "./components/Panel";
 import { DecisionFeed } from "./components/DecisionFeed";
 import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
+import { formatCount } from "./lib/format";
 import "./App.css";
 
 /*
@@ -34,8 +35,12 @@ function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["a
 function App() {
   const { agents, decisions, beliefs } = useConsoleData();
 
+  // Feed header count is honest about the bounding: loaded / cluster total. The
+  // feed shows the most-recent page (limit 200), not every row.
   const decisionCount =
-    decisions.status === "ready" ? decisions.data.total : undefined;
+    decisions.status === "ready"
+      ? `${formatCount(decisions.data.decisions.length)} / ${formatCount(decisions.data.total)}`
+      : undefined;
   const beliefCount = beliefs.status === "ready" ? beliefs.data.count : undefined;
 
   return (
@@ -67,9 +72,7 @@ function App() {
 
         <div className="console__region">
           <Panel title="Inspector" count={beliefCount}>
-            <Loaded state={beliefs} loadingLabel="Loading beliefs…">
-              {(data) => <Inspector data={data} />}
-            </Loaded>
+            <Inspector agents={agents} decisions={decisions} beliefs={beliefs} />
           </Panel>
         </div>
       </div>

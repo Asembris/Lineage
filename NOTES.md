@@ -468,3 +468,32 @@ not conflate the numbers. Backend is frozen this phase except nothing — no bac
 - Screenshots: no repo dep added. Playwright installed in the scratchpad (`--no-save`); full
   chromium via `chromium.launch({ channel: 'chromium' })` (the default headless path wanted the
   chrome-headless-shell build which wasn't present). Script: scratchpad/shot.mjs.
+
+### Stage C — decision feed + inspector (committed; COMPLETES Frontend Phase 2)
+- **Backfill had to be re-run first** — the cluster's `decisions` was empty again at Stage-C start
+  (seed.seed() truncates it), exactly as the Stage-B note warned. `python -m seed.backfill_decisions`
+  reseeded genealogy (same 24 agents / 1 belief) + inserted 4000 rows in ~228s. Emergent curve
+  reproduced byte-for-byte (conf g0..g7 .924 .952 .876 .852 .724 .556 .624 .528; gen-6 recession
+  dip intact; fraud% 7.6→47.2). Deterministic — same numbers every run.
+- **DecisionFeed** (`components/DecisionFeed.{tsx,css}`): fleet-wide feed, newest-first. Bounded
+  live window, NOT a table dump — hook already fetches the backend max page (limit=200, offset 0);
+  no offset paging / "load more" (that's a Phase-3 interaction). Header count is honest: `200 / 4000`
+  (loaded / cluster total). Because newest-first, all 200 rows are window-7 (the DENSEST fraud gen,
+  ~28% fraud across the page) — so the rendered feed is the worst-case density by construction.
+- **Fraud accent** = the one signal in the feed: `--alert` (fraud is the palette's designated alert
+  meaning, distinct from the reserved amber/orange trace warmth — approved). Kept minimal: a 2px left
+  rule + a 6px dot, NO "FRAUD" text word (a red word on ~28% of rows would be noise). Verified at real
+  worst-case density across 1280/1440/1920 — reads as a scannable peripheral flag, not a wash. Erring
+  subtle on purpose (Phase-2 stays quiet so the Phase-3 trace lands).
+- **Inspector** (`components/Inspector.{tsx,css}`): fleet stat block (agents/alive/dead/decisions/
+  beliefs-active, each read DEFENSIVELY from its own slot — a not-ready slot shows "—", preserving
+  per-panel degradation) over the belief catalog (rule_text, status, origin 6-char frag, formed date,
+  invalidated flag when set). Origin frag `108cf7` == the crimson gen-0 tree node — real cross-panel
+  coherence, not coincidence (the belief's originating_agent IS crimson-0).
+- **App wiring**: Inspector now takes all three Loadables (was beliefs-only) so the fleet block can
+  count agents+decisions; belief catalog still gated on the beliefs slot via `Loaded`.
+- **New** `lib/format.ts`: deterministic formatters (USD amount, thousands count, 2-dp confidence,
+  6-char id frag, ISO instant sliced to date/time — NOT parsed through local tz, so the record shows
+  exactly what the cluster stored). `tsc -b` clean, oxlint clean, no page errors at any width.
+- Belief `ACTIVE` status reuses `--alive` green (active/healthy) — a deliberate reuse of the existing
+  cold+green vocabulary, no new color, not warmth.
