@@ -520,6 +520,110 @@ not conflate the numbers. Backend is frozen this phase except nothing — no bac
 - Belief `ACTIVE` status reuses `--alive` green (active/healthy) — a deliberate reuse of the existing
   cold+green vocabulary, no new color, not warmth.
 
+## Frontend Phase 4 — live consistency demo (2026-07-05)
+
+### Verbatim SSE capture — GET /demo/consistency/stream (curl -sN, live cluster, before any design)
+Captured a full run against the running backend so components are built on the REAL wire shape,
+not the NOTES prose summary. Confirms exact event names + payload keys. (This run was itself the
+destructive reseed→fan-out→invalidation; belief left invalidated, re-backfilled after.)
+
+Wire format = sse-starlette: `event: <name>\ndata: <json>\n\n`, plus `: ping - <ts>` COMMENT
+keep-alive lines every 15s (`ping=15`) that a consumer must ignore (they are not events).
+
+Events observed, in order (payloads verbatim):
+- `event: start`
+  `{"belief_id": "898ad0e5-b4f8-5863-abe3-4145c9b5af68", "strategy": "eventual", "note": "per-holder fan-out to invalidation; watch the SPLIT window open"}`
+- `event: sample` × 25 (seq 1..25). Shape:
+  `{"seq": 1, "state": "ALL_ACTIVE", "open_edges": 8, "total_edges": 8, "elapsed_ms": 141}`
+  - `state` ∈ {`ALL_ACTIVE`, `SPLIT`, `ALL_INVALIDATED`} (consistency.classify).
+  - Real drain observed: open_edges 8→8→7→7→7→6…→1→0 across the samples; total_edges constant 8.
+  - `elapsed_ms` real observer timing: 141, 360, 610, 860, 1188, 1422, 1875, 2110, 2344, 2610,
+    2875, 3141, 3407, 3688, 4063, 4360, 4610, 4891, 5157, 5547, 5766(→ALL_INVALIDATED), …, 6688.
+    Multi-second real gaps (per-holder delay 0.5s in the endpoint); do NOT smooth/interpolate.
+  - First SPLIT at seq 3 (open 7), first ALL_INVALIDATED at seq 21 (open 0, elapsed 5766ms).
+- `event: summary`
+  `{"commit_points": 9, "split_samples": 18, "saw_transition": true, "total_samples": 25, "elapsed_ms": 6719}`
+  - `commit_points: 9` = 8 edges + 1 belief row (the eventual baseline) — vs the atomic endpoint's 1.
+    That 1-vs-9 is the STRUCTURAL fact to state plainly (9 is real from this payload; 1 is the
+    documented strong-path fact from consistency.py, NOT in this stream — label its source).
+  - `split_samples: 18` = committed, externally-visible torn reads (matches the 18 SPLIT samples).
+- `event: busy` (NOT seen this run; sent when `_stream_active` already true):
+  `{"detail": "a consistency stream is already running; retry shortly"}` — terminal, stream then ends.
+
+Design implications locked from this capture (not assumed): consume by `event:` name; parse
+`data` as JSON; ignore `:`-comment pings; `total_edges` is the denominator for a drain meter;
+`open_edges` the numerator; `state` drives the ALL_ACTIVE/SPLIT/ALL_INVALIDATED coloring;
+`summary.commit_points` is the only real commit count on the wire (9). Full raw capture saved to
+scratchpad/sse_capture.txt during the session.
+
+### Pre-build backend-behavior confirmations (empirical, via scratchpad httpx probes — not assumed)
+Two build additions required confirming REAL backend behavior before designing the UI states
+(backend is frozen this phase — if either had failed it would have been a flag, not a fix).
+
+- **Mid-stream abort releases the single-flight guard (PASS).** Opened the stream, read until
+  genuinely mid-DRAIN (past reseed, ≥3 samples), then CLOSED the TCP connection (httpx `stream`
+  context exit == what the frontend's `fetch` AbortController does). Waited 3s; opened a fresh
+  stream → it got a clean `event: start`, NOT `busy`. So sse-starlette detects the client
+  disconnect, throws GeneratorExit, and `_consistency_events`' outer `finally` sets
+  `_stream_active=False` even when aborted mid-drain (previously only exercised on clean
+  completion). CONSEQUENCE: the "click Run, watch partway, hit Stop" workflow is safe — Stop won't
+  wedge the backend `busy`. (Must still re-verify the SAME through the real frontend Stop button +
+  component unmount during the build, per the approval.)
+- **An already-invalidated belief does NOT break the stream (PASS — self-heals).** Ran a stream to
+  full completion (belief → invalidated, summary `commit_points:9 split_samples:20 total 28`), then
+  immediately ran another. Stream 2's seq-1 was `ALL_ACTIVE / open_edges 8 / total 8` — proving the
+  endpoint's `run_seed()` (TRUNCATE CASCADE + reseed belief `status='active'` + 8 open edges) resets
+  a dead belief back to active BEFORE the fan-out. So there is NO 409 and NO "corrected animation
+  over nothing"; the demo always drains a real active 8/8 closure. The frontend needs no separate
+  already-invalidated state for the stream path — but WILL still show honest `busy` / error / no-
+  `start`-timeout terminals.
+- **Reseed latency is VARIABLE (2s clean → ~30s under backlog).** A single clean run reseeds in
+  ~2–3s (first capture). Rapid abort-during-reseed + immediate retry queues CRDB schema-change jobs
+  (the TRUNCATE "indexes being dropped" gotcha, Phase 3 Step 7) and inflated reseed to ~30s during
+  probing. DESIGN CONSEQUENCE: between Confirm and the first `start`, show an explicit "reseeding
+  cluster…" waiting state with a generous timeout; never a blank hang. Aborting during the DRAIN
+  (after `start`) is collision-safe; aborting during the RESEED then instantly re-running is what
+  provokes the backlog — not a normal single-operator path.
+
+### Build + verification (2026-07-05) — Frontend Phase 4 DONE
+Standalone FLEET-LEVEL view (takes over the console body via a header toggle: `view` flag in
+App, no router, no new dep) — NOT bolted onto the Inspector, because the demo is fleet-scoped,
+not per-decision/per-agent like the four supervisor interactions (coupling it to row-selection
+state + cramming a drain timeline into the 24rem column both rejected). No new dependencies;
+framer-motion NOT used here (motion is opacity-only CSS, reduced-motion-guarded — the demo stays
+quiet so Trace/Time-travel remain the two loud moments).
+- **lib/consistencyStream.ts** — fetch + ReadableStream reader (NOT EventSource; see the client.ts
+  note). Runs once, never reconnects; `summary`/`busy` terminal→abort; 20s silence watchdog reset
+  by any chunk incl. 15s pings; `stop()` for Stop button + unmount. openConsistencyStream deleted.
+- **components/ConsistencyDemo** — idle → arm/confirm gate (states the destructive blast radius:
+  truncate+reseed, belief left invalidated, decisions/perf reset, re-backfill needed) → reseeding
+  (explicit waiting state) → streaming → done | busy | error | stopped. Drain meter: closed edge =
+  --alive (corrected), open-while-torn = --alert (laggard still live on the dead belief), open-at-
+  rest = --ash; SPLIT banner --alert, ALL_INVALIDATED --alive. Samples append with real elapsed_ms
+  (no smoothing). Stopped state states the honest consequence: the closure is left PARTIALLY
+  invalidated (a real torn state, not a clean rollback) until the next run reseeds.
+- **The 1-vs-9 copy (honesty-critical, reviewed):** 9 and split_samples are labeled "measured this
+  run" (off summary); the atomic "1 commit / 0 split reads" is labeled "a property of the atomic
+  transaction design, not a number off this stream" and cites POST /beliefs/{id}/invalidate's
+  single serializable txn + Phase 3's strong-path test. Never presented as a live measurement.
+- **Abort lifecycle re-verified through the REAL frontend (the mandated check):** Playwright drove
+  a run mid-drain, then (A) clicked Stop and (B) left the view (ConsistencyDemo unmount). After
+  BOTH, a fresh run was ACCEPTED on the first attempt — NOT busy. So the client abort (fetch
+  AbortController → TCP close) releases the backend `_stream_active` guard in practice, not just in
+  the httpx probe. Stop shows the honest partial-state note. (Race caveat: the guard needs ~1-3s to
+  detect the disconnect; a Run-again faster than that would get an honest `busy` + Retry, which the
+  UI handles — not a wedge.)
+- **Screenshot-and-critique @1280/1440/1920, motion + reduced-motion, ZERO page errors** in every
+  run. Rendered numbers cross-checked against the wire (eventual 9, atomic 1, "N split reads
+  observed here" from summary.split_samples). tsc -b + oxlint clean. Scripts: scratchpad/
+  shot_static, shot_run (--reduced), abort_test, shot_stopped; probes probe_stream/probe_reseed.
+- **Cluster left testable:** each run wipes the cluster + leaves the belief invalidated, so the
+  session ran the destructive stream many times; a final `python -m seed.backfill_decisions` (via
+  .venv) restores belief=active + 4000 decisions + 8 perf windows for the rest of the console. Do
+  NOT leave a stale Consistency-demo tab open on a completed run — the fetch reader never auto-
+  reconnects, but an explicit Run still has the full reseed blast radius.
+- **Phase 5 (react-three-fiber) stays gated** — untouched, not a consideration this phase.
+
 ## Frontend Phase 3 — Investigate (2026-07-05)
 
 First of the four supervisor interactions. Selecting a decision in the feed TAKES OVER the Inspector
