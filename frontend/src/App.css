@@ -47,6 +47,44 @@
   color: var(--ash);
 }
 
+/* View toggle — Console vs the standalone Consistency demo. A quiet segmented control;
+   the pressed view reads --bone on --surface-2, the rest stay muted. */
+.console__views {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.console__view {
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ash);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.console__view:hover {
+  color: var(--bone);
+}
+
+.console__view[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--bone);
+}
+
+.console__view:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 1px;
+}
+
 .console__fleet {
   display: flex;
   align-items: baseline;

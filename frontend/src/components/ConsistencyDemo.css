@@ -1,0 +1,557 @@
+/*
+ * ConsistencyDemo — Frontend Phase 4. A focused, fleet-level narrative that takes over the
+ * console body. Cold by default; the ONLY signal colors are --alert (a torn/split holder) and
+ * --alive (a corrected one), reused exactly as Invalidate did. No amber/orange (Trace's).
+ * Motion is opacity-only and is disabled under prefers-reduced-motion.
+ */
+
+.cx {
+  height: 100%;
+  overflow: auto;
+  background: var(--void);
+}
+
+/* A centered reading column — the demo is a narrative, not the 3-region grid. */
+.cx__intro,
+.cx__stage {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.cx__intro {
+  padding-top: 1.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.cx__title {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+  color: var(--bone);
+}
+
+.cx__lead {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 52rem;
+}
+
+.cx__lead b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.cx__stage {
+  padding-top: 1.25rem;
+  padding-bottom: 3rem;
+}
+
+/* --- Shared quiet panel + notes ------------------------------------------- */
+
+.cx__panel {
+  padding: 1.4rem 0;
+}
+
+.cx__note {
+  margin: 0 0 0.9rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--bone);
+  max-width: 44rem;
+}
+
+.cx__note b {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+.cx__note--busy {
+  color: var(--ghost);
+}
+
+.cx__note--err {
+  color: var(--alert);
+}
+
+.cx__hint {
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--ash);
+  max-width: 40rem;
+}
+
+.cx__hint.mono {
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.cx__caution {
+  margin: 0.7rem 0 0;
+  font-size: 0.74rem;
+  color: var(--ash);
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.cx__run,
+.cx__confirm,
+.cx__cancel,
+.cx__stop {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+
+.cx__run {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.86rem;
+  background: transparent;
+  color: var(--bone);
+  border: 1px solid var(--ash);
+}
+
+.cx__run:hover {
+  border-color: var(--bone);
+  background: var(--surface-2);
+}
+
+.cx__run:focus-visible,
+.cx__confirm:focus-visible,
+.cx__cancel:focus-visible,
+.cx__stop:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+/* --- Destructive confirm gate --------------------------------------------- */
+
+.cx__gate {
+  margin: 0.5rem 0;
+  padding: 1.1rem 1.2rem;
+  max-width: 44rem;
+  border: 1px solid var(--alert);
+  border-radius: 6px;
+  background: var(--alert-dim);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cx__gate,
+  .cx-sum {
+    animation: cx-fade 200ms ease-out;
+  }
+}
+
+@keyframes cx-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cx__gate-warn {
+  margin: 0 0 1rem;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--bone);
+}
+
+.cx__gate-warn b {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+.cx__gate-warn code,
+.cx__hint code,
+.cx-sum__sub code {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--ghost);
+  word-break: break-word;
+}
+
+.cx__gate-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cx__confirm {
+  padding: 0.55rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: var(--alert);
+  color: var(--void);
+  border: 1px solid var(--alert);
+}
+
+.cx__confirm:hover {
+  opacity: 0.88;
+}
+
+.cx__cancel {
+  padding: 0.55rem 1rem;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--ghost);
+  border: 1px solid var(--line);
+}
+
+.cx__cancel:hover {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+/* --- Reseeding (waiting for the first sample) ----------------------------- */
+
+.cx__reseed {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--bone);
+}
+
+.cx__pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ash);
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cx__pulse {
+    animation: cx-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes cx-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.cx__stop {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--ghost);
+  border: 1px solid var(--line);
+}
+
+.cx__stop:hover {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+.cx__running {
+  padding: 0.5rem 0 1rem;
+}
+
+/* --- Drain meter ---------------------------------------------------------- */
+
+.cx-meter {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.25rem 0 1.1rem;
+  flex-wrap: wrap;
+}
+
+.cx-meter__cell {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* corrected (edge closed / invalidated) — --alive, exactly as Invalidate's correction. */
+.cx-meter__cell--closed {
+  border-color: var(--alive);
+  background: color-mix(in srgb, var(--alive) 20%, var(--surface));
+}
+
+/* still open while the closure is torn — --alert: a laggard still live on the dead belief. */
+.cx-meter__cell--split {
+  border-color: var(--alert);
+  background: color-mix(in srgb, var(--alert) 20%, var(--surface));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cx-meter__cell--split {
+    animation: cx-split-pulse 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes cx-split-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* open, closure still whole (nothing corrected yet) — quiet. */
+.cx-meter__cell--rest {
+  border-color: var(--line);
+  background: var(--surface);
+}
+
+/* --- Live counts ---------------------------------------------------------- */
+
+.cx-obs__counts {
+  display: flex;
+  align-items: baseline;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.cx-obs__count {
+  font-size: 0.85rem;
+  color: var(--ghost);
+}
+
+.cx-obs__count b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.cx-obs__state {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.cx-obs__state--ALL_ACTIVE {
+  color: var(--ash);
+}
+
+.cx-obs__state--SPLIT {
+  color: var(--alert);
+}
+
+.cx-obs__state--ALL_INVALIDATED {
+  color: var(--alive);
+}
+
+.cx-obs__leak {
+  font-size: 0.76rem;
+  color: var(--alert);
+}
+
+/* --- Sample log ----------------------------------------------------------- */
+
+.cx-obs__log-wrap {
+  margin-bottom: 1.4rem;
+}
+
+.cx-obs__log-head {
+  display: block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ash);
+  margin-bottom: 0.4rem;
+}
+
+.cx-obs__log {
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  max-height: 15rem;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.cx-obs__row {
+  display: grid;
+  grid-template-columns: 3rem 5.5rem 9rem auto;
+  gap: 0.75rem;
+  padding: 0.2rem 0.2rem;
+  font-size: 0.76rem;
+  color: var(--ghost);
+  border-left: 2px solid transparent;
+  padding-left: 0.5rem;
+}
+
+.cx-obs__row--SPLIT {
+  border-left-color: var(--alert);
+  color: var(--bone);
+}
+
+.cx-obs__row--ALL_INVALIDATED {
+  border-left-color: var(--alive);
+}
+
+.cx-obs__seq {
+  color: var(--ash);
+}
+
+.cx-obs__st {
+  color: var(--bone);
+}
+
+/* --- Summary (the measured contrast) -------------------------------------- */
+
+.cx-sum {
+  margin-top: 1.6rem;
+  padding: 1.3rem 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.cx-sum__title {
+  margin: 0 0 1.1rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.cx-sum__commit {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1.2rem;
+  align-items: start;
+  margin-bottom: 1.2rem;
+}
+
+.cx-sum__col {
+  padding: 0.9rem 1rem;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.cx-sum__col--eventual {
+  border-color: color-mix(in srgb, var(--alert) 45%, var(--line));
+}
+
+.cx-sum__col--atomic {
+  border-color: color-mix(in srgb, var(--alive) 45%, var(--line));
+}
+
+.cx-sum__n {
+  display: block;
+  font-size: 2.4rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.cx-sum__col--eventual .cx-sum__n {
+  color: var(--alert);
+}
+
+.cx-sum__col--atomic .cx-sum__n {
+  color: var(--alive);
+}
+
+.cx-sum__label {
+  display: block;
+  margin: 0.5rem 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--bone);
+}
+
+.cx-sum__sub {
+  display: block;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--ash);
+}
+
+.cx-sum__vs {
+  align-self: center;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ash);
+}
+
+.cx-sum__takeaway {
+  margin: 0 0 1.2rem;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--ghost);
+}
+
+.cx-sum__alert {
+  color: var(--alert);
+  font-weight: 600;
+}
+
+.cx-sum__alive {
+  color: var(--alive);
+  font-weight: 600;
+}
+
+.cx-sum__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.9rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.cx-sum__facts div {
+  display: contents;
+}
+
+.cx-sum__facts dt {
+  font-size: 0.74rem;
+  color: var(--ash);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cx-sum__facts dd {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--bone);
+}
+
+.cx-sum__col--eventual .cx-sum__sub code,
+.cx-sum__col--atomic .cx-sum__sub code {
+  color: var(--ghost);
+}
+
+/* Mono utility shared with the rest of the console. */
+.cx .mono,
+.cx-sum .mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+}
+
+/* Narrow widths: stack the commit comparison. */
+@media (max-width: 720px) {
+  .cx-sum__commit {
+    grid-template-columns: 1fr;
+  }
+  .cx-sum__vs {
+    justify-self: start;
+  }
+}
