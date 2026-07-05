@@ -19,7 +19,7 @@ import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsole
 import type { Belief } from "../api/types";
 import type { Investigation as InvestigationData } from "../lib/investigation";
 import { Loaded } from "./Panel";
-import { Investigation } from "./Investigation";
+import { Investigation, type TraceHandlers } from "./Investigation";
 import { fragId, formatCount, formatDate } from "../lib/format";
 import "./Inspector.css";
 
@@ -105,10 +105,17 @@ export function Inspector(props: {
   beliefs: Loadable<BeliefsData>;
   investigation: InvestigationData | null;
   onClear: () => void;
+  traceHandlers: TraceHandlers;
 }) {
   // A selected decision takes over the whole Inspector surface.
   if (props.investigation) {
-    return <Investigation inv={props.investigation} onClear={props.onClear} />;
+    return (
+      <Investigation
+        inv={props.investigation}
+        onClear={props.onClear}
+        handlers={props.traceHandlers}
+      />
+    );
   }
 
   return (

@@ -547,3 +547,49 @@ default fleet+catalog. Still cold + motionless — warmth/motion stay reserved f
   Python, which lacks the cockroachdb dialect — reseeded belief=active + 4000 rows, emergent curve
   reproduced). One mid-insert connection drop on the first attempt (CRDB Cloud closed the conn);
   per-window commits meant a clean re-run fixed it. Do NOT run the backfill from the global Python.
+
+### Trace (2026-07-05) — the signature animation
+
+Second interaction. From an investigated belief, a "Trace lineage" button walks the belief backward
+through the family tree to its origin ancestor — warmth spreading edge by edge through the cold dead
+tree, igniting the origin. **framer-motion 12.42.2 installed** (first phase needing it).
+
+- **Single chain, not the closure (approved).** `GET /beliefs/{id}/lineage` returns the belief's whole
+  inheritance closure (a FORK — at depth 5 two holders: the living branch cd75b330 + the spine
+  d3e2c4d5). Trace animates only the single ancestral chain from the ONE investigated agent back to
+  origin, via `lib/trace.ts` `deriveChain()` walking real `from_agent_id` pointers up that closure.
+  Every hop is a real belief_inheritance edge; no order guessed. The fork/closure reveal is RESERVED
+  for Invalidate (two living holders correcting atomically lands harder there).
+- **Inheritance edges == genealogy edges** (minted parent->child at spawn), so each chain hop maps
+  exactly onto an existing tree edge by key `${parent}->${child}`. GenealogyTree.computeTraceGeo maps
+  the chain onto its own layout geometry; `reversedEdgePath` flips each edge to draw child->parent (the
+  backward direction). Straight spine edges AND the curved offshoot bezier are both reversed correctly
+  — verified by tracing a crimson-5b decision (chain curves gen4->5b; conclusion "5 generations ago").
+- **Warmth is an additive overlay** (`TraceOverlay.tsx`, `<g className="tree__trace">`) layered above
+  the untouched cold tree — reset is trivial, base tree stays cold. NO JS color interpolation: each
+  `--trace` edge is DRAWN OVER its cold counterpart via `pathLength 0->1` (opacity/transform/pathLength
+  only, per CLAUDE.md's transforms/opacity guidance), so it visibly turns warm as it draws. Nodes tint
+  `--ash`->`--trace` on `opacity`; origin ignites to `--origin` + a `filter:blur` glow ramp + one scale
+  pulse [1,1.12,1]. Sequence: STAGGER 150ms/hop, edge 160ms, ignite 500ms -> ~1.55s for the 7-hop spine.
+- **Architecture:** App.tsx owns `TraceState` (idle|loading|error|empty|ready{phase}) because three
+  regions coordinate — trigger in the Inspector, animation in the tree, conclusion back in the
+  Inspector. App fetches the lineage, derives the chain, passes `{chain, playToken, onComplete}` to the
+  tree (which owns PLAYBACK) and a projected `InvestigationTrace` + handlers to the Inspector. The tree
+  reports origin-ignition via `onAnimationComplete`->`onTraceComplete`->App flips `phase:"done"`->the
+  Inspector reveals the conclusion ("Belief 898ad0 originated with agent 108cf7 — 7 generations ago",
+  real formed_at, warm accents = the only warmth in the Inspector). Changing the selected decision
+  resets trace to idle (effect on selectedId) so a stale warm path never lingers.
+- **Re-trigger + reset:** the overlay `<g>` is keyed by `playToken`; Replay increments it -> remounts
+  from the cold `initial` state -> that remount IS the snap-back-to-cold-before-replay. Verified: replay
+  mid-frame shows cold reset + fresh spread.
+- **prefers-reduced-motion** (`useReducedMotion`): all delays/durations -> 0, so the sequence collapses
+  to its FINAL state instantly (full warm spine, origin ignited, conclusion shown) — no crawl; fires
+  onComplete on mount. Verified via a `reducedMotion:"reduce"` Playwright context.
+- **Empty-chain fallback** (defensive, per approver): if `deriveChain` returns [] (agent not a holder),
+  App->status "empty"->Inspector shows "No inheritance chain resolved for this agent — nothing to
+  trace." rather than crashing (same discipline as Investigate's "not belief-driven").
+- **Verification:** frame-sampled the animation with Playwright at real elapsed times (rAF pauses
+  during each screenshot, so animation-time < wall-clock — samples confirm the per-hop backward spread +
+  origin ignition, not exact pacing). Main spine, branch hop, reduced-motion, and Replay all captured,
+  zero page errors, `tsc -b` + oxlint clean. Timing constants (STAGGER/EDGE_DUR/IGNITE_DUR in
+  TraceOverlay.tsx) are the tuning knobs if the real-time feel needs adjustment after live viewing.

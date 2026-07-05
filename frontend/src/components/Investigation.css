@@ -275,3 +275,86 @@
 .inv__gap {
   color: var(--bone);
 }
+
+/* --- Trace trigger + conclusion ------------------------------------------- */
+
+/* The trigger stays COLD — warmth is earned by the animation, never the button. */
+.inv__trace-btn {
+  margin-top: 0.7rem;
+  appearance: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.inv__trace-btn:hover:not(:disabled) {
+  border-color: var(--ash);
+}
+
+.inv__trace-btn:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: 1px;
+}
+
+.inv__trace-btn:disabled {
+  color: var(--ash);
+  cursor: default;
+}
+
+.inv__trace-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Quiet, warm-tinted "in progress" line while the tree animates. */
+.inv__tracing {
+  margin: 0.7rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--trace);
+  letter-spacing: 0.04em;
+}
+
+.inv__conclusion {
+  margin-top: 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--origin);
+  border-radius: 3px;
+  background: var(--surface-2);
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inv__conclusion-text {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--bone);
+}
+
+.inv__conclusion-meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--ash);
+}
+
+/* The only warm accents in the Inspector — echoing the origin the trace just lit. */
+.inv__hot-trace {
+  color: var(--trace);
+}
+
+.inv__hot-origin {
+  color: var(--origin);
+}

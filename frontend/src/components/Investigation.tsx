@@ -10,8 +10,23 @@
  */
 
 import type { Investigation as InvestigationData } from "../lib/investigation";
+import type { UUID } from "../api/types";
 import { fragId, formatAmount, formatConfidence, formatDate, splitInstant } from "../lib/format";
 import "./Investigation.css";
+
+/** UI-facing view of the App's trace state (App owns the real state/animation). */
+export type InvestigationTrace =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "empty" }
+  | { status: "active"; phase: "animating" | "done"; chainLength: number };
+
+export interface TraceHandlers {
+  trace: InvestigationTrace;
+  onStartTrace: (beliefId: UUID, agentId: UUID) => void;
+  onReplay: () => void;
+}
 
 /** "gen 7 · 108cf7" — a real agent's generation + id fragment, or a fallback. */
 function AgentTag({
@@ -73,7 +88,79 @@ function InheritedBadge({ inv }: { inv: InvestigationData }) {
   );
 }
 
-function DrivingBelief({ inv }: { inv: InvestigationData }) {
+/* The Trace trigger and its resolved conclusion. Only rendered for a resolved
+   belief. The button is cold (warmth is earned by the animation, not the button);
+   the conclusion — shown once the origin has ignited (phase "done") — carries the
+   only warm accents in the Inspector, echoing the origin it just lit. */
+function TraceBlock({ inv, handlers }: { inv: InvestigationData; handlers: TraceHandlers }) {
+  const b = inv.belief;
+  if (!b) return null;
+  const { trace, onStartTrace, onReplay } = handlers;
+  const start = () => onStartTrace(b.id, inv.decision.agent_id);
+
+  if (trace.status === "idle") {
+    return (
+      <button className="inv__trace-btn" onClick={start}>
+        Trace lineage →
+      </button>
+    );
+  }
+  if (trace.status === "loading") {
+    return (
+      <button className="inv__trace-btn" disabled>
+        Tracing…
+      </button>
+    );
+  }
+  if (trace.status === "error") {
+    return (
+      <div className="inv__trace-wrap">
+        <p className="panel__note inv__note">Trace failed: {trace.message}</p>
+        <button className="inv__trace-btn" onClick={start}>
+          Retry trace
+        </button>
+      </div>
+    );
+  }
+  if (trace.status === "empty") {
+    return (
+      <p className="panel__note inv__note">
+        No inheritance chain resolved for this agent — nothing to trace.
+      </p>
+    );
+  }
+
+  // active
+  if (trace.phase === "animating") {
+    return <p className="inv__tracing">Tracing lineage…</p>;
+  }
+  const hops = Math.max(0, trace.chainLength - 1);
+  return (
+    <div className="inv__conclusion">
+      <p className="inv__conclusion-text">
+        Belief <span className="inv__mono inv__hot-trace">{fragId(b.id)}</span> originated with
+        agent <span className="inv__mono inv__hot-origin">{fragId(b.originating_agent_id)}</span>
+        {hops > 0 ? (
+          <>
+            {" — "}
+            <span className="inv__hot-trace">
+              {hops} generation{hops === 1 ? "" : "s"} ago
+            </span>
+            .
+          </>
+        ) : (
+          <> — formed by this agent.</>
+        )}
+      </p>
+      <p className="inv__conclusion-meta">formed {formatDate(b.formed_at)}</p>
+      <button className="inv__trace-btn" onClick={onReplay}>
+        Replay ↺
+      </button>
+    </div>
+  );
+}
+
+function DrivingBelief({ inv, handlers }: { inv: InvestigationData; handlers: TraceHandlers }) {
   if (inv.beliefState === "none") {
     return (
       <p className="panel__note inv__note">
@@ -115,6 +202,7 @@ function DrivingBelief({ inv }: { inv: InvestigationData }) {
         </div>
       </div>
       <InheritedBadge inv={inv} />
+      <TraceBlock inv={inv} handlers={handlers} />
     </>
   );
 }
@@ -122,9 +210,11 @@ function DrivingBelief({ inv }: { inv: InvestigationData }) {
 export function Investigation({
   inv,
   onClear,
+  handlers,
 }: {
   inv: InvestigationData;
   onClear: () => void;
+  handlers: TraceHandlers;
 }) {
   const d = inv.decision;
   const { date, time } = splitInstant(d.decided_at);
@@ -178,7 +268,7 @@ export function Investigation({
       {/* The belief that drove it */}
       <section className="inspector__section inv__section">
         <h3 className="inspector__heading">Driving belief</h3>
-        <DrivingBelief inv={inv} />
+        <DrivingBelief inv={inv} handlers={handlers} />
       </section>
     </div>
   );
