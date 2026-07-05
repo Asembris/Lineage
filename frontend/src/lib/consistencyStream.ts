@@ -29,6 +29,7 @@ import type {
   ConsistencyBusyEvent,
   ConsistencySampleEvent,
   ConsistencyStartEvent,
+  ConsistencyStrategy,
   ConsistencySummaryEvent,
 } from "../api/types";
 
@@ -100,9 +101,14 @@ function dispatchFrame(frame: string, h: ConsistencyStreamHandlers): boolean {
 /**
  * Open the consistency stream and drive `handlers` from it. Call once per run; the returned
  * controller's `stop()` aborts it. Never reconnects.
+ *
+ * `strategy` picks which real invalidation the backend runs and streams the observer samples of:
+ * `"eventual"` (default — the Phase-4 behavior, unchanged) or `"strong"` (the real atomic
+ * endpoint function). Both are destructive and reseed first; only the mutation differs.
  */
 export function runConsistencyStream(
   handlers: ConsistencyStreamHandlers,
+  strategy: ConsistencyStrategy = "eventual",
 ): ConsistencyStreamController {
   const ac = new AbortController();
   let stallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -128,7 +134,7 @@ export function runConsistencyStream(
   void (async () => {
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/demo/consistency/stream`, {
+      res = await fetch(`${API_BASE}/demo/consistency/stream?strategy=${strategy}`, {
         headers: { Accept: "text/event-stream" },
         signal: ac.signal,
       });

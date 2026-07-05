@@ -22,14 +22,22 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import type {
   ConsistencySampleEvent,
   ConsistencyStartEvent,
   ConsistencyState,
+  ConsistencyStrategy,
   ConsistencySummaryEvent,
 } from "../api/types";
 import { runConsistencyStream, type ConsistencyStreamController } from "../lib/consistencyStream";
+import { ConsistencyScene3D } from "./ConsistencyScene3D";
 import "./ConsistencyDemo.css";
+
+/** How the live closure is drawn: the Phase-4 2D meter, or the Phase-5 r3f scene. Default 2d
+ *  keeps the shipped fallback the default; the toggle only swaps the closure VISUAL — counts,
+ *  sample log, summary and the whole destructive lifecycle are shared and unchanged. */
+type RenderMode = "2d" | "3d";
 
 type Phase =
   | { status: "idle" }
@@ -70,14 +78,19 @@ function DrainMeter({ open, total, state }: { open: number; total: number; state
   );
 }
 
-/** The observed closure: meter + live counts + the scrolling sample log. Shared by streaming,
- *  done and stopped so the record stays on screen. */
+/** The observed closure: the closure VISUAL (2D meter or 3D scene) + live counts + the scrolling
+ *  sample log. Shared by streaming, done and stopped so the record stays on screen. The visual is
+ *  the only thing the render toggle swaps; counts + log are identical in both modes. */
 function Observation({
   samples,
   live,
+  render,
+  reducedMotion,
 }: {
   samples: ConsistencySampleEvent[];
   live: boolean;
+  render: RenderMode;
+  reducedMotion: boolean;
 }) {
   const logRef = useRef<HTMLOListElement>(null);
   // Keep the newest sample in view as they arrive. useLayoutEffect so the scroll lands before paint.
@@ -92,7 +105,11 @@ function Observation({
 
   return (
     <div className="cx-obs">
-      <DrainMeter open={open} total={total} state={state} />
+      {render === "3d" ? (
+        <ConsistencyScene3D samples={samples} reducedMotion={reducedMotion} />
+      ) : (
+        <DrainMeter open={open} total={total} state={state} />
+      )}
 
       <div className="cx-obs__counts" aria-live="polite">
         <span className="cx-obs__count">
@@ -123,44 +140,95 @@ function Observation({
   );
 }
 
-/** The measured contrast. This is the one place the "1" is easy to misrepresent: the 9 and the
- *  18 are real off THIS run's summary; the 1/0 for the atomic path are labeled as a property of
- *  the transaction design (cited to Phase 3's strong-path test), never as this run's measurement. */
-function Summary({ summary }: { summary: ConsistencySummaryEvent }) {
+/** The measured contrast — strategy-aware. Whichever strategy actually ran is labelled
+ *  "measured this run" (its numbers come straight off THIS run's `summary`); the OTHER strategy
+ *  is the cited structural contrast, never presented as this run's measurement. So:
+ *   - eventual run → 9 / N-split measured here, atomic 1 / 0 cited (Phase-4 wording, unchanged);
+ *   - strong run   → 1 / 0 measured here (the real atomic endpoint), eventual 9 / split cited.
+ *  This keeps the honesty rule symmetric: the atomic "1 / 0" is only ever a live measurement when
+ *  the strong strategy was the one that ran. */
+function Summary({
+  summary,
+  strategy,
+}: {
+  summary: ConsistencySummaryEvent;
+  strategy: ConsistencyStrategy;
+}) {
+  const strong = strategy === "strong";
   return (
     <div className="cx-sum">
       <h3 className="cx-sum__title">Measured contrast</h3>
 
       <div className="cx-sum__commit">
-        <div className="cx-sum__col cx-sum__col--eventual">
-          <span className="cx-sum__n mono">{summary.commit_points}</span>
-          <span className="cx-sum__label">commit points · eventual</span>
-          <span className="cx-sum__sub">
-            measured this run — one commit per holder edge (8) plus the belief row, each externally
-            visible
-          </span>
-        </div>
-        <div className="cx-sum__vs" aria-hidden="true">
-          vs
-        </div>
-        <div className="cx-sum__col cx-sum__col--atomic">
-          <span className="cx-sum__n mono">1</span>
-          <span className="cx-sum__label">commit point · atomic (CockroachDB)</span>
-          <span className="cx-sum__sub">
-            a property of the atomic transaction design, not a number off this stream:{" "}
-            <code>POST /beliefs/{"{id}"}/invalidate</code> closes the whole closure in one
-            serializable transaction. Phase 3's strong-path test measured it — 1 commit / 0 split
-            reads.
-          </span>
-        </div>
+        {strong ? (
+          <>
+            <div className="cx-sum__col cx-sum__col--atomic">
+              <span className="cx-sum__n mono">{summary.commit_points}</span>
+              <span className="cx-sum__label">commit point · atomic (CockroachDB)</span>
+              <span className="cx-sum__sub">
+                measured this run — the real endpoint path{" "}
+                <code>POST /beliefs/{"{id}"}/invalidate</code> closed the whole inherited closure in
+                one serializable transaction.
+              </span>
+            </div>
+            <div className="cx-sum__vs" aria-hidden="true">
+              vs
+            </div>
+            <div className="cx-sum__col cx-sum__col--eventual">
+              <span className="cx-sum__n mono">9</span>
+              <span className="cx-sum__label">commit points · eventual</span>
+              <span className="cx-sum__sub">
+                the per-holder baseline: one commit per holder edge (8) plus the belief row, each
+                externally visible — a real SPLIT window. Switch strategy to <b>Eventual</b> to
+                measure it live.
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="cx-sum__col cx-sum__col--eventual">
+              <span className="cx-sum__n mono">{summary.commit_points}</span>
+              <span className="cx-sum__label">commit points · eventual</span>
+              <span className="cx-sum__sub">
+                measured this run — one commit per holder edge (8) plus the belief row, each
+                externally visible
+              </span>
+            </div>
+            <div className="cx-sum__vs" aria-hidden="true">
+              vs
+            </div>
+            <div className="cx-sum__col cx-sum__col--atomic">
+              <span className="cx-sum__n mono">1</span>
+              <span className="cx-sum__label">commit point · atomic (CockroachDB)</span>
+              <span className="cx-sum__sub">
+                a property of the atomic transaction design, not a number off this stream:{" "}
+                <code>POST /beliefs/{"{id}"}/invalidate</code> closes the whole closure in one
+                serializable transaction. Phase 3's strong-path test measured it — 1 commit / 0
+                split reads. Switch strategy to <b>Strong</b> to measure it live.
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <p className="cx-sum__takeaway">
-        Eventual consistency needs one commit per holder, so an intermediate torn closure is
-        committed and externally visible —{" "}
-        <b className="cx-sum__alert mono">{summary.split_samples} split reads observed here</b>.
-        CockroachDB closes the entire inherited closure at a single commit, so that torn state is{" "}
-        <b className="cx-sum__alive">structurally unreachable</b>, not merely unlikely.
+        {strong ? (
+          <>
+            This run closed the whole closure at a single commit —{" "}
+            <b className="cx-sum__alive mono">{summary.split_samples} split reads observed</b>. The
+            torn state is <b className="cx-sum__alive">structurally unreachable</b>, not merely
+            unlikely: snapshot isolation forbids a reader from ever seeing a half-invalidated
+            closure. The eventual baseline commits that torn closure and exposes it.
+          </>
+        ) : (
+          <>
+            Eventual consistency needs one commit per holder, so an intermediate torn closure is
+            committed and externally visible —{" "}
+            <b className="cx-sum__alert mono">{summary.split_samples} split reads observed here</b>.
+            CockroachDB closes the entire inherited closure at a single commit, so that torn state
+            is <b className="cx-sum__alive">structurally unreachable</b>, not merely unlikely.
+          </>
+        )}
       </p>
 
       <dl className="cx-sum__facts">
@@ -183,6 +251,12 @@ function Summary({ summary }: { summary: ConsistencySummaryEvent }) {
 
 export function ConsistencyDemo() {
   const [phase, setPhase] = useState<Phase>({ status: "idle" });
+  // The invalidation strategy the NEXT run will use (chosen while idle, echoed by the server's
+  // `start`). Default "eventual" keeps the no-arg Phase-4 behavior. The render mode swaps only the
+  // closure visual and can flip any time — even on a finished run's stored samples.
+  const [strategy, setStrategy] = useState<ConsistencyStrategy>("eventual");
+  const [render, setRender] = useState<RenderMode>("2d");
+  const reducedMotion = useReducedMotion() ?? false;
   const ctrl = useRef<ConsistencyStreamController | null>(null);
 
   // Abort the stream on unmount (navigating back to the console). This is one of the two
@@ -201,21 +275,24 @@ export function ConsistencyDemo() {
   const run = () => {
     ctrl.current?.stop(); // paranoia: never leave a prior reader running
     setPhase({ status: "reseeding" });
-    ctrl.current = runConsistencyStream({
-      onStart: (start) => setPhase({ status: "streaming", start, samples: [] }),
-      onSample: (s) =>
-        setPhase((prev) =>
-          prev.status === "streaming" ? { ...prev, samples: [...prev.samples, s] } : prev,
-        ),
-      onSummary: (summary) =>
-        setPhase((prev) =>
-          prev.status === "streaming"
-            ? { status: "done", start: prev.start, samples: prev.samples, summary }
-            : prev,
-        ),
-      onBusy: (b) => setPhase({ status: "busy", detail: b.detail }),
-      onError: (e) => setPhase({ status: "error", message: e.message }),
-    });
+    ctrl.current = runConsistencyStream(
+      {
+        onStart: (start) => setPhase({ status: "streaming", start, samples: [] }),
+        onSample: (s) =>
+          setPhase((prev) =>
+            prev.status === "streaming" ? { ...prev, samples: [...prev.samples, s] } : prev,
+          ),
+        onSummary: (summary) =>
+          setPhase((prev) =>
+            prev.status === "streaming"
+              ? { status: "done", start: prev.start, samples: prev.samples, summary }
+              : prev,
+          ),
+        onBusy: (b) => setPhase({ status: "busy", detail: b.detail }),
+        onError: (e) => setPhase({ status: "error", message: e.message }),
+      },
+      strategy,
+    );
   };
 
   const stop = () => {
@@ -231,38 +308,119 @@ export function ConsistencyDemo() {
   return (
     <section className="cx">
       <header className="cx__intro">
-        <h2 className="cx__title">Atomic vs eventual — the closure under observation</h2>
+        <div className="cx__intro-head">
+          <h2 className="cx__title">Atomic vs eventual — the closure under observation</h2>
+          <div
+            className="cx__render-toggle"
+            role="group"
+            aria-label="Closure render mode"
+          >
+            <button
+              className="cx__seg"
+              aria-pressed={render === "2d"}
+              onClick={() => setRender("2d")}
+            >
+              2D
+            </button>
+            <button
+              className="cx__seg"
+              aria-pressed={render === "3d"}
+              onClick={() => setRender("3d")}
+            >
+              3D
+            </button>
+          </div>
+        </div>
         <p className="cx__lead">
           Invalidating a belief must close its whole inherited closure — every holder edge. This
-          streams the <b>real observer samples</b> of the eventually-consistent baseline: one commit
-          per holder, so a torn closure is committed and externally visible for a real window.
-          CockroachDB does it in a single transaction, so that split state never exists. Samples
-          render as they arrive from the live cluster — the multi-second gaps are the real fan-out.
+          streams the <b>real observer samples</b> of a live invalidation. The{" "}
+          <b>eventual</b> baseline commits one update per holder, so a torn closure is externally
+          visible for a real window; the <b>strong</b> path is CockroachDB's real endpoint — one
+          serializable transaction, so that split state never exists. Samples render as they arrive
+          from the live cluster; the multi-second gaps on the eventual path are the real fan-out.
         </p>
       </header>
 
       <div className="cx__stage">
         {phase.status === "idle" && (
           <div className="cx__panel">
+            <div className="cx__preview" aria-hidden="true">
+              {render === "3d" ? (
+                <ConsistencyScene3D samples={[]} reducedMotion={reducedMotion} />
+              ) : (
+                <DrainMeter open={8} total={8} state="ALL_ACTIVE" />
+              )}
+              <span className="cx__preview-cap mono">closure at rest · 8/8 holders live</span>
+            </div>
+
+            <fieldset className="cx__strat">
+              <legend className="cx__strat-legend">Strategy to run</legend>
+              <label className={`cx__strat-opt${strategy === "eventual" ? " is-on" : ""}`}>
+                <input
+                  type="radio"
+                  name="cx-strategy"
+                  checked={strategy === "eventual"}
+                  onChange={() => setStrategy("eventual")}
+                />
+                <span className="cx__strat-name">Eventual baseline</span>
+                <span className="cx__strat-desc">
+                  per-holder fan-out — opens a real, externally-visible SPLIT window
+                </span>
+              </label>
+              <label className={`cx__strat-opt${strategy === "strong" ? " is-on" : ""}`}>
+                <input
+                  type="radio"
+                  name="cx-strategy"
+                  checked={strategy === "strong"}
+                  onChange={() => setStrategy("strong")}
+                />
+                <span className="cx__strat-name">Strong · atomic (CockroachDB)</span>
+                <span className="cx__strat-desc">
+                  the real <code>POST&nbsp;/beliefs/&#123;id&#125;/invalidate</code> — one
+                  serializable commit, no split
+                </span>
+              </label>
+            </fieldset>
+
             <button className="cx__run" onClick={arm}>
               Run the consistency proof
             </button>
-            <p className="cx__caution">Resets fleet state — details on the next step.</p>
+            <p className="cx__caution">
+              {strategy === "strong"
+                ? "Executes the real fleet-wide invalidation — irreversible. Details on the next step."
+                : "Resets fleet state — details on the next step."}
+            </p>
           </div>
         )}
 
         {phase.status === "arming" && (
-          <div className="cx__gate">
-            <p className="cx__gate-warn">
-              This runs the <b>real destructive demo</b>. It <b>truncates and reseeds the cluster</b>{" "}
-              and runs a fleet-wide invalidation to completion. When it finishes the belief is left{" "}
-              <b>invalidated</b> and <b>decisions / performance reset to empty</b> — Investigate,
-              Trace, Time-travel and Invalidate will read empty until the fleet is re-backfilled (
-              <code>python -m seed.backfill_decisions</code>). Only one stream can run at a time.
-            </p>
+          <div className={`cx__gate${strategy === "strong" ? " cx__gate--strong" : ""}`}>
+            {strategy === "strong" ? (
+              <p className="cx__gate-warn">
+                <b className="cx__gate-flag">This is the real governed write, not a preview.</b>{" "}
+                Confirm executes <code>POST /beliefs/&#123;id&#125;/invalidate</code> — the same
+                atomic, fleet-wide invalidation the supervisor Invalidate action performs — against
+                the live cluster. The belief is <b>genuinely invalidated across every holder in one
+                irreversible commit</b>; there is no rollback. It also <b>truncates and reseeds the
+                cluster</b>, leaving <b>decisions / performance empty</b>, so Investigate, Trace,
+                Time-travel and Invalidate read empty until the fleet is re-backfilled (
+                <code>python -m seed.backfill_decisions</code>). Only one stream can run at a time.
+              </p>
+            ) : (
+              <p className="cx__gate-warn">
+                This runs the <b>real destructive demo</b>. It{" "}
+                <b>truncates and reseeds the cluster</b> and runs a fleet-wide invalidation to
+                completion. When it finishes the belief is left <b>invalidated</b> and{" "}
+                <b>decisions / performance reset to empty</b> — Investigate, Trace, Time-travel and
+                Invalidate will read empty until the fleet is re-backfilled (
+                <code>python -m seed.backfill_decisions</code>). Only one stream can run at a time.
+              </p>
+            )}
             <div className="cx__gate-actions">
               <button className="cx__confirm" onClick={run}>
-                Confirm &amp; run — reset and stream
+                {strategy === "strong"
+                  ? "Confirm — invalidate fleet-wide for real"
+                  : "Confirm & run — reset and stream"}
               </button>
               <button className="cx__cancel" onClick={cancel}>
                 Cancel
@@ -290,7 +448,12 @@ export function ConsistencyDemo() {
 
         {phase.status === "streaming" && (
           <div className="cx__running">
-            <Observation samples={phase.samples} live />
+            <Observation
+              samples={phase.samples}
+              live
+              render={render}
+              reducedMotion={reducedMotion}
+            />
             <button className="cx__stop" onClick={stop}>
               Stop
             </button>
@@ -299,8 +462,13 @@ export function ConsistencyDemo() {
 
         {phase.status === "done" && (
           <div className="cx__running">
-            <Observation samples={phase.samples} live={false} />
-            <Summary summary={phase.summary} />
+            <Observation
+              samples={phase.samples}
+              live={false}
+              render={render}
+              reducedMotion={reducedMotion}
+            />
+            <Summary summary={phase.summary} strategy={phase.start.strategy as ConsistencyStrategy} />
             <button className="cx__run" onClick={arm}>
               Run again
             </button>
@@ -310,11 +478,18 @@ export function ConsistencyDemo() {
         {phase.status === "stopped" && (
           <div className="cx__running">
             <p className="cx__note">
-              Stopped. The fan-out was interrupted mid-flight, so the closure is left{" "}
+              Stopped. The invalidation was interrupted mid-flight, so the closure is left{" "}
               <b>partially invalidated</b> until the next run reseeds it — a real torn state, not a
               clean rollback. {phase.samples.length} samples were observed.
             </p>
-            {phase.samples.length > 0 && <Observation samples={phase.samples} live={false} />}
+            {phase.samples.length > 0 && (
+              <Observation
+                samples={phase.samples}
+                live={false}
+                render={render}
+                reducedMotion={reducedMotion}
+              />
+            )}
             <button className="cx__run" onClick={arm}>
               Run again
             </button>
