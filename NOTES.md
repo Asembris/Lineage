@@ -999,3 +999,22 @@ cross-highlight, click→real holder detail. Additive; 2D untouched.
   (6/8 open, clean red+green); hover→node + witnessed row #14 (3/8 open); click→REAL detail for the LIVING
   branch holder cd75b3 (gen5 crimson ALIVE, inherited 2025-08-15, closed at #14) — status/consistency all
   real; strong all-8-flipped (log 8/8→0/8, no SPLIT). Orbit/zoom already confirmed (verify_orbit.mjs).
+
+## Frontend CI (Tier 1) — .github/workflows/frontend-ci.yml (2026-07-06)
+
+- **What it checks:** on pushes touching `frontend/**` (or its own workflow file), one
+  ubuntu job — `npm ci` → `npx tsc -b` (typecheck) → `npm run lint` (oxlint) → `npx vite build`
+  (build), Node 24 with npm cache. Exactly the manual checks every frontend phase ends with per
+  FRONTEND.md/NOTES discipline; run as distinct steps so a failure points at the exact stage.
+- **Why separate from the backend job (ci.yml):** this job is fully OFFLINE — no DATABASE_URL,
+  no AWS creds, no CockroachDB, no secrets. It cannot collide with the backend CI's live-cluster
+  reseeds (the TRUNCATE ... CASCADE gotcha, Phase 3 Step 7). That isolation is the whole point,
+  so it lives in its own workflow, not as a job bolted onto the secrets-laden backend suite.
+- **Path filters both directions:** frontend-ci fires ONLY on `frontend/**` (+ its own file);
+  ci.yml gained `paths-ignore: ['frontend/**']` (separate commit) so a frontend-only push no
+  longer triggers a live cluster reseed. Any non-frontend change (app/migrations/seeds/tests/
+  root docs like CLAUDE.md/NOTES.md/a workflow file) still runs the full backend suite.
+- **Tier 2 is DEFERRED, not started this session.** Actual test coverage — Vitest unit tests on
+  the pure logic (`deriveChain`, the investigation resolver, `treeLayout`, `consistencyStream`'s
+  SSE frame parser, the `format.ts` formatters) — is a known, deliberate next step. No test
+  runner, config, or scaffold was added; only the build/typecheck/lint gate exists today.
