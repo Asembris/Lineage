@@ -7,6 +7,13 @@ name: CI
 on:
   push:
     branches: [main]
+    # Frontend-only pushes touch neither the backend nor the cluster, so skip the
+    # live pytest suite for them — the frontend has its own offline CI in
+    # frontend-ci.yml. paths-ignore skips a push ONLY when every changed file is
+    # under frontend/**; anything else (app code, migrations, seeds, tests, root
+    # docs like CLAUDE.md/NOTES.md, or a workflow file) still runs the full suite.
+    paths-ignore:
+      - 'frontend/**'
 
 # Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
 # both TRUNCATE ... CASCADE the shared cluster and collide (see NOTES Phase 3, Step 7).
