@@ -914,3 +914,67 @@ view is the shipped fallback and was not weakened. Genealogy tree stays SVG; no 
 - **The payoff:** the eventual SPLIT frame shows 3 --alive + 5 --alert nodes ("5 still live on the invalidated
   belief") vs strong's all-flip-together-no-red — the split state made VISIBLE, directly targeting the audit's
   worst-ranked criticism (atomic-across-regions argued-not-demonstrated).
+
+## Frontend Phase 5.1 — the 3D scene made an interactive instrument (2026-07-06)
+
+Turned the static Phase-5 render into a forensic instrument: orbit/zoom camera, hover→real-data
+cross-highlight, click→real holder detail. Additive; 2D untouched.
+
+### Diagnose-first (the mandated step) — the "frozen/dead-hover/immovable" hypothesis was WRONG
+- Temp-instrumented the real scene (DOM `onPointerMove` on `.cx3d` + r3f `onPointerOver` on a mesh),
+  swept the mouse via Playwright: **DOM pointermove fired 83×, r3f mesh pointerover fired 2×, 0 errors.**
+  So there is NO overlay / `pointer-events:none` / stacking bug — events reach the canvas AND meshes
+  are raycast-hittable. Root cause: **the interaction layer was never written** (Phase 5 was a
+  deliberately static render). Camera immovable = OrbitControls never mounted (true), not an overlay.
+  Reverted the temp handlers before building. Lesson banked: don't accept a stated root cause — the
+  brief's "r128 / CDN / CapsuleGeometry / decoupled-from-data" premises did NOT match this repo
+  (it's three@0.185 + r3f v9 via npm; nodes DO animate; scene renders real counts).
+
+### The identity problem (the real integrity fork, flagged to the approver before building)
+- The SSE stream carries COUNTS ONLY (open/total/state) — **no per-holder identity.** So node i was
+  count-based, and a naive "hover node → its observer-sample row" is a category error (nodes = holders
+  / a spatial axis; sample rows = time-points / a temporal axis). Real identity lives in a DIFFERENT
+  endpoint the panel didn't load: `GET /beliefs/{id}/lineage`. Approved to add that fetch (additive,
+  already trusted by Trace/Invalidate, does NOT touch the observer-sample pipeline).
+- **VERIFIED the load-bearing ordering claim from source (not asserted):** eventual fan-out closes
+  `ORDER BY inherited_at` (`app/services/consistency.py:145-146`, loop `:158-163`); strong is one
+  set-based `UPDATE ... WHERE belief_id=:b AND invalidated_at IS NULL` with NO order
+  (`app/services/invalidation.py:128-129`). So the k-th edge to close IS the k-th holder by
+  inherited_at (eventual); strong closes all at one commit. The 8 `inherited_at` values are distinct →
+  total, deterministic order. This is why node i can bind to `holders[i]` (lineage sorted by
+  inherited_at) without inventing identity. Honest hover mapping: holder i → the observer-sample that
+  witnessed its edge closing = first sample with `open_edges <= total-(i+1)` (strong → the single
+  commit sample). Item 2 reinterpreted to this, approved.
+
+### Build (all four decisions locked with the approver)
+- **Camera:** zero-dep — `three/examples/jsm/controls/OrbitControls.js` wired via `useThree`+`useEffect`
+  +`useFrame` (NOT drei; same "one helper ≠ a whole dep" call as the base scene). `enablePan=false`,
+  min/max distance clamp, **`enableDamping = !reducedMotion`** (no non-user motion under reduce), no
+  autoRotate. tsc/oxlint/build all resolve the jsm import; +~20 KB to the bundle.
+- **Identity:** `getBeliefLineage(start.belief_id)` on the SSE `start` (post-reseed → this run's edges);
+  `holders[] = path.filter(from_agent_id!=null).sort(by inherited_at)`. node i == holders[i]. Failure
+  leaves the scene non-interactive (holders=null), never blocks the demo.
+- **Hover:** node `onPointerOver/Out` lifts `hoveredHolder`; node gets emissive+scale boost; the
+  observer-samples table row that witnessed that holder's closure gets an `is-witness` --bone bar.
+- **Click:** `onClick` selects; a 3D-only detail panel renders REAL lineage fields (agent frag, gen,
+  bloodline, alive/dead, inherited_at, parent frag, closure edge state, "closed at sample #N·Xms"),
+  cites `GET /beliefs/{id}/lineage`. `onPointerMissed` deselects. Selected node gets a --bone wireframe
+  halo. Colors: state tokens + --bone accent only (no amber).
+- **2D untouched:** DrainMeter and the 2D path are byte-unchanged; detail/hint/is-witness are all gated
+  on `render==="3d"`; hovered/selected cleared when leaving 3D. Parity is data-level: cell i and node i
+  are the same edge (same samples), and node i now additionally carries real identity.
+
+### Verification (Playwright @1440, channel:chromium, live 5173→8000)
+- **Item 1 (camera):** drag changed the render AND wheel changed the render (identical images would mean
+  dead controls) → PASS, 0 errors. Screenshot confirms a real rotation. (scratchpad/verify_orbit.mjs)
+- **Item 2 (hover):** hovering a node lit its witnessed row — e.g. hovered holder `82c31a` → row
+  **#6 / 1360ms / 6/8 open**, and the node enlarged. Real: `82c31a` is holder index 1 by inherited_at,
+  `witnessSeq(1)=`first sample with open≤6 = #6. (verify_interaction.mjs, interact_hover.png)
+- **Item 3 (click):** detail showed REAL `82c31a` gen2 crimson dead, inherited from `43c136` @2024-11-08,
+  edge invalidated, closed at sample #6·1360ms — cross-checked: `82c31a` ∈ the 8 real lineage frags.
+  Not a placeholder. (interact_click_detail.png)
+- **Item 4 (parity/2D-untouched):** toggling to 2D on the SAME data → 8 meter cells, 0 detail panels,
+  0 3D hints. (interact_2d_parity.png)
+- Internal consistency: the hovered witness row (#6) == the detail's "closed at sample" (#6). tsc -b +
+  oxlint + vite build clean, ZERO page errors across all runs. Cluster restored via backfill after the
+  one destructive eventual verification run.
