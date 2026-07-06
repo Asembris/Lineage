@@ -1,0 +1,53 @@
+name: frontend-ci
+
+# Build / typecheck / lint the Vite frontend on pushes to main that touch it.
+#
+# Deliberately SEPARATE from ci.yml (the backend pytest suite). This job is fully
+# OFFLINE — no DATABASE_URL, no AWS creds, no CockroachDB connection, no secrets —
+# so it can never collide with the backend CI's live-cluster reseeds (the
+# TRUNCATE ... CASCADE "indexes being dropped" gotcha; see NOTES Phase 3, Step 7).
+#
+# Scope is Tier 1 only: build/typecheck/lint, mirroring the manual checks every
+# frontend phase ends with per FRONTEND.md/NOTES discipline. Tier 2 (Vitest unit
+# tests on the pure logic) is a deliberately deferred next step — not wired here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+# Cancel an in-flight run when a newer push lands on the same ref (cheap; nothing
+# live is touched, kept only for parity with the backend workflow).
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc -b)
+        run: npx tsc -b
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Build (vite build)
+        run: npx vite build
