@@ -978,3 +978,24 @@ cross-highlight, click→real holder detail. Additive; 2D untouched.
 - Internal consistency: the hovered witness row (#6) == the detail's "closed at sample" (#6). tsc -b +
   oxlint + vite build clean, ZERO page errors across all runs. Cluster restored via backfill after the
   one destructive eventual verification run.
+
+### Follow-ups (2026-07-06) — idle-hover legibility + a token-discipline fix
+- **At-rest hover is inert BY DESIGN (confirmed empirically, not asserted).** Re-instrumented the scene
+  (DOM `onPointerMove` + unconditional mesh `onPointerOver` logging the gate): at the idle preview,
+  events reach the canvas (117 moves) AND the spheres ARE raycast-hit (`interactive=false`), so hover is
+  gated off by the identity gate, not a broken pipeline. `interactive = holders !== null`, and holders is
+  fetched only on the SSE `start` — and at rest there are also no observer samples, so there'd be no real
+  witnessed-row to light. Chose option A (legibility, not new capability): appended a one-line idle hint
+  `drag to orbit · run the proof to inspect holders`. Rejected fetching lineage at mount (option B) — it
+  still couldn't deliver the row cross-highlight at rest, so it would have created two different "sort-of-
+  works" hover flavors instead of one clean "not active yet."
+- **Token fix — node colour now SNAPS, never cross-fades.** The mid-drain torn frame revealed a transient
+  TAN/amber node: an RGB lerp from --alert (red) to --alive (green) passes through off-palette warm hues
+  for ~0.3s on every close — a real violation of the "no amber/orange (Trace's)" rule. Fixed: `mat.color`
+  and `mat.emissive` are set to the token instantly; the flip still reads via the scale pulse + emissive
+  brightness ramp (dropped under reduced motion). Also matches the 2D meter, which switches cell colour
+  crisply. Re-captured torn frame = clean 2 green / 6 red, zero amber.
+- **Full evidence set (scratchpad/verify_runs.mjs, @1440, 0 page errors):** idle hint; eventual torn frame
+  (6/8 open, clean red+green); hover→node + witnessed row #14 (3/8 open); click→REAL detail for the LIVING
+  branch holder cd75b3 (gen5 crimson ALIVE, inherited 2025-08-15, closed at #14) — status/consistency all
+  real; strong all-8-flipped (log 8/8→0/8, no SPLIT). Orbit/zoom already confirmed (verify_orbit.mjs).

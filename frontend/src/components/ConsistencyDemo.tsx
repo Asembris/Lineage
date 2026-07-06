@@ -535,7 +535,10 @@ export function ConsistencyDemo() {
               ) : (
                 <DrainMeter open={8} total={8} state="ALL_ACTIVE" />
               )}
-              <span className="cx__preview-cap mono">closure at rest · 8/8 holders live</span>
+              <span className="cx__preview-cap mono">
+                closure at rest · 8/8 holders live
+                {render === "3d" && " · drag to orbit · run the proof to inspect holders"}
+              </span>
             </div>
 
             <fieldset className="cx__strat">
