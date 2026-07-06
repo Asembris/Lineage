@@ -1,5 +1,11 @@
 # React + TypeScript + Vite
 
+[![frontend-ci](https://github.com/Asembris/Lineage/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/frontend-ci.yml)
+
+CI (`.github/workflows/frontend-ci.yml`) runs `npm ci` → `tsc -b` → `oxlint` → `vite build`
+on pushes that touch `frontend/`. It is fully offline (no backend, no cluster, no secrets),
+kept separate from the backend's live-cluster pytest suite.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
