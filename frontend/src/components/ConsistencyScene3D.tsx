@@ -23,10 +23,11 @@
  * the lineage + samples). onHover/onSelect report the node index; the parent resolves identity.
  *
  * Tokens only: corrected=--alive, torn=--alert, at-rest=--ash, background=--void, edges=--line,
- * hover/select accent=--bone. NO amber/orange (that stays Trace's). Motion is emissive/color lerp
- * + a small scale pulse; prefers-reduced-motion SNAPS every node to its current state (no lerp,
- * no pulse). Camera: user-driven OrbitControls only — no autoRotate, no flythrough; damping is
- * disabled under reduced motion so there is zero non-user motion.
+ * hover/select accent=--bone. NO amber/orange (that stays Trace's) — node colour SNAPS to its
+ * token and never cross-fades, because a red→green lerp would pass through off-palette warm hues.
+ * The flip reads via a scale pulse + emissive brightness ramp; prefers-reduced-motion drops those
+ * too (pure snap). Camera: user-driven OrbitControls only — no autoRotate, no flythrough; damping
+ * is disabled under reduced motion so there is zero non-user motion.
  */
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -136,15 +137,17 @@ function HolderNode({
     if (!mat || !mesh) return;
     const emTarget = EMISSIVE[kind] + (hovered || selected ? 0.45 : 0);
     const scaleBase = hovered ? 1.22 : selected ? 1.12 : 1;
+    // Colour SNAPS to the token, never cross-fades: an RGB lerp from --alert (red) to --alive
+    // (green) passes through off-palette warm hues (tan/amber), and amber/orange is reserved for
+    // Trace. The flip stays legible via the scale pulse + emissive brightness ramp (below), and
+    // this matches the 2D meter, which switches cell colour crisply too.
+    mat.color.set(target);
+    mat.emissive.set(target);
     if (reducedMotion) {
-      mat.color.set(target);
-      mat.emissive.set(target);
       mat.emissiveIntensity = emTarget;
       mesh.scale.setScalar(scaleBase);
       return;
     }
-    mat.color.lerp(target, LERP);
-    mat.emissive.lerp(target, LERP);
     mat.emissiveIntensity += (emTarget - mat.emissiveIntensity) * LERP;
     pulse.current = pulse.current < 0.01 ? 0 : pulse.current * 0.9;
     mesh.scale.setScalar(scaleBase + pulse.current * 0.28);
