@@ -722,3 +722,111 @@
   color: var(--alert);
   font-weight: 700;
 }
+
+/* --- Frontend Phase 5.1: 3D interaction (orbit / hover / click) ------------ */
+
+/* Affordance hint under the scene. */
+.cx3d-hint {
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  color: var(--ash);
+  letter-spacing: 0.01em;
+}
+
+/* The observer-sample row a hovered holder's edge closed at — the real cross-highlight. --bone
+   (neutral bright), NOT a state colour, so it reads as "you are pointing here" without competing
+   with the --alert/--alive state rules on the same row. */
+.cx-obs__row.is-witness {
+  background: color-mix(in srgb, var(--bone) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--bone);
+}
+
+/* Clicked-holder forensic detail — every field is real lineage data. Cold, like Investigate. */
+.cx-detail {
+  margin: 0 0 1.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--bone);
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.cx-detail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.cx-detail__title {
+  font-size: 0.82rem;
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.cx-detail__close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--ash);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+}
+
+.cx-detail__close:hover {
+  color: var(--bone);
+}
+
+.cx-detail__close:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+.cx-detail__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.28rem 0.9rem;
+}
+
+.cx-detail__facts div {
+  display: contents;
+}
+
+.cx-detail__facts dt {
+  font-size: 0.72rem;
+  color: var(--ash);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cx-detail__facts dd {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--bone);
+}
+
+.cx-detail__status--alive {
+  color: var(--alive);
+}
+
+.cx-detail__status--dead {
+  color: var(--ash);
+}
+
+.cx-detail__src {
+  margin: 0.8rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--ash);
+}
+
+.cx-detail__src code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--ghost);
+  word-break: break-word;
+}
