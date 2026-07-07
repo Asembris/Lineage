@@ -316,7 +316,11 @@ addition + one CI workflow. Approved with an explicit correction (see actor vali
   TRUNCATE CASCADE; a `busy` event is sent if one is already in flight. try/finally reaps the
   observer/fanout tasks on client disconnect (GeneratorExit). Repeatable — every run reseeds.
   (Guard hardened post-audit — see "Post-audit integrity fixes" below.)
-- **OPERATIONAL RISK (address before any public/shared deployment):** this endpoint's blast
+- **OPERATIONAL RISK (address before any public/shared deployment):** [RESOLVED 2026-07-07 —
+  see "Roadmap Item 0 — cluster isolation" at the bottom of this file. The SSE stream now runs in
+  a dedicated `demo` database and can no longer wipe `defaultdb`; this risk and its "re-backfill
+  after every demo run" remediation no longer apply to the SSE path.] Original note follows:
+  this endpoint's blast
   radius is a FULL cluster wipe (run_seed → TRUNCATE CASCADE of all five tables), and nothing
   distinguishes "someone is deliberately watching the demo" from "a browser tab was left open."
   A stale tab's auto-reconnecting EventSource re-triggers the reseed every ~10-15s, silently
@@ -1128,3 +1132,87 @@ more than corrective. Two commits: motion harmonization + reduced-motion reconci
   next; never poll-then-abort during the reseed.
 - That patient run DID truncate, so a final `python -m seed.backfill_decisions` (via `.venv`)
   restores belief=active + 4000 decisions + 8 perf windows (conf 0.924→0.528) for handoff.
+
+## Roadmap Item 0 — cluster isolation for the demo stream (2026-07-07)
+
+Item 0 of the new roadmap is a prerequisite, not a feature: the destructive consistency-demo
+stream had to stop being able to wipe shared state out from under the rest of the console before
+anything downstream (an AML dataset, a forensic eval, adversarial lineage-poisoning detection)
+could assume the cluster stays in a knowable state. The fix landed as physical isolation — the
+SSE consistency stream now runs its entire lifecycle (provision, reseed, observe, eventual/strong
+invalidate) in a DEDICATED `demo` database on the same cluster, while the console (the decision
+feed and all four supervisor interactions) keeps reading `defaultdb`. A `TRUNCATE` in `demo` is
+physically incapable of naming a `defaultdb` table, so a demo run — deliberate or a stray
+reconnecting EventSource tab — can no longer touch the console's data. This closes the Phase-4
+"OPERATIONAL RISK" at its root cause (one shared cluster, no demo/console isolation).
+
+### ⚠️ CORRECTION TO PRIOR GUIDANCE — the SSE demo is NO LONGER destructive-by-default
+The operational warnings written across Frontend Phases 4, 5, and 6 all assumed the SSE
+consistency stream reseeds and invalidates `defaultdb`, and therefore told future sessions to run
+a ~228s `python -m seed.backfill_decisions` after every demo run/verification to restore the
+console's belief=active + 4000 decisions + 8 perf windows. **That is now WRONG for the SSE-demo
+path.** After this change the stream reseeds/kills only the throwaway `demo` database;
+`defaultdb`'s backfill, perf windows, and belief are never touched by it. Running the demo — or
+the `test_sse_stream` / `test_demo_isolation` tests — no longer requires any backfill recovery.
+The prior "budget a backfill after every demo run" rule is superseded for the SSE stream.
+- STILL TRUE, do not misread this: the console's own **Invalidate** action (POST
+  /beliefs/{id}/invalidate) is the one real governed write and STILL invalidates `defaultdb`'s
+  real belief by design, consuming it and requiring a reseed to restore. It was deliberately NOT
+  isolated (isolating it would make the certificate a fake — FRONTEND.md requires a real cert with
+  real belief_performance staleness). So: exercise the console Invalidate flow → still re-backfill
+  afterwards; run the SSE consistency demo → no backfill needed.
+- STILL TRUE: the direct-function consistency tests (`test_consistency_window.py`) and
+  `test_atomic_invalidation.py` call the service functions with no injected engine, so they still
+  reseed/invalidate `defaultdb` and remain destructive to it. Only the SSE ENDPOINT moved to
+  `demo`. Pointing all of CI at its own database is the documented follow-up below.
+
+### Verified facts (probed live, not assumed — the tier constraint drove the design)
+- `CREATE DATABASE` / `DROP DATABASE` and `CREATE SCHEMA` / `DROP SCHEMA` are ALL **permitted**
+  for the app user (`mohamed_aziz`) on this Basic-tier cluster (scratchpad/probe_isolation.py).
+  Basic-tier billing is aggregated per org/cluster (RU + storage), not per database, so one extra
+  small database is effectively free. Cluster is single-region `aws-eu-central-1`, `defaultdb` only.
+- All six tables are ORM models on `Base` (incl. `audit_log` + the post-0003 belief_inheritance
+  closure columns), so the `demo` database is provisioned with one idempotent `CREATE DATABASE IF
+  NOT EXISTS` + `Base.metadata.create_all` — no Alembic. The demo needs only the lightweight
+  genealogy seed (24 agents / 1 belief / 9 edges); never the decisions backfill or perf windows,
+  which the console alone reads. Verified live: `demo` carries all six tables, the vector embedding
+  column, and the closure columns.
+
+### Design choices (weighed, with the roads not taken)
+- **Physical (separate database) over logical (a run_id threaded through the five tables).**
+  Logical isolation would have meant a schema migration plus a run_id predicate on nearly every
+  query in a verified five-phase surface — the lineage recursive CTE, the AOST deposition, the
+  set-based atomic closure UPDATE that is the whole CRDB kill-shot — muddying the clean five-table
+  data model CLAUDE.md calls the moat, and turning fast `TRUNCATE CASCADE` into `DELETE WHERE
+  run_id=X` (which also rewrites the MVCC history the AOST story reads). Wrong trade for a
+  prerequisite meant to UNBLOCK the roadmap.
+- **A single persistent `demo` database, NOT one-per-request.** Per-request would buy true demo
+  concurrency at the cost of per-run DDL, orphan-database sweeping, and the schema-change-job
+  stacking this project keeps hitting (the "indexes being dropped" TRUNCATE contention). The
+  realistic threat model (stray tab, judge poking around, CI) is fully covered by decoupling demo
+  from console; the existing single-flight guard already serialises two concurrent demo runs into a
+  clean `busy`, and that collision is now confined to `demo` and harmless to the console either way.
+- **Mechanism = additive dependency injection.** `seed.seed()`, `consistency.observe_closure`,
+  `consistency.eventual_invalidate`, and `invalidation.invalidate_belief` grew an OPTIONAL
+  engine/session_factory param defaulting to the app globals; the SSE endpoint (routers/demo.py)
+  alone injects the `demo` engine (app/demo_db.py). Zero query-text changes — every statement in
+  those functions is unqualified, so it resolves against whichever database the injected connection
+  is bound to. Every existing caller/test passing no engine keeps hitting `defaultdb` unchanged.
+
+### Graceful degradation (folded in, scoped to the two exposed surfaces only)
+`app/resilience.py` classifies CRDB transients (SQLSTATE 40001 serialization; the 08xxx/57Pxx
+connection/shutdown family; and the "indexes being dropped" TRUNCATE schema-change contention
+string) and `run_with_retry()` does bounded exponential backoff, retrying the WHOLE unit and
+raising `TransientRetryExhausted` past the budget. Applied at exactly two places and nowhere else:
+the invalidation endpoint retries the whole serializable txn (the correct unit for a 40001) —
+BeliefNotFound/AlreadyInvalidated still short-circuit to 404/409, and exhaustion maps to a clean
+503 instead of an opaque 500; and the SSE stream retry-wraps provisioning + reseed so a transient
+CRDB Cloud hiccup degrades to an honest `error` event instead of a broken stream or a wedged
+single-flight guard.
+
+### Deferred (documented, NOT done this session)
+Pointing the rest of CI at its own database — so `test_atomic_invalidation` and the direct
+consistency tests stop reseeding `defaultdb` and can never collide with local console use — is the
+complementary fix to the "CI-vs-LOCAL collision" (Phase 4). It is a config/secret change (a
+distinct CI DATABASE_URL), out of this session's scope (which was the SSE stream + the invalidation
+endpoint). Left as the next isolation step if CI flakes reappear.
