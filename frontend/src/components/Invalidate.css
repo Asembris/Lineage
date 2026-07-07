@@ -56,7 +56,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .kill--armed,
   .kill-done {
-    animation: kill-fade 180ms ease-out;
+    /* reveal gesture — keep in sync with lib/motion.ts DUR.reveal (0.2s) / EASE.out */
+    animation: kill-fade 200ms ease-out;
   }
 }
 

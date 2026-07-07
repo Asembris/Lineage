@@ -15,11 +15,14 @@
  */
 
 import { motion, useReducedMotion } from "framer-motion";
+import { BLOOM_TIMES, DUR, EASE } from "../lib/motion";
 
+// Trace-local cadence knobs (the warmth-walk feel; NOTES.md calls these out for live tuning).
 const STAGGER = 0.15; // per-hop delay
-const EDGE_DUR = 0.16;
-const NODE_DUR = 0.14;
-const IGNITE_DUR = 0.5;
+const EDGE_DUR = 0.16; // one edge's pathLength draw
+const EDGE_FADE = 0.04; // the near-instant opacity flash alongside the draw
+const NODE_DUR = 0.14; // a chain node tinting to --trace
+const IGNITE_DUR = DUR.bloom; // the origin bloom — shared with Invalidate's corrected halo
 
 export interface TraceEdgeGeo {
   key: string;
@@ -73,8 +76,8 @@ export function TraceOverlay({
             reduce
               ? { duration: 0 }
               : {
-                  pathLength: { delay: e.index * STAGGER, duration: EDGE_DUR, ease: "easeOut" },
-                  opacity: { delay: e.index * STAGGER, duration: 0.04 },
+                  pathLength: { delay: e.index * STAGGER, duration: EDGE_DUR, ease: EASE.out },
+                  opacity: { delay: e.index * STAGGER, duration: EDGE_FADE, ease: EASE.out },
                 }
           }
         />
@@ -88,7 +91,7 @@ export function TraceOverlay({
             <motion.g
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={reduce ? { duration: 0 } : { delay: n.index * STAGGER, duration: NODE_DUR }}
+              transition={reduce ? { duration: 0 } : { delay: n.index * STAGGER, duration: NODE_DUR, ease: EASE.out }}
             >
               <circle className="tree__trace-dot" r={13} />
               <text className="tree__trace-gen" dominantBaseline="central">
@@ -108,11 +111,13 @@ export function TraceOverlay({
               className="tree__trace-glow"
               r={22}
               initial={{ opacity: 0, scale: 0.65 }}
-              animate={{ opacity: reduce ? 0.6 : [0, 0.8, 0.55], scale: 1 }}
+              // reduced-motion settles on the SAME resting opacity as the full-motion end
+              // keyframe (0.55), so both paths land on one identical final state.
+              animate={{ opacity: reduce ? 0.55 : [0, 0.8, 0.55], scale: 1 }}
               transition={
                 reduce
                   ? { duration: 0 }
-                  : { delay: originDelay, duration: IGNITE_DUR, ease: "easeOut", times: [0, 0.5, 1] }
+                  : { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out, times: BLOOM_TIMES }
               }
             />
             <motion.g
@@ -121,7 +126,7 @@ export function TraceOverlay({
               transition={
                 reduce
                   ? { duration: 0 }
-                  : { delay: originDelay, duration: IGNITE_DUR, ease: "easeOut", times: [0, 0.5, 1] }
+                  : { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out, times: BLOOM_TIMES }
               }
               onAnimationComplete={fireOnce}
             >

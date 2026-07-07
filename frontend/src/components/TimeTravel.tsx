@@ -25,6 +25,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { DUR, EASE } from "../lib/motion";
 import type { Investigation } from "../lib/investigation";
 import type { BeliefPerformanceWindow, UUID } from "../api/types";
 import { getAgentBeliefs, getBeliefPerformance } from "../api/client";
@@ -97,7 +98,7 @@ function Curve({
         stroke="url(#tt-grad)"
         initial={reduce ? { pathLength: 1 } : { pathLength: 0 }}
         animate={{ pathLength: 1 }}
-        transition={{ duration: reduce ? 0 : 0.9, ease: "easeInOut" }}
+        transition={{ duration: reduce ? 0 : DUR.sweep, ease: EASE.inOut }}
       />
       {windows.map((w, i) => (
         <circle
@@ -224,7 +225,7 @@ export function TimeTravel({ inv }: { inv: Investigation }) {
         className={`tt__readout tt__readout--${tone}`}
         initial={reduce ? false : { opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: reduce ? 0 : 0.25 }}
+        transition={{ duration: reduce ? 0 : DUR.reveal, ease: EASE.out }}
       >
         <div className="tt__conf">
           <span className={`tt__conf-val tt__hot-${tone}`}>{formatConfidence(active.confidence)}</span>
