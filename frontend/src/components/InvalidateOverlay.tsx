@@ -19,6 +19,7 @@
  */
 
 import { motion, useReducedMotion } from "framer-motion";
+import { BLOOM_TIMES, DUR, EASE } from "../lib/motion";
 
 export interface InvalHolderGeo {
   id: string;
@@ -54,7 +55,9 @@ export function InvalidateOverlay({
             initial={corrected ? { opacity: 0, scale: 0.7 } : { opacity: 0.35, scale: 1 }}
             animate={
               corrected
-                ? { opacity: reduce ? 0.65 : [0, 0.9, 0.6], scale: 1 }
+                // reduced-motion settles on the SAME resting opacity as the full-motion end
+                // keyframe (0.6), so both paths land on one identical final state.
+                ? { opacity: reduce ? 0.6 : [0, 0.9, 0.6], scale: 1 }
                 : reduce
                   ? { opacity: 0.5, scale: 1 }
                   : { opacity: [0.3, 0.6, 0.3], scale: [1, 1.08, 1] }
@@ -63,17 +66,17 @@ export function InvalidateOverlay({
               corrected
                 ? reduce
                   ? { duration: 0 }
-                  : { duration: 0.5, ease: "easeOut", times: [0, 0.5, 1] }
+                  : { duration: DUR.bloom, ease: EASE.out, times: BLOOM_TIMES } // shared with Trace's origin ignite
                 : reduce
                   ? { duration: 0 }
-                  : { duration: 1.6, repeat: Infinity, ease: "easeInOut" }
+                  : { duration: DUR.pulse, repeat: Infinity, ease: EASE.inOut }
             }
           />
           {/* Recolored dot + generation drawn over the cold node. */}
           <motion.g
             initial={corrected ? { opacity: 0 } : { opacity: 1 }}
             animate={{ opacity: 1 }}
-            transition={corrected ? (reduce ? { duration: 0 } : { duration: 0.3, delay: 0.12 }) : { duration: 0 }}
+            transition={corrected ? (reduce ? { duration: 0 } : { duration: DUR.reveal, delay: 0.12, ease: EASE.out }) : { duration: 0 }}
           >
             <circle className={`tree__inval-dot tree__inval-dot--${corrected ? "alive" : "alert"}`} r={13} />
             <text className={`tree__inval-gen tree__inval-gen--${corrected ? "alive" : "alert"}`} dominantBaseline="central">
