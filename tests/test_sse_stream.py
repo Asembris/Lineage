@@ -48,11 +48,16 @@ def test_sse_single_flight_rejects_a_concurrent_second_request(monkeypatch):
         seeded = asyncio.Event()
         calls = {"seed": 0}
 
-        async def fake_seed():
+        async def fake_ensure():
+            pass  # keep hermetic: no real demo-db provisioning / cluster access
+
+        # run_seed now takes an injected session_factory (the demo session) — accept + ignore it.
+        async def fake_seed(session_factory=None):
             calls["seed"] += 1
             seeded.set()
             await gate.wait()  # hold the first stream 'active' while we probe
 
+        monkeypatch.setattr(demo, "ensure_demo_ready", fake_ensure)
         monkeypatch.setattr(demo, "run_seed", fake_seed)
 
         gen1 = demo._consistency_events()
