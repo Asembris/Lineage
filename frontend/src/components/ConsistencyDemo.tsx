@@ -248,8 +248,8 @@ function Observation({
       {render === "3d" && (
         <p className="cx3d-hint mono">
           {interactive
-            ? "drag to orbit · scroll to zoom · hover a holder to trace its closure · click for detail"
-            : "drag to orbit · scroll to zoom · holder identity loads on run"}
+            ? "drag to orbit · scroll to zoom · hover a holder to trace its closure · click for detail · pointer-driven — use the 2D view for keyboard access"
+            : "drag to orbit · scroll to zoom · holder identity loads on run · pointer-driven — use the 2D view for keyboard access"}
         </p>
       )}
 
