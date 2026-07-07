@@ -34,8 +34,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.db import SessionLocal, engine
+# Defaults: the app's global engine/session (defaultdb). Callers that pass their own
+# engine/session_factory (e.g. the isolated demo stream) operate on a different database
+# with ZERO query-text changes — every SELECT/UPDATE here is unqualified, so it resolves
+# against whichever database the injected engine is connected to.
+from app.db import SessionLocal as _DEFAULT_SESSION, engine as _DEFAULT_ENGINE
 from app.sim.transactions import matches_target
 
 ALL_ACTIVE = "ALL_ACTIVE"
@@ -83,6 +88,7 @@ async def observe_closure(
     interval: float = 0.01,
     ready: asyncio.Event | None = None,
     on_sample: Callable[[str, int, int], None] | None = None,
+    engine: AsyncEngine | None = None,
 ) -> ObserverResult:
     """Sample the closure repeatedly until `stop`, classifying each read.
 
@@ -99,6 +105,7 @@ async def observe_closure(
     the accumulated ObserverResult return value is unchanged, so existing callers are unaffected.
     """
     result = ObserverResult()
+    eng = engine if engine is not None else _DEFAULT_ENGINE
 
     def _record(total: int, open_edges: int) -> None:
         classification = classify(total, open_edges)
@@ -106,7 +113,7 @@ async def observe_closure(
         if on_sample is not None:
             on_sample(classification, total, open_edges)
 
-    async with engine.connect() as conn:
+    async with eng.connect() as conn:
         total, open_edges = await _closure_counts(conn, belief_id)
         _record(total, open_edges)
         await conn.rollback()
@@ -129,14 +136,20 @@ class EventualResult:
 
 
 async def eventual_invalidate(
-    belief_id: uuid.UUID, actor_id: uuid.UUID, per_holder_delay: float = 0.06
+    belief_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    per_holder_delay: float = 0.06,
+    engine: AsyncEngine | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
 ) -> EventualResult:
     """The eventually-consistent baseline: one committed update PER holder edge, with a
     fan-out delay between them. Each commit is externally visible => a real split window.
 
     Deliberately NOT how the endpoint works — this exists only to measure the contrast.
     """
-    async with engine.connect() as conn:
+    eng = engine if engine is not None else _DEFAULT_ENGINE
+    make_session = session_factory if session_factory is not None else _DEFAULT_SESSION
+    async with eng.connect() as conn:
         edge_ids = list(
             (
                 await conn.execute(
@@ -153,7 +166,7 @@ async def eventual_invalidate(
     now = dt.datetime.now(dt.timezone.utc)
     closed: list[uuid.UUID] = []
     for edge_id in edge_ids:
-        async with SessionLocal() as s:  # a SEPARATE committed transaction per holder
+        async with make_session() as s:  # a SEPARATE committed transaction per holder
             async with s.begin():
                 await s.execute(
                     text(
@@ -166,7 +179,7 @@ async def eventual_invalidate(
         await asyncio.sleep(per_holder_delay)  # models per-holder fan-out latency
     # The belief row itself would be yet another non-atomic write in a multi-store baseline;
     # flip it last so global status eventually agrees with the per-holder copies.
-    async with SessionLocal() as s:
+    async with make_session() as s:
         async with s.begin():
             await s.execute(
                 text(
@@ -189,7 +202,7 @@ async def holder_holds_belief_live(belief_id: uuid.UUID, agent_id: uuid.UUID) ->
 
     This is the per-holder cache view — the thing that lags under eventual consistency.
     """
-    async with engine.connect() as conn:
+    async with _DEFAULT_ENGINE.connect() as conn:
         open_edges = (
             await conn.execute(
                 text(

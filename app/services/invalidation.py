@@ -32,8 +32,12 @@ import datetime as dt
 import uuid
 
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.db import SessionLocal, engine
+# Defaults: the app's global engine/session (defaultdb). The isolated demo stream injects its
+# own demo engine/session so the SAME atomic function runs against the demo database — no query
+# text changes, since every statement here is unqualified.
+from app.db import SessionLocal as _DEFAULT_SESSION, engine as _DEFAULT_ENGINE
 
 
 class BeliefNotFound(Exception):
@@ -55,22 +59,32 @@ _CLOSURE_SQL = text(
 )
 
 
-async def invalidate_belief(belief_id: uuid.UUID, actor_id: uuid.UUID) -> dict:
+async def invalidate_belief(
+    belief_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    engine: AsyncEngine | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> dict:
     """Invalidate `belief_id` and its full closure atomically. Returns the audit payload.
 
     Raises BeliefNotFound / AlreadyInvalidated. The returned dict carries everything the
     certificate builder needs (belief, actor, affected closure, the pre-invalidation
     snapshot HLC, and the audit_log id).
+
+    `engine`/`session_factory` default to the app globals (defaultdb). The isolated demo
+    stream passes its own so this exact atomic transaction runs against the demo database.
     """
     now = dt.datetime.now(dt.timezone.utc)
+    eng = engine if engine is not None else _DEFAULT_ENGINE
+    make_session = session_factory if session_factory is not None else _DEFAULT_SESSION
 
     # 0. Pre-invalidation snapshot, strictly before the write commit (see module docstring).
-    async with engine.connect() as c:
+    async with eng.connect() as c:
         snapshot_hlc = (
             await c.execute(text("SELECT cluster_logical_timestamp()::string"))
         ).scalar_one()
 
-    async with SessionLocal() as s:
+    async with make_session() as s:
         async with s.begin():  # single serializable CRDB transaction
             # 1. Lock + guard.
             belief = (
@@ -190,7 +204,7 @@ async def record_certificate_result(
     result is recorded in its own small transaction. A 'failed' status is a retriable record,
     not a rollback of the (already durable) invalidation.
     """
-    async with SessionLocal() as s:
+    async with _DEFAULT_SESSION() as s:
         async with s.begin():
             await s.execute(
                 text(
