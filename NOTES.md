@@ -1216,3 +1216,75 @@ consistency tests stop reseeding `defaultdb` and can never collide with local co
 complementary fix to the "CI-vs-LOCAL collision" (Phase 4). It is a config/secret change (a
 distinct CI DATABASE_URL), out of this session's scope (which was the SSE stream + the invalidation
 endpoint). Left as the next isolation step if CI flakes reappear.
+
+## Roadmap Item 1 (pre-work) — AML dataset modeling spike (2026-07-07)
+
+Verification spike, NOT ingestion. Question: does an IBM AML transaction typology (a laundering
+CYCLE, a SCATTER-GATHER, etc.) fit the existing five-table belief-inheritance model, or need
+something structurally different? Pressure-tested against the REAL data before any ingestion.
+Diagnostic: `scripts/probe_aml.py` (READ-ONLY, streams the 470MB CSV once, never loads it whole).
+
+### GO. The five-table moat stays untouched; AML data becomes a separate evidence layer.
+The working hypothesis held under real data. IBM's data models accounts and money flow — a
+different graph from agent genealogy. It becomes NEW `aml_*` tables the belief/agent layer is
+grounded and measured AGAINST; nothing about agents inheriting transactions.
+
+### Verified facts (probed, not assumed)
+- **Join is perfect.** Patterns.txt data lines are VERBATIM copies of Trans.csv rows, so the
+  exact-tuple join (ts + both bank/account pairs + amounts + currencies + format) is a literal
+  string match: **3209/3209 labeled pattern rows match exactly one CSV row — 0 misses, 0
+  collisions, 0 duplicate keys within patterns**, across all 8 typologies. The feared
+  floating-point-amount and timestamp-format drift do NOT exist (both files store the identical
+  string; timestamps are minute-resolution `YYYY/MM/DD HH:MM`, no seconds).
+- **Scale:** CSV = **5,078,345 transaction rows** (~470MB) — the FULL transaction universe;
+  laundering is a tiny labeled subset. **5,177 rows carry Is_Laundering=1, but Patterns.txt labels
+  only 3,209** → **1,968 laundering txns have NO typology label** (Is_Laundering is a superset of
+  the pattern-labeled rows). Formats: ACH 4483, Cheque 324, Credit Card 206, Cash 108, Bitcoin 56.
+- **Degeneracy confirmed:** 43/370 (11.6%) blocks are single-transaction — all in BIPARTITE(18),
+  RANDOM(13), FAN-OUT(8), FAN-IN(4). CYCLE / SCATTER-GATHER / GATHER-SCATTER / STACK have ZERO
+  degenerate blocks (the structurally rich typologies to draw from). Median hops: CYCLE 4,
+  SCATTER-GATHER 14, GATHER-SCATTER 14, STACK 10 (max 32).
+- **Hub-reuse is real but NARROW, and the worst offenders are artifacts.** Only 100/3170 nodes
+  (3.2%) appear in >1 block. The block-sharing graph has **210 connected components; 190 blocks
+  (51%) are fully isolated** self-contained stories. The apparent "super-hub in 32 blocks across
+  all 8 typologies" is a **labeling artifact**: that largest component's 32 blocks span only TWO
+  accounts (`023691/8021353D0` ⇄ `015231/80266F880`) ping-ponging tiny Euro ACH transfers, each
+  2-row exchange relabeled as STACK / CYCLE-2-hops / GATHER-SCATTER-1-degree / BIPARTITE / FAN-OUT
+  etc. The `Max N hops/degree` string is the generator's PARAMETER, not the instance's real size.
+- **CYCLE vs SCATTER-GATHER overlap:** the first non-degenerate CYCLE (10 rows/10 nodes) and
+  SCATTER-GATHER (32 rows/18 nodes) share **zero** nodes and touch no other block — genuinely
+  isolated. So a bounded subgraph is easy to select cleanly (18 isolated non-trivial CYCLEs alone).
+
+### Selection consequence for the next session (ingestion)
+Filter TWO classes of noise, not one: the 43 single-txn blocks AND the trivial 2-node ping-pong
+blocks (the `Max N` label lies about size — filter on ACTUAL distinct-node/hop count ≥ some floor).
+Then prefer isolated components for a genuinely bounded subgraph, OR deliberately include a
+hub-connected component if a shared-intermediary story is wanted — but know the biggest "hub" is a
+2-account artifact, not rich infrastructure.
+
+### Evidence-layer table sketch (NOT built — confirms zero touch to the five tables)
+- **aml_accounts** — node identity is the compound `(bank, account)`, never account alone.
+  `UNIQUE(bank, account)`, surrogate uuid PK.
+- **aml_transactions** — the money-flow edges (the CSV): ts, from_account_id/to_account_id (FK
+  aml_accounts), amount_received, receiving_currency, amount_paid, payment_currency, payment_format,
+  `is_laundering` (ground-truth label). ~5M rows if fully ingested; the bounded subgraph is a slice.
+- **aml_pattern_instances** — one row per labeled block: typology, generator max-param, source
+  ('ibm-hi-small'), instance_index.
+- **aml_pattern_members** — join block→its rows: pattern_instance_id (FK), transaction_id (FK
+  aml_transactions), hop_index. The exact-tuple join, MATERIALIZED once at ingest so it's never
+  re-run.
+
+### The ONE real seam (new info the roadmap should note)
+The two graphs connect at exactly one place, and it is ADDITIVE, not a restructuring: a `decisions`
+row (existing table) may eventually cite a REAL `aml_transactions` row instead of a synthetic
+`txn_ref`, and that decision's `is_fraud` would be sourced from `aml_transactions.is_laundering`
+(ground truth). That is the grounding bridge roadmap items 3/4/7 already assume — a nullable
+`aml_transaction_id` FK added to `decisions` LATER, or reuse of the existing free-form `txn_ref`.
+No FK runs FROM the aml_* tables INTO agents/beliefs/inheritance; the agent layer READS the evidence
+layer. A belief stays a heuristic rule ("cyclic flows returning to origin within N hops via shared
+intermediaries indicate laundering") the agents inherit; the AML data is what lets it cite real
+evidence and measure real precision/recall — nothing inherits a transaction. Forcing typology into
+`belief_inheritance` (e.g. "this account inherited hub-status") would be exactly the forced-fit
+fabrication this project refuses. Confirmed avoided.
+
+### Do NOT build ingestion/migrations/tables yet — that is the next session, gated on this GO.
