@@ -255,7 +255,13 @@ export function ConsistencyScene3D({
     <div
       className="cx3d"
       role="img"
-      aria-label={`Closure in 3D: ${closed} of ${total} holder edges corrected, state ${state}`}
+      // Keyboard-focusable so the scene is never an invisible dead zone in the tab order:
+      // a keyboard user can land on it, see a focus ring, and hear the live closure state.
+      // The holder-level drill-down (orbit/hover/select) is pointer-driven by design — the
+      // 2D DrainMeter is the fully keyboard-accessible view of the identical stream (2D is
+      // the complete path, 3D the gated enhancement, per FRONTEND.md).
+      tabIndex={0}
+      aria-label={`Closure in 3D: ${closed} of ${total} holder edges corrected, state ${state}. Pointer-driven; the 2D view is keyboard-accessible.`}
     >
       <Canvas
         camera={{ position: [0, 0.6, 7.4], fov: 42 }}

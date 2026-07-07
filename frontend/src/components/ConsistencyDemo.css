@@ -146,6 +146,7 @@
 @media (prefers-reduced-motion: no-preference) {
   .cx__gate,
   .cx-sum {
+    /* reveal gesture — keep in sync with lib/motion.ts DUR.reveal (0.2s) / EASE.out */
     animation: cx-fade 200ms ease-out;
   }
 }
@@ -232,7 +233,8 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .cx__pulse {
-    animation: cx-pulse 1.4s ease-in-out infinite;
+    /* live-pulse gesture — keep in sync with lib/motion.ts DUR.pulse (1.5s) / EASE.inOut */
+    animation: cx-pulse 1.5s ease-in-out infinite;
   }
 }
 
@@ -295,6 +297,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .cx-meter__cell--split {
+    /* live-pulse gesture — keep in sync with lib/motion.ts DUR.pulse (1.5s) / EASE.inOut */
     animation: cx-split-pulse 1.5s ease-in-out infinite;
   }
 }
@@ -703,6 +706,13 @@
   border-radius: 6px;
   overflow: hidden;
   background: var(--void);
+}
+
+/* The scene is a focusable region (not an interactive control) so keyboard focus never
+   vanishes into the canvas. Inset ring, matching the decision-feed-row baseline convention. */
+.cx3d:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
 }
 
 .cx__preview .cx3d {
