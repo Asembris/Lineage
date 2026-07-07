@@ -1018,3 +1018,113 @@ cross-highlight, click→real holder detail. Additive; 2D untouched.
   the pure logic (`deriveChain`, the investigation resolver, `treeLayout`, `consistencyStream`'s
   SSE frame parser, the `format.ts` formatters) — is a known, deliberate next step. No test
   runner, config, or scaffold was added; only the build/typecheck/lint gate exists today.
+
+## Frontend Phase 6 — motion + polish audit (2026-07-07)
+
+The last rung on FRONTEND.md's ladder. A holistic audit-and-harmonize pass over the whole
+assembled app, NOT a feature phase — the four interactions + consistency demo already worked.
+Three independent audits (reduced-motion, keyboard focus, motion timing) drove the plan; they
+came back far cleaner than a five-session build had any right to, so the phase was confirmatory
+more than corrective. Two commits: motion harmonization + reduced-motion reconciliation
+(8f9a8cc), and the 3D-canvas focus fix (f462f27).
+
+### Two library/behaviour decisions (both recorded so they don't get re-litigated)
+- **Lenis (smooth-scroll): NOT added.** FRONTEND.md recommends it "confirm in your plan"; the
+  answer is no. This app has no page-level scroll to hijack — the shell is `height:100vh;
+  overflow:hidden`, a fixed CSS grid, and every scroll surface is a modest internal panel body
+  (`.panel__body`, the demo body + its sample log). Lenis's inertial "alive under your hand"
+  momentum has nothing to attach to, would need one instance per independent scroller running a
+  continuous rAF loop, must be disabled under reduced-motion anyway, and — the real objection —
+  imposes consumer-flashy momentum on a dense forensic feed, against the "clinical, dense, calm"
+  language. The lighter alternative (scoped `scroll-behavior:smooth`) has no trigger either: no
+  scroll-to-selection, no anchor nav. Net: no scroll library, no scroll-smoothing.
+- **Springs: the app still uses NONE — a real, deliberate deviation from FRONTEND.md.** The
+  stack section asks for "genuine spring physics, not just eased CSS transitions"; the motion
+  audit found every framer-motion animation is a TWEEN, zero springs. Phase 6 chose Path A —
+  harmonize the tweens in place, do NOT convert them to springs — because converting the two
+  verified signature moments (Trace ignite, Invalidate corrected halo) for spec-purity is churn
+  a polish pass shouldn't take on. The gap is flagged here as a KNOWN deviation, not closed. If
+  a future pass wants to honour the spring language, the two atomic-bloom moments are the place.
+
+### Motion harmonization (Path A) — lib/motion.ts is the new single source
+- Before: the same gesture appeared at different durations across five sessions, and four
+  framer animations silently inherited framer's default ease. New `lib/motion.ts` exports `EASE`
+  (out / inOut only) + `DUR` (reveal 0.2 / sweep 0.9 / bloom 0.5 / pulse 1.5) + `BLOOM_TIMES`.
+  Grouped by GESTURE, not feature. Trace/Invalidate/TimeTravel point at it; the CSS-driven
+  animations (kill-fade, cx-fade, cx-pulse, cx-split-pulse) can't import TS, so they carry the
+  SAME literals with a "keep in sync with lib/motion.ts" comment.
+- Collapsed duplicates: panel/readout reveal 0.25s(framer)+180ms+200ms(CSS) → one 0.2s;
+  live-pulse 1.6s(framer armed halo)+1.4s+1.5s(CSS) → one 1.5s; the 0.5s atomic bloom that Trace
+  ignite + Invalidate corrected halo already shared is the anchor, kept. The four ease-unspecified
+  animations now name an explicit ease (all EASE.out — reveals/tints/draws/blooms decelerate to
+  rest; EASE.inOut reserved for the self-contained sparkline sweep + the infinite pulses).
+- Named the previously-bare literals (TraceOverlay `EDGE_FADE`; the TimeTravel + InvalidateOverlay
+  inline durations now resolve to DUR.*). NOTES' called-out Trace knobs (STAGGER/EDGE_DUR/NODE_DUR)
+  stay LOCAL to TraceOverlay for live tuning; only IGNITE_DUR moved to DUR.bloom (it already ==0.5).
+
+### Reduced-motion — reconcile the drift, do NOT unify the five idioms
+- The audit confirmed all five animated features DO collapse to a static final state today (via
+  five unrelated idioms: Trace runs a duration:0 anim that snaps; TimeTravel mounts already-
+  complete; InvalidateOverlay swaps an infinite pulse for a steady value; Invalidate + 2D demo
+  rely on CSS `@media (prefers-reduced-motion: no-preference)` gates; the 3D scene imperatively
+  snaps in useFrame). Forcing one idiom across five independently-verified features is churn for
+  tidiness, not a bug fix — left as-is. The shared DEFINITION ("collapse == the identical final
+  state a full-motion viewer ends on") is documented at the reconciled sites.
+- The ONE substantive fix: reduced-motion "final" values had drifted from the animated end-state
+  — Trace origin glow settled 0.6 vs animated 0.55; Invalidate corrected halo 0.65 vs 0.6. Both
+  now match, so reduced and full motion land pixel-identical (verified — the two Trace end-frames
+  are indistinguishable).
+- **The one load-bearing reduced-motion path — VERIFIED, not assumed.** Trace is the only feature
+  whose conclusion is gated on an animation callback (`onAnimationComplete` → reveals the origin
+  conclusion). Under reduce it runs a duration:0 anim and relies on framer still firing that
+  callback. Playwright strand check (reducedMotion:"reduce"): after the real lineage fetch
+  resolves, the conclusion text IS present → callback fires, no strand. (First check false-alarmed
+  because a 400ms wait didn't clear the network round-trip — the button read "Tracing…"; lengthened
+  past the fetch and it passes. Lesson: never assert a reduced-motion conclusion before the fetch
+  it waits on has resolved.)
+
+### Keyboard focus — every DOM control already at baseline; one canvas gap
+- Audit result: every DOM interactive surface (feed rows, view toggle, strategy radios, 2D/3D
+  toggle, Run/Stop/Confirm/Cancel, Invalidate arm/confirm/cancel, Trace/Replay, Time-travel
+  toggle+open, the ✕ closes) already meets the decision-feed-row baseline — native control +
+  `:focus-visible` + correct ARIA. Five sessions held the line; nothing to fix there.
+- The ONLY gap: the 3D holder nodes are three.js meshes in `<canvas>`, so orbit/hover/select are
+  pointer/raycast-only and the container wasn't in the tab order — keyboard focus skipped straight
+  over the scene into nothing. Honest-minimal fix (per FRONTEND.md's own framing of 3D as the
+  gated enhancement over the fully-accessible 2D meter): `.cx3d` is now a focusable REGION
+  (tabIndex=0) with an inset `:focus-visible` ring in the feed-row convention, its aria-label +
+  the affordance hint state plainly that 3D inspection is pointer-driven and the 2D view is the
+  keyboard path. Full 3D keyboard parity (tab-cycle nodes, arrow-key orbit) is a real feature with
+  its own scope — deliberately NOT smuggled into a polish phase. Verified: tabindex=0, reachable by
+  keyboard Tab, ring renders (--bone, distinct from the resting --line border).
+
+### Verification (Playwright @1280/1440/1920, channel:chromium, live 5173→8000)
+- **Responsive:** Console + Consistency-demo, 2D and 3D, at all three widths — ZERO page errors,
+  no crowding/overflow. The header-toggle-crowding concern didn't materialise (the demo's 2D/3D
+  toggle sits in the content region, clear of the app header; wide layout is max-width capped, not
+  stretched; the tree fills the wider centre well at 1920). No responsive fixes needed.
+- **Console interactions, motion + reduced-motion:** Investigate → Trace (identical final frame
+  both modes, warmth ONLY on the spine+origin+conclusion, strand check passes) → Time-travel
+  (0.53 --alert stale / real MVCC held·ACTIVE depo, harmonized readout swap) → Invalidate arm gate
+  (both real living holders 3fb55c + cd75b3 flagged --alert). All real cluster data, mono, correct
+  colours, zero page errors.
+- **Consistency demo:** reduced-motion collapse of the CSS pulses proven by computed style —
+  no-preference → cx-split-pulse / cx-pulse; reduce → `animationName:none` for both. One PATIENT
+  live eventual run under the harmonized code caught the split window (1 --alive + 7 --alert torn,
+  real observer timings) and the done summary (all corrected, 9-vs-1 measured contrast intact,
+  14 split reads) — red/green only, no amber leak, zero page errors.
+- `tsc -b` clean, oxlint clean, `vite build` OK (the ~1.27 MB three chunk + >500 KB warning is the
+  known accepted Phase-5 bundle, unchanged).
+
+### CLUSTER GOTCHA (banked) — do NOT fire consecutive demo runs that abort mid-reseed
+- First destructive attempt ran three demo runs back-to-back, each polling only 45s then closing
+  the context WHILE STILL "reseeding cluster & connecting…". That is exactly the abort-mid-reseed
+  pattern (Phase 4 note): each aborted-then-immediately-relaunched run stacks CRDB schema-change
+  jobs and the reseed never completes. Key finding: the TRUNCATE never COMMITTED across all three
+  (a probe showed belief still active + 4000 decisions intact) — aborting before the reseed's
+  truncate commits destroys nothing, but it does jam subsequent reseeds. Fix that worked: stop
+  hammering, let it settle, then a SINGLE patient run (long reseed tolerance, no early abort)
+  completed cleanly in one go. Rule: one demo run at a time, let each reach `summary` before the
+  next; never poll-then-abort during the reseed.
+- That patient run DID truncate, so a final `python -m seed.backfill_decisions` (via `.venv`)
+  restores belief=active + 4000 decisions + 8 perf windows (conf 0.924→0.528) for handoff.
