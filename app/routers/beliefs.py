@@ -15,6 +15,7 @@ from app.schemas import (
     LineageResponse,
     PreInvalidationState,
 )
+from app.resilience import TransientRetryExhausted, run_with_retry
 from app.services import catalog, certificate, invalidation, lineage, s3_audit
 
 router = APIRouter(tags=["beliefs"])
@@ -62,12 +63,24 @@ async def invalidate(belief_id: uuid.UUID, body: InvalidateRequest) -> Invalidat
     certificate is a POST-COMMIT side effect: if it fails, the invalidation still stands and
     the audit row is marked 'failed' for retry — correctness is never gated on S3.
     """
+    # The atomic invalidation is one serializable CRDB transaction; a contended commit can hit a
+    # transient 40001 / a dropped Cloud connection. Retry the WHOLE transaction (the correct unit
+    # for serialization retries) with bounded backoff. BeliefNotFound / AlreadyInvalidated are
+    # deterministic, so run_with_retry re-raises them at once → 404 / 409 unchanged. A transient
+    # that outlives the budget becomes a clean 503, never an opaque 500.
     try:
-        inv = await invalidation.invalidate_belief(belief_id, body.actor_id)
+        inv = await run_with_retry(
+            lambda: invalidation.invalidate_belief(belief_id, body.actor_id)
+        )
     except invalidation.BeliefNotFound:
         raise HTTPException(status_code=404, detail="belief not found")
     except invalidation.AlreadyInvalidated:
         raise HTTPException(status_code=409, detail="belief is not active (already invalidated)")
+    except TransientRetryExhausted:
+        raise HTTPException(
+            status_code=503,
+            detail="database temporarily unavailable (transient); please retry",
+        )
 
     # Post-commit: build + write the certificate. Failure does not undo the invalidation.
     staleness = await certificate.gather_staleness_evidence(belief_id)

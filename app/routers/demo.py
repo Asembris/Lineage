@@ -8,10 +8,17 @@ pacing — the split window actually opens and closes in real time on the wire.
 Deliberately NOT applied to the lineage trace: that recursive CTE returns in milliseconds, so
 streaming it would be fake server-side pacing. The trace stays a single request.
 
-This endpoint MUTATES demo state (it reseeds, then runs the eventual fan-out to invalidation).
-A module-level single-flight guard admits only one stream at a time so two reseeds can't
-collide on TRUNCATE ... CASCADE (see NOTES Phase 3, Step 7). Every run reseeds first, so it is
-repeatable.
+This endpoint MUTATES demo state (it reseeds, then runs the fan-out to invalidation) — but ONLY
+in a dedicated, isolated `demo` database (see app/demo_db.py), NEVER defaultdb. The console (the
+decision feed + the four supervisor interactions) reads defaultdb, so a demo run — deliberate or
+a stray reconnecting tab — can no longer wipe the console's state. This closes the Phase-4
+"OPERATIONAL RISK": the reseed's blast radius is now a throwaway database.
+
+A module-level single-flight guard still admits only one stream at a time so two reseeds can't
+collide on TRUNCATE ... CASCADE (see NOTES Phase 3, Step 7) — but that collision is now confined
+to the demo database and harmless to the console either way. Every run reseeds first, so it is
+repeatable. Provisioning + reseed + fan-out are bounded-retry wrapped (app/resilience.py) so a
+transient CRDB Cloud error degrades to a clean `error` event instead of a broken stream.
 """
 
 from __future__ import annotations
@@ -25,6 +32,8 @@ from typing import Literal
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
+from app.demo_db import DemoSession, demo_engine, ensure_demo_ready
+from app.resilience import run_with_retry
 from app.services import consistency
 from app.services.invalidation import invalidate_belief
 from seed.seed import aid, bid
@@ -59,7 +68,22 @@ async def _consistency_events(strategy: Literal["eventual", "strong"] = "eventua
     _stream_active = True
 
     try:
-        await run_seed()
+        # ISOLATION: everything below runs against the dedicated `demo` database, never
+        # defaultdb. Provision it (idempotent) and reseed its genealogy. The reseed's blast
+        # radius is now the throwaway demo db — a stray reconnecting tab can no longer wipe the
+        # console's backfill/beliefs, which live in defaultdb and are never touched here.
+        # Both provisioning and reseed are wrapped in bounded retry/backoff so a transient CRDB
+        # Cloud hiccup (dropped conn, TRUNCATE schema-change contention) degrades to an honest
+        # `error` event, not a broken stream or a wedged single-flight guard.
+        try:
+            await run_with_retry(ensure_demo_ready)
+            await run_with_retry(lambda: run_seed(session_factory=DemoSession))
+        except Exception:  # noqa: BLE001 — bounded failure: report cleanly, never crash the stream
+            yield _sse(
+                "error",
+                {"detail": "demo reseed failed (transient cluster error); please retry shortly"},
+            )
+            return
 
         queue: asyncio.Queue = asyncio.Queue()
         stop = asyncio.Event()
@@ -81,7 +105,12 @@ async def _consistency_events(strategy: Literal["eventual", "strong"] = "eventua
 
         observer = asyncio.create_task(
             consistency.observe_closure(
-                ORIGIN, stop, interval=observe_interval, ready=ready, on_sample=on_sample
+                ORIGIN,
+                stop,
+                interval=observe_interval,
+                ready=ready,
+                on_sample=on_sample,
+                engine=demo_engine,  # observe the demo db's closure, not defaultdb's
             )
         )
         fanout: asyncio.Task | None = None
@@ -127,10 +156,20 @@ async def _consistency_events(strategy: Literal["eventual", "strong"] = "eventua
             # pre-flip ALL_ACTIVE window; no artificial pacing. EVENTUAL runs the per-holder
             # fan-out baseline. Either way the observer streams the REAL samples it takes.
             if strategy == "strong":
-                fanout = asyncio.create_task(invalidate_belief(ORIGIN, ACTOR))
+                fanout = asyncio.create_task(
+                    invalidate_belief(
+                        ORIGIN, ACTOR, engine=demo_engine, session_factory=DemoSession
+                    )
+                )
             else:
                 fanout = asyncio.create_task(
-                    consistency.eventual_invalidate(ORIGIN, ACTOR, per_holder_delay=0.5)
+                    consistency.eventual_invalidate(
+                        ORIGIN,
+                        ACTOR,
+                        per_holder_delay=0.5,
+                        engine=demo_engine,
+                        session_factory=DemoSession,
+                    )
                 )
 
             # Stream each observer sample as it arrives, until the fan-out is done and drained.
