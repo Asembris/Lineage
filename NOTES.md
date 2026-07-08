@@ -1361,6 +1361,26 @@ column comment says so), not something a reader has to re-derive or take on fait
 - Re-run to restore after a hypothetical wipe: `PYTHONPATH=. .venv/Scripts/python.exe scripts/ingest_aml.py`
   then `scripts/verify_aml_ingest.py`. Idempotent — same 20 instances / 1500 txns every run.
 
+### hop_index semantics — real (generator/file order) but NOT chronological (verified, do not misread)
+Post-ingestion review asked whether `aml_pattern_members.hop_index` encodes anything real.
+Answer: YES — it is the Patterns.txt **generator emission order** within the block, and it is NOT
+arbitrary insertion order. Verified with scripts/probe_hop_index.py against the live DB + an
+independent re-parse of Patterns.txt (one instance per typology, incl. a multi-component STACK):
+`hop_index == independently re-derived file position` holds EXACTLY for every row of every checked
+instance. BUT it is **not reliably chronological**:
+- CYCLE (instance_index=1, 1 component): ts IS monotonic along hop — here file order == chronological
+  (a clean traversal path).
+- SCATTER-GATHER (idx=17, 1 component) and STACK (idx=3, 11 components): ts is NOT monotonic along
+  hop — file/generator order, not time order. And a num_components>1 STACK has no single path at all.
+
+Consequence (flagged for Item 5 traversal narration and any future consumer): hop_index is a stable,
+reproducible generator-order index — safe to ORDER BY for a deterministic listing — but it must NOT
+be treated as chronological, and NOT as a single traversal path for multi-component instances. Any
+time-ordered or per-path narration must derive order from `ts` and/or the edge graph
+(component-aware), not assume hop_index is it. Left as-is (it faithfully encodes what it intended —
+generator order); the column comment in app/aml_models.py now states this precisely rather than the
+vague "order within the block". No data changed.
+
 ### Explicitly NOT done (still gated): Item 2 (reversible replay), Item 3 (RAG/typology-regulation
 ### corpus embeddings — owns transaction/typology EMBEDDINGS, none here), the decisions.aml_transaction_id
 ### grounding FK (items 3/4/7), any change to the five tables. Do NOT start Item 2/3 without approval.

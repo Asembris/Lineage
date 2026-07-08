@@ -128,7 +128,13 @@ class AmlPatternMember(AmlBase):
     transaction_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("aml_transactions.id"), nullable=False
     )
-    hop_index: Mapped[int] = mapped_column(Integer, nullable=False)  # order of the row within the block
+    # Patterns.txt generator EMISSION order within the block. Verified real & stable: it matches an
+    # independent re-parse exactly (scripts/probe_hop_index.py). It is NOT guaranteed chronological —
+    # ts ascends along hop_index only for SOME instances (e.g. connected CYCLEs) and NOT for
+    # SCATTER-GATHER or multi-component STACK. For a num_components>1 instance it is NOT a single
+    # traversal path. Chronological/per-path narration (e.g. Item 5) must derive order from ts/edges,
+    # NOT assume this is it. See NOTES.md "Roadmap Item 1 — hop_index semantics".
+    hop_index: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (
         UniqueConstraint(
