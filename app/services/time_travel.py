@@ -61,7 +61,9 @@ _BELIEFS_SQL = text(
     LEFT JOIN belief_inheritance bi
            ON bi.belief_id = b.id AND bi.to_agent_id = :agent_id
     WHERE b.originating_agent_id = :agent_id OR bi.to_agent_id = :agent_id
-    ORDER BY b.formed_at
+    -- b.id tiebreaks formed_at (not a total order — two beliefs can share a formed_at)
+    -- so the deposition is byte-identical across independent reads (Roadmap Item 2).
+    ORDER BY b.formed_at, b.id
     """
 )
 
