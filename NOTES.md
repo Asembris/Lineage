@@ -1288,3 +1288,79 @@ evidence and measure real precision/recall — nothing inherits a transaction. F
 fabrication this project refuses. Confirmed avoided.
 
 ### Do NOT build ingestion/migrations/tables yet — that is the next session, gated on this GO.
+
+## Roadmap Item 1 — AML evidence-layer ingestion (2026-07-08)
+
+Item 1 delivered: migration 0004 (four additive `aml_*` tables) + a deterministic, idempotent
+ingestion of a bounded, verified laundering subgraph from the REAL 470MB data into `defaultdb`,
++ a verification script that re-derives every claim against the LIVE DB and the RAW CSV (not the
+spike's numbers, not the ingest run's stdout). All 20 verification checks PASS. The five-table
+moat is untouched; no FK crosses the aml_/moat boundary (verified structurally, check #7).
+
+### Separate metadata is STRUCTURAL, not a convention (do not "fix" it back onto Base)
+`app/aml_models.py` defines `AmlBase(DeclarativeBase)` with its OWN metadata, deliberately NOT
+`app.db.Base`. This makes "the evidence layer is a defaultdb-only concern" impossible to violate
+by accident, given how often this project has momentarily forgotten a documented constraint:
+- Item 0's `demo` database is provisioned by `Base.metadata.create_all`. Off `Base`, that call
+  physically cannot create empty `aml_*` tables in the throwaway demo db.
+- Alembic migrations here are hand-written (0001-0003 precedent), so keeping `aml_*` off
+  `Base.metadata` (Alembic's `target_metadata`) costs nothing — migration 0004 is their sole DDL.
+A one-line comment at the top of `app/aml_models.py` states the why on a cold read; this is the
+full reasoning.
+
+### The four decisions, as REALIZED (verified live, not intended-on-paper)
+- **Benign noise = is_laundering=0 txns TOUCHING the selected accounts**, per-account capped (8)
+  and globally capped at 4x fraud. Realized **1200 benign : 300 fraud = 4.00:1**; every benign row
+  is confirmed anchored to a labeled-instance account (check #4, 0 stray). These are the meaningful,
+  adversarial precision negatives (they share nodes with the positives), NOT random unrelated rows.
+  Byproduct: benign counterparties expanded the account universe to 648 (from the ~250 labeled).
+- **Scope = 4 zero-degenerate typologies, 5 isolated instances each = 20 total, 300 labeled rows.**
+  CYCLE + SCATTER-GATHER + GATHER-SCATTER + STACK (FAN-IN/FAN-OUT/BIPARTITE/RANDOM excluded — they
+  carry the 43 degenerate single-txn blocks). Floor = >=4 distinct accounts (filters single-txn
+  blocks AND the 2-node ping-pong artifacts whose "Max N" label lies about size). Greedy file-order
+  selection keeps all 20 instances pairwise account-disjoint (check #3, 0 shared). All four
+  typologies yielded a full 5; realized spread {'CYCLE':5,'GATHER-SCATTER':5,'SCATTER-GATHER':5,'STACK':5}.
+- **Target DB = `defaultdb`** (console/Trace/Invalidate/belief_performance), NOT the throwaway
+  `demo` db. Alembic points at `sync_database_url` (=defaultdb); ingestion uses the app engine.
+- **Reseed interaction:** static reference data wired into NO reseed path. `seed.seed()` only
+  TRUNCATEs `belief_inheritance, decisions, belief_performance, beliefs, agents CASCADE` — and
+  because there are ZERO inbound FKs from aml_* into those tables, CASCADE cannot reach aml_*. The
+  SSE demo targets `demo` (which now has no aml_* at all). Ingestion idempotency = deterministic
+  uuid5 ids (account=uuid5(bank/account), txn=uuid5(raw_key), instance=uuid5(source:index),
+  member=uuid5(inst:txn)) + `ON CONFLICT DO NOTHING`, so re-running converges without wiping.
+
+### STACK instances are NOT one connected story — measured, flagged for future RAG grounding
+A future session reading `aml_pattern_instances` must NOT assume `num_rows`/`num_accounts` imply a
+single coherent path. Measured from the loaded data: `num_components` (weakly-connected components
+among an instance's edges) is **1 for every CYCLE / SCATTER-GATHER / GATHER-SCATTER instance**, but
+**>1 for ALL 5 STACK instances (4, 6, 10, 11, 11 components)** — i.e. STACK bundles internally
+disjoint 2-hop sub-chains under one label, exactly as the pre-work spike suspected. The
+`num_components` column exists precisely so this is answerable directly from the table (and the
+column comment says so), not something a reader has to re-derive or take on faith.
+
+### Verified facts (scripts/verify_aml_ingest.py, all PASS, against live defaultdb + raw CSV)
+- Row counts: accounts=648, transactions=1500, instances=20, members=300. Split: 300 laundering,
+  1200 benign. No member links a benign txn.
+- Join integrity re-confirmed at ingest: 300/300 labeled keys matched exactly one CSV row, 0
+  collisions, across the full 5,078,345-row scan (the spike's 3209/3209 result holds for our slice).
+- Positional-parse (duplicate "Account" header) fix spot-checked BY HAND: 6 stored txns (3 laundering
+  + 3 benign) reconstructed and their from/to bank+account compared column-for-column against the
+  exact raw CSV line — all match; stored txn ids confirmed == uuid5(raw_key). (One benign spot row is
+  a legit Reinvestment self-loop from==to — a real CSV shape, valid as a negative.)
+- Structural isolation: querying information_schema, NO foreign key crosses the aml_/moat boundary
+  in either direction.
+
+### Mechanics / gotchas
+- `scripts/ingest_aml.py` REUSES `scripts/probe_aml.py` (loaded via importlib since scripts/ isn't a
+  package): `probe_aml.parse` (the positional fix) is reused verbatim; only header-param capture,
+  selection, benign sampling, and the DB load are added. CSV streamed ONCE, never loaded whole (~10s).
+- ts stored timestamptz-at-UTC from minute-resolution 'YYYY/MM/DD HH:MM' (no tz in source) — a
+  storage-typing convention, documented in the migration; not a semantic tz claim.
+- Bulk insert is fast (~1500 rows, client-assigned uuid5 ids, single txn) — none of the per-row
+  RETURNING slowness the Phase-2 backfill hit (that came from server-default UUID PKs).
+- Re-run to restore after a hypothetical wipe: `PYTHONPATH=. .venv/Scripts/python.exe scripts/ingest_aml.py`
+  then `scripts/verify_aml_ingest.py`. Idempotent — same 20 instances / 1500 txns every run.
+
+### Explicitly NOT done (still gated): Item 2 (reversible replay), Item 3 (RAG/typology-regulation
+### corpus embeddings — owns transaction/typology EMBEDDINGS, none here), the decisions.aml_transaction_id
+### grounding FK (items 3/4/7), any change to the five tables. Do NOT start Item 2/3 without approval.
