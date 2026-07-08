@@ -48,6 +48,43 @@ class LineageResponse(BaseModel):
     path: list[LineageNode]
 
 
+# --- Roadmap Item 2: reversible-deterministic replay --------------------------
+
+
+class ReplayClosureNode(BaseModel):
+    """One node of a belief's inheritance closure as reconstructed at a past time.
+
+    Same shape as LineageNode plus `edge_invalidated_at` (whether this holder's inheritance
+    edge was revoked as of the replayed timestamp) — the per-edge closure state that item B's
+    counterfactual invalidation replays over.
+    """
+
+    depth: int
+    agent_id: uuid.UUID
+    generation: int
+    bloodline: str
+    status: str
+    from_agent_id: uuid.UUID | None
+    inherited_at: dt.datetime | None
+    edge_invalidated_at: dt.datetime | None
+
+
+class ReplaySnapshotResponse(BaseModel):
+    """A deterministic, content-hashed reconstruction of a belief's closure AS OF a time.
+
+    `content_hash` = sha256 over the canonical JSON of the reconstructed world (belief +
+    closure) only; `as_of` (input) and `read_hlc` (the resolved MVCC read timestamp) are
+    provenance, NOT hashed. Two independent reads at the same timestamp are byte-identical.
+    """
+
+    belief: BeliefOut
+    origin_agent_id: uuid.UUID
+    closure: list[ReplayClosureNode]
+    as_of: str | None  # the requested ISO/HLC point; None => current-state snapshot
+    read_hlc: str  # the MVCC read timestamp actually used (cluster_logical_timestamp())
+    content_hash: str  # 'sha256:...' over the canonical reconstructed world
+
+
 # --- Phase 3: atomic invalidation ---------------------------------------------
 
 

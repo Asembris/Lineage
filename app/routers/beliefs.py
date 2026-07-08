@@ -14,9 +14,10 @@ from app.schemas import (
     InvalidateResponse,
     LineageResponse,
     PreInvalidationState,
+    ReplaySnapshotResponse,
 )
 from app.resilience import TransientRetryExhausted, run_with_retry
-from app.services import catalog, certificate, invalidation, lineage, s3_audit
+from app.services import catalog, certificate, invalidation, lineage, replay, s3_audit
 
 router = APIRouter(tags=["beliefs"])
 
@@ -53,6 +54,31 @@ async def get_belief_lineage(belief_id: uuid.UUID) -> LineageResponse:
     if result is None:
         raise HTTPException(status_code=404, detail="belief not found")
     return LineageResponse(**result)
+
+
+@router.get("/beliefs/{belief_id}/replay", response_model=ReplaySnapshotResponse)
+async def replay_belief_closure(
+    belief_id: uuid.UUID,
+    as_of: str | None = Query(
+        None,
+        description="Replay point: ISO-8601 timestamp or CRDB HLC decimal. Omit for a "
+        "current-state snapshot. Bounded to the AOST window (~75 min); older -> 400.",
+    ),
+) -> ReplaySnapshotResponse:
+    """Reconstruct this belief's inheritance closure AS OF a past time, canonically hashed.
+
+    Real CockroachDB time-travel over the belief-closure recursive CTE. The `content_hash`
+    makes replay byte-identical: two reads at the same timestamp reproduce the same world.
+    A malformed / out-of-window `as_of` -> 400; an unknown belief -> 404. The foundation
+    later items build counterfactual invalidation (B) and confidence propagation (D) on.
+    """
+    try:
+        result = await replay.closure_snapshot(belief_id, as_of)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if result is None:
+        raise HTTPException(status_code=404, detail="belief not found")
+    return ReplaySnapshotResponse(**result)
 
 
 @router.post("/beliefs/{belief_id}/invalidate", response_model=InvalidateResponse)
