@@ -1384,3 +1384,107 @@ vague "order within the block". No data changed.
 ### Explicitly NOT done (still gated): Item 2 (reversible replay), Item 3 (RAG/typology-regulation
 ### corpus embeddings — owns transaction/typology EMBEDDINGS, none here), the decisions.aml_transaction_id
 ### grounding FK (items 3/4/7), any change to the five tables. Do NOT start Item 2/3 without approval.
+
+## Roadmap Item 2 — reversible-deterministic replay over the lineage timeline (2026-07-08)
+
+Item 2 delivered: a dedicated `GET /beliefs/{id}/replay?as_of=` surface that reconstructs ONE
+belief's full inheritance closure (genealogy nodes + per-edge revocation state) AS OF an
+arbitrary past MVCC point via real `SET TRANSACTION AS OF SYSTEM TIME`, and emits a canonical,
+content-hashed snapshot. It reuses the deposition's AOST plumbing (app/services/time_travel.py)
+over the lineage path's recursive closure CTE (app/services/lineage.py). The live `/lineage`
+endpoint is UNTOUCHED — it stays current-state/unfiltered for the frontend Trace contract; replay
+is a separate surface. 4 tests pass (2 replay + the Phase-1 AOST test re-confirmed for the
+tiebreaker; the 2 lineage/AOST originals unchanged).
+
+### Scoping conclusion on the GC TTL tension: scope (a), stated honestly (do NOT let "any timestamp" stand)
+The roadmap's "any timestamp reproduces byte-identically" is NOT literally achievable via raw AOST
+and was deliberately restated, not silently adopted. Raw `AS OF SYSTEM TIME` is bounded by the
+range `gc.ttlseconds` = 4500s (~75 min, confirmed Phase 1) — it can reproduce any timestamp WITHIN
+that window and nothing older. So the shipped scope is **(a): byte-identical replay within the
+AOST-reachable window, full stop**; an out-of-window `as_of` (older than the GC TTL, or in the
+future) fails inside CRDB at the SET statement and is surfaced as a **400, never a 500** (reusing
+time_travel's `_AOST_RANGE_ERRORS` translation). This is NOT a gap left open: durability past the
+75-min window is the certificate's already-proven pattern (Phase 3 / post-audit fixes) — a
+self-contained, hash-covered snapshot captured at a consequential event, independent of whether the
+live MVCC window still reaches it. So the honest two-tier framing the roadmap collapses into one
+sentence is: **live raw-AOST replay = the within-window mechanism; a captured hashed snapshot = the
+durability mechanism for events that must outlive the window.** Item 2 built the first tier plus the
+canonical-hashing discipline that makes the two interchangeable to a consumer.
+
+### "Byte-identical" as a falsifiable claim (the actual mechanism, not a vibe)
+`content_hash` = `sha256` over the canonical (sorted-key, stable-separator) JSON of the
+RECONSTRUCTED WORLD — belief + closure — and ONLY that. The input `as_of` and the resolved
+`read_hlc` are returned as provenance but are NOT hashed: the claim is that the reconstructed
+closure at a given time is byte-identical, and the world at two equal timestamps is the same world
+(so hashing the input would be circular). The proof (tests/test_replay.py) lifts the Phase-1
+AOST done-test to the hash level: two independent reads at the same captured HLC hash identically;
+then a closure-CHANGING write (a new inheritance edge extending the origin belief to crimson-2b, a
+real agent deliberately outside the seeded closure) is committed, and the replay at the OLD
+timestamp STILL hashes identically (MVCC hides it) while a current read shows the grown 10-node
+closure with a different hash. This is genuinely falsifiable because three real non-determinism
+sources would break it — non-total row ordering, non-canonical serialization, and any `now()`/random
+in the path. The closure CTE's `ORDER BY depth, generation, agent_id` is already a TOTAL order
+(agent_id is a unique UUID); the belief-side deposition needed a fix (below) to match.
+
+### Tiebreaker on Phase-1's oldest code — its own item, re-confirmed separately
+Item 2 required the ONE surface it does not own — the deposition's `_BELIEFS_SQL` — to also be
+total-ordered: it ordered by `b.formed_at` alone (not total; two beliefs can share a formed_at), so
+add `b.id` as a tiebreaker. This is the first edit to `test_aost_hides_a_committed_write`'s
+subject since Phase 1. Committed separately (`fix(backend): total-order the deposition query`), and
+that exact Phase-1 test was re-run and **still passes unchanged** (32.56s, 1 passed) — confirmed on
+its own, not bundled into the replay test summary.
+
+### Why per-belief-closure is the RIGHT granularity for B and D (not just today's single-belief convenience)
+Replay is scoped to ONE belief's inheritance closure, which today happens to equal "the whole
+genealogy" only because exactly one belief exists (CLAUDE.md Phase 1). That coincidence is NOT the
+reason for the scope. The belief is the system's actual unit of inheritance AND of invalidation:
+`belief_inheritance` edges are keyed by `belief_id`, and the atomic kill-shot
+(`invalidate_belief`) closes exactly one belief's closure in one txn. The two items this unblocks
+operate on a single belief's chain by construction:
+- **B (counterfactual "what-if invalidation")** asks "if belief X had been invalidated at time T,
+  what closure/holders would that have touched, and which decisions would have flipped." It calls
+  `closure_snapshot(X, as_of=T)`, gets the as-of-T edge set (with each edge's open/revoked state —
+  that's why the snapshot carries `edge_invalidated_at`), and replays a hypothetical kill over that
+  set IN MEMORY — a pure mirror of invalidation.py's set-based closure, no DB mutation. The hash
+  guarantee means the counterfactual is itself reproducible.
+- **D (confidence propagation through the chain)** walks a single belief's ordered inheritance
+  edges propagating a confidence/staleness signal, joined with that belief's `belief_performance`
+  windows. Replay gives D the graph AS OF T; belief_performance gives D the measured numbers (two
+  clocks, kept distinct per the "do not conflate" note).
+Both take a per-belief closure-as-of-T as their literal input. A whole-genealogy blob would be the
+wrong shape for either — they'd have to filter it back down to one belief's edges anyway.
+
+### Multi-belief future: the per-belief contract HOLDS unchanged (verified against the CTE, not assumed)
+Once items 3/4 start forming beliefs from AML typologies there will be >1 belief, and the contract
+does NOT need to change. `closure_snapshot(belief_id, ...)` and its CTE are already keyed by
+`:belief_id` throughout (`WHERE bi.belief_id = :belief_id`), so a second belief's closure is a
+separate, independent call — no cross-belief leakage, no shared-state assumption. What WILL change is
+only the incidental identity "one belief's closure == the genealogy": with multiple beliefs, an
+agent can hold several beliefs, closures will overlap on shared agents, and "replay the genealogy"
+(if ever wanted as a distinct concept) would be a DIFFERENT, additive surface — a union over
+per-belief closures or a genealogy-scoped snapshot — NOT a change to this endpoint's contract. B and
+D still want per-belief, so no pressure to build that. Flagged so a future session does not
+mistake per-belief replay for a single-belief shortcut that "should" be generalized onto /replay.
+
+### No AML touch — confirmed, not assumed
+Replay reads only `agents` / `beliefs` / `belief_inheritance` (the belief/agent timeline). The
+`aml_*` evidence-layer tables (Item 1) are static reference data on their own `AmlBase` metadata
+with zero inbound FKs to/from the moat, and are not part of the MVCC genealogy timeline. Nothing in
+this item queries, migrates, or references them. As expected — confirmed by reading the closure
+SQL, not by assumption.
+
+### Mechanics / gotchas
+- `content_hash`/`_json_default` are kept LOCAL to app/services/replay.py (mirroring certificate.py's
+  canonical-digest discipline) rather than importing certificate's private helpers — replay is
+  app-side, certificate is deliberately import-safe for the Lambda; coupling them buys nothing.
+- The belief lookup and the closure traversal run in the SAME explicit txn (after the one SET), so
+  both read the identical MVCC snapshot — a belief that flipped between two reads can't produce a
+  belief/closure mismatch within one call.
+- `read_hlc` = `cluster_logical_timestamp()::string` captured inside the txn; for an HLC `as_of` it
+  equals the requested literal exactly (Phase-1 property), so it's stable across reads at the same
+  timestamp. It is metadata, not hashed.
+
+### Explicitly NOT done (still gated): Item B (counterfactual what-if invalidation), Item D
+### (confidence propagation), Item 3 (RAG/typology embeddings), any AML/RAG work, any change to the
+### five tables. This session was scoped to the belief/agent genealogy timeline only. Do NOT start
+### B/D/3 without approval.
