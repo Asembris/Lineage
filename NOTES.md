@@ -1488,3 +1488,125 @@ SQL, not by assumption.
 ### (confidence propagation), Item 3 (RAG/typology embeddings), any AML/RAG work, any change to the
 ### five tables. This session was scoped to the belief/agent genealogy timeline only. Do NOT start
 ### B/D/3 without approval.
+
+## Roadmap Item 3 — CockroachDB-native RAG: typology corpus (2026-07-09)
+
+Item 3 delivered the TYPOLOGY half of the RAG corpus: one additive `typology_corpus` table in
+`defaultdb` holding the four IBM typology definitions embedded as REAL 1536-dim
+text-embedding-3-small vectors, on the SAME cluster and SAME AOST timeline as the lineage graph and
+the aml_* evidence layer, with a `retrieve_typology()` surface whose RESULTS join back to real
+ingested pattern instances and whose RETRIEVAL can be time-travelled with real
+`SET TRANSACTION AS OF SYSTEM TIME`. This is a mechanism-and-realness deliverable, NOT a
+retrieval-quality-at-scale one — labeled as such below. Migration 0005 + 12/12 verify checks +
+2 hermetic tests, all passing on the live cluster. Five-table moat untouched; no FK crosses into
+it or into aml_*.
+
+### Sourcing = two-track, and only the typology track was buildable this session (approved)
+Corpus text is never fabricated (same discipline as the AML CSV). The **typology** definitions are
+self-sourced from real primary text: Altman et al., "Realistic Synthetic Financial Transactions for
+Anti-Money Laundering Models" (NeurIPS 2023, arXiv 2306.16424) — the paper behind the HI-Small
+dataset — §3.2 / Figure 2, fetched live (arxiv.org/html/2306.16424v1) and quoted faithfully in
+`app/services/corpus.py::TYPOLOGY_DOCS`. The **regulatory** corpus (FATF/FinCEN/FFIEC red flags) is
+gated on a `data/raw/` drop because those sources are BLOCKED to automated fetch in this environment
+(verified: fatf-gafi.org PDFs + HTML, bsaaml.ffiec.gov Appendix F HTML+PDF, fincen.gov advisories,
+and web.archive.org all returned 403/timeout). Assembling it from WebSearch snippet fragments would
+be lower-fidelity secondary text — refused. Precise drop list for the next session: FATF *Virtual
+Assets Red Flag Indicators* PDF (or a FATF ML/TF Typologies report); the FFIEC BSA/AML Manual
+Appendix F "Money Laundering and Terrorist Financing Red Flags" PDF; FinCEN advisories (e.g.
+FIN-2014-A005 funnel accounts/TBML, FIN-2010-A001).
+
+### Typology labels match EXACTLY (the join thread), enforced at load, re-checked at verify
+The corpus `typology` values are the exact uppercase strings `CYCLE / SCATTER-GATHER /
+GATHER-SCATTER / STACK` — the literal `BEGIN LAUNDERING ATTEMPT - <TYPOLOGY>` header tokens from
+Patterns.txt, identical to what Item 1 stored in `aml_pattern_instances.typology`. The one real trap
+is the paper's LOWERCASE prose ("cycle", "scatter-gather"); we store only the uppercase join key,
+never the prose casing. `scripts/ingest_corpus.py` has a load-time GATE that ABORTS before any write
+if a corpus typology is absent from `SELECT DISTINCT typology FROM aml_pattern_instances`, and
+`verify_corpus.py` re-checks 0 orphans + all-4-covered against the live DB. NOT an FK: aml has five
+rows per typology (no single parent to point at), and a cross-metadata FK would break the clean
+CorpusBase/AmlBase/Base separation — a validated string + hard check is the honest equivalent
+(same "materialize the join, verify against live data" discipline as Item 1).
+
+### Structure = defaultdb, its OWN `CorpusBase` metadata (the Item-1 call, restated)
+`app/corpus_models.py` defines `CorpusBase(DeclarativeBase)` with its own metadata, deliberately NOT
+`app.db.Base` and NOT `AmlBase`. Same structural-safety reason as AmlBase: the throwaway `demo`
+database is provisioned by `Base.metadata.create_all`, so keeping the corpus off `Base` makes it
+physically impossible for a demo run to create an empty `typology_corpus`, and the five-table moat
+stays exactly five. It DOES live on `defaultdb` and shares the AOST timeline — that one transactional
+store spanning graph + vectors is the whole value prop over a Pinecone split. Unlike aml_*, this
+table carries a `VECTOR(1536)` column + C-SPANN index, reusing `app/types_crdb.Vector` and the
+migration-0001/0002 raw-`op.execute` vector-DDL pattern. Migration 0005 is its sole DDL.
+
+### "No batch inserts" + "time-travel the retrieval" — as REALIZED
+Each document is loaded in its OWN committed transaction (`scripts/ingest_corpus.py`, a `for` loop of
+`async with engine.begin()` — NOT one multi-row INSERT), so each is its own AOST-addressable HLC
+moment. The concrete "time-travel the retrieval" feature in scope: a corpus revision is an in-place
+UPDATE (MVCC keeps the prior version), and a `retrieve_typology(query, as_of=T)` reads the corpus —
+including the vector search itself — as of T. A query as of a pre-revision HLC returns the
+pre-revision vector/ranking; present returns the revised one. DEFERRED to Item 4: using a retrieved
+definition to ground a verdict, and the decisions.aml_transaction_id grounding FK.
+
+### FINDING (requirement 1) — the C-SPANN vector index is NOT exercised at 4 rows. Full scan wins.
+Confirmed via real EXPLAIN / EXPLAIN ANALYZE on the retrieval query against the live 4-row corpus:
+the plan is `scan typology_corpus@typology_corpus_pkey` with `spans: FULL SCAN` feeding a `top-k`
+sort (`order: +d, k: 3`); KV decodes all 4 rows; the vector index `ix_typology_corpus_embedding`
+does NOT appear in the plan. So at this scale the planner brute-forces a full table scan + top-k, and
+the vector index is not engaged. This is expected and is stated plainly: **Item 3 is a MECHANISM
+proof (the VECTOR column, the `<=>` cosine operator, the C-SPANN index DDL, and AOST-over-vector-
+search are all really wired end to end), NOT a demonstration of vector INDEXING at scale.** Meaningful
+index exercise needs far more rows (the regulatory corpus, chunked, will help) — flagged for whoever
+grows the corpus. `verify_corpus.py` captures and asserts this plan every run, so a silent divergence
+would fail the check.
+
+### FINDING (requirement 2) — the revision genuinely RE-EMBEDS (new vector, not stale text)
+Proven two ways. The hermetic test (`tests/test_corpus.py`) EXPLICITLY asserts `new_vec != old_vec`
+before checking AOST differentiation — the AOST proof is only meaningful because the vector moved,
+and the test states that, it does not assume it. The LIVE demo (`scripts/demo_corpus_timetravel.py`)
+exercises the REAL `embed_text()` path: it revises CYCLE's body, re-embeds via
+text-embedding-3-small, asserts `new_vec != old_vec` (measured cosine distance old↔new ≈ 0.037), and
+shows that querying with the OLD vector self-matches CYCLE at distance 0.000000 AS OF t0 (v1) but at
+0.036719 now (v2) — the stored vector genuinely moved and CRDB time-travels the vector search to
+reproduce the pre-revision embedding. The demo is REVERSIBLE (writes the saved originals back), so it
+leaves the corpus pristine (re-verified: CYCLE self-retrieves at 0 again).
+
+### CONSTRAINT (requirement 3) for the FUTURE regulatory-corpus session — NOT optional
+This session did NOT touch chunking, correctly: the four typology definitions are already atomic,
+self-contained units, so one-document-one-embedding is right and no chunking logic exists. But the
+regulatory corpus (FATF / FFIEC / FinCEN) is HIERARCHICAL — sectioned, nested, heading-structured —
+and naive fixed-window or recursive-character chunking is the WRONG default for it. Whoever ingests
+that corpus MUST use structure/heading-aware chunking, and MUST prepend each chunk's section path as
+context BEFORE embedding it (e.g. "FATF §3.2 Virtual Asset Red Flags > Structuring: <chunk text>"),
+so a retrieved fragment carries its own provenance and a query about "structuring" ranks the right
+subsection. This is a requirement that session must honor, not a simplification it may skip. (It is
+also what will finally give the vector index enough rows to actually be exercised — see finding 1.)
+
+### What Item 4 can call once this ships (the analog to Item 2's closure_snapshot())
+`app.services.corpus.retrieve_typology(query_vec, *, k=3, as_of=None, source=None) -> list[dict]`.
+Returns cosine-nearest corpus rows `{id, typology, title, body, source, version, distance}`, ordered
+by ascending cosine distance. GUARANTEE: every returned `typology` is a value present in
+`aml_pattern_instances.typology` (load-gate enforced), so Item 4 retrieves a grounded definition and
+joins it straight to real pattern instances → real transactions with NO fuzzy matching. `as_of`
+(ISO-8601 or HLC) time-travels the retrieval with real AOST; out-of-window/malformed → ValueError
+(map to 400), never 500 — same contract as the deposition/replay. `source` scopes the search (e.g.
+to `altman-2306.16424` vs a future regulatory provenance). Item 4 supplies the query vector via the
+SAME `embed_text()` the agent already uses; nothing here calls OpenAI except the loader/demo.
+
+### Mechanics / gotchas
+- `retrieve_typology` reuses `time_travel.normalize_as_of` + `_AOST_RANGE_ERRORS` (no duplicate AOST
+  parsing) and mirrors `beliefs_held_by_agent`'s single-connection/explicit-txn/first-statement-SET
+  shape. The `<=>` cosine operator + `(:qvec)::VECTOR(1536)` cast match `agent_brain._retrieve_beliefs`.
+- Idempotent load = `id = uuid5("lineage.corpus", f"{source}:{typology}")` + `ON CONFLICT
+  (source, typology) DO NOTHING`. A revision is a deliberate separate UPDATE, never the loader.
+- `tests/test_corpus.py` is CI-SAFE and NON-DESTRUCTIVE: hand-built vectors (no OpenAI, so the dummy
+  CI key is fine), scoped to a private `source='__test_corpus__'` tag, deleted before+after. It does
+  NOT call `run_seed`, so unlike the replay/consistency tests it never wipes the moat backfill.
+- Windows console: EXPLAIN output uses box-drawing chars (│) that cp1252 can't encode → run the
+  scripts with `PYTHONIOENCODING=utf-8` (verify/demo already ascii-'replace' the plan lines).
+- Migration 0005 applied to the live cluster; re-run to restore after a hypothetical wipe:
+  `PYTHONPATH=. .venv/Scripts/python.exe scripts/ingest_corpus.py` then `scripts/verify_corpus.py`.
+
+### Explicitly NOT done (still gated): the regulatory corpus (gated on a data/raw/ drop; must use
+### structure-aware chunking per the constraint above), Item 4 (the grounded fraud agent that CALLS
+### retrieve_typology to ground a verdict), Item E (explanation-faithfulness guard), the
+### decisions.aml_transaction_id grounding FK, any change to the five tables or the aml_* schema.
+### Do NOT start Item 4 / E without approval.
