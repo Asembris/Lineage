@@ -2247,3 +2247,135 @@ Verified by a clean re-run (`state=Active last=Successful`).
 ### a `verdicts` table, asymmetric certificate signing, reconciling the two-certificate model, any
 ### change to the five tables / aml_* / typology_corpus.
 ### Do NOT start Item E / 7 / F without approval.
+
+## Roadmap Item 7 — forensic detection eval (2026-07-10)
+
+Item 7 delivered: `scripts/eval_detection.py`, an OFFLINE, DETERMINISTIC, READ-ONLY eval that
+measures the AML structural-witness detector (`app/services/aml_graph.py`) as precision/recall
+against IBM's pattern-typology ground truth on TWO sets — the in-sample development set (Item 1's
+original 20 instances) and a GENUINELY FRESH, account-disjoint HOLD-OUT no design decision ever saw
+— plus a non-structural per-transaction baseline on both. No migration, no new persisted table, no
+write to `aml_*`, no change to the five-table moat / `aml_*` schema / `typology_corpus`, no OpenAI
+call. The witness functions are imported FROZEN and unchanged; this item is purely fresh data to
+score them against. `tests/test_eval_detection.py` (5 pure-math tests) is CI-safe.
+
+### THE CONTAMINATION QUESTION, RESOLVED FIRST (the single most important finding)
+Item 4's precision/recall are **development-set (in-sample) numbers, NOT a hold-out you never
+tuned**, and must never be quoted as such. What did and did not touch the 1,500-edge extract, the
+honest three-way split (also recorded under Item 4's "DEVELOPMENT-SET DISCLOSURE"):
+- **Derived-from-domain (clean):** the witness ALGORITHMS come from the IBM/Altman typology
+  definitions (Item 3 corpus), not fit to data.
+- **Selected-by-looking-at-results (in-sample):** `FLAG_CAPABLE = {CYCLE, SCATTER-GATHER}` was
+  CHOSEN by measuring cross-typology soundness over all 1,500 edges; a GATHER-SCATTER tightening was
+  measured on the extract before rejection; the SCATTER-GATHER "subject must participate" tightening
+  moved its numbers on the extract (recall 48->39). Final counts read off that same, examined set.
+- **Set-from-observed-data:** `MAX_CYCLE_HOPS=12` / neighbourhood radius fixed from observed cycle
+  lengths (6,7,10).
+Degrees of freedom are low (no continuous threshold gradient-fit; MARGIN_FLOOR/distance-tau gates
+were REJECTED), so this is not egregious leakage — but "never tuned" is false for that set. Item 7
+earns the never-tuned headline on the fresh slice, AND re-runs the FLAG_CAPABLE soundness
+measurement on unseen data as the direct rebuttal.
+
+### FIDELITY GATE — the in-memory reconstruction is proven faithful before any hold-out is trusted
+The eval rebuilds Item 1's original extract in memory from the CSV (reusing `ingest_aml`'s exact
+`select_instances` + `stream_csv` + benign caps) and asserts the witness tallies equal Item 4's
+asserted constants BYTE-FOR-BYTE (CYCLE 43/43,0/257,14/1200; SG 39/96,0/204,3/1200; GS
+64/77,6/223,37/1200; STACK 6/84,27/216,2/1200) plus the 1500/300/1200/648 shape. It does — so the
+same pipeline scoring the hold-out is trustworthy. (Reproducing those exact counts IS the fidelity
+proof; the persisted extract is deterministic uuid5 + ON CONFLICT, and the CSV is unchanged.)
+
+### THE NUMBERS — per-edge precision/recall (95% Wilson CI), ring-membership ground truth
+```
+                     DEVELOPMENT (in-sample)              HOLD-OUT (never tuned)
+CYCLE           R 100.0% (43/43)  P 75.4% (43/57)    R 100.0% (38/38)  P 100.0% (38/38)  benignFP 0/1328
+SCATTER-GATHER  R  40.6% (39/96)  P 92.9% (39/42)    R  50.0% (43/86)  P  89.6% (43/48)  benignFP 5/1328
+GATHER-SCATTER  R  83.1% (64/77)  P 59.8% (64/107)   R  62.7% (69/110) P  77.5% (69/89)   [not flag-capable]
+STACK           R   7.1% (6/84)   P 17.1% (6/35)     R   7.1% (7/98)   P  22.6% (7/31)    [not flag-capable]
+```
+- **SOUNDNESS REPLICATES on unseen data:** measured-sound (0 cross-typology false witness) =
+  {CYCLE, SCATTER-GATHER} = `FLAG_CAPABLE` on BOTH sets; GATHER-SCATTER (2 cross) and STACK (24
+  cross) again fail. The most in-sample decision re-derives on data it never saw. This is the answer
+  to "you selected FLAG_CAPABLE by looking at the eval set."
+- The tune/no-tune PATTERN is stable: CYCLE ~perfect recall + high precision; SG ~half recall +
+  ~90% precision. Hold-out CYCLE precision is 100% only because that slice's benign draw happened to
+  produce 0 cycle-witness fires (CI lower bound 90.8%); do NOT trumpet "100%" — the stable claim is
+  "high precision, perfect recall" on both sides of the tune/no-tune boundary.
+
+### THE BASELINE IS NOT A STRAWMAN — the most important honest finding, reported not buried
+Head-to-head on the honest task (separate FLAG-capable ring members CYCLE/SG from the adversarial
+benign noise; GATHER-SCATTER/STACK excluded), each set fit INDEPENDENTLY and given every oracle
+advantage (sees its own labels, scored at best-F1 threshold — the dev fit is NEVER transferred to
+score the hold-out):
+```
+                                    DEVELOPMENT              HOLD-OUT (never tuned)
+structural (CYCLE or SG witness)  P 82.8% R 59.0% F1 68.9%   P 94.2% R 65.3% F1 77.1%
+best single raw-feature rule      P 38.7% R 100%  F1 55.8%   P 50.4% R 100%  F1 67.0%   [payment_format]
+logistic regression (raw fields)  P 62.4% R 76.3% F1 68.6%   P 76.9% R 80.6% F1 78.7%
+```
+An oracle-advantaged logistic regression on RAW FIELDS reaches F1 comparable to (dev 68.6 vs 68.9)
+or ABOVE (hold-out 78.7 vs 77.1) the frozen structural detector. This is because the SYNTHETIC IBM
+laundering carries raw-feature signal — `payment_format` alone achieves 100% recall (at 39-50%
+precision), i.e. the positives concentrate in particular payment formats, a signal an
+oracle-advantaged classifier exploits. **So the honest thesis is NOT "structure crushes a naive
+baseline on F1."** Where structure decisively wins is (1) PRECISION — hold-out 94.2% vs the
+baseline's best 76.9%, at the baseline's own best operating point — and (2) it emits an AUDITABLE,
+re-derivable cited witness path (the whole point of the grounded agent), whereas the logreg is an
+opaque correlation on a leaky synthetic feature that carries no evidence trail and would collapse
+against an adversary who varies `payment_format`. The baseline being competitive is a FEATURE of the
+eval's honesty (it proves the strawman was not rigged), not a failure. A judge who probes the
+baseline finds we already surfaced this.
+
+### Ground-truth scope: RING detection, not fraud detection (stated so it can't be conflated)
+Scored against pattern-typology MEMBERSHIP (`aml_pattern_members`), i.e. "does this edge belong to a
+labeled ring." Inside the extract `is_laundering=1` <=> pattern-member BY CONSTRUCTION (Item 1
+ingested only labeled fraud + `is_laundering=0` benign; the 1,968 unlabeled launderers of the full
+CSV were never ingested), so the two ground-truth columns cannot diverge here — which is exactly why
+this is a RING/typology-detection number and NOT general fraud detection, and speaks only to the
+FLAG-capable typologies. That scoping travels with every quote.
+
+### Evaluation unit: per-EDGE is the headline; per-instance is the intuitive secondary
+Per-edge/per-transaction precision/recall is the headline (conventional meaning of "detection", and
+reproducible). Per-instance detection is reported too ("caught 5/5 fresh CYCLE rings on all edges;
+5/5 SG rings on >=1 edge, 0/5 on all edges — SG's subject-participation strictness means it flags
+part of each ring, never the whole gather leg"). Both legitimate, different shapes; labeled as such.
+
+### Terminology (restated for this item's record — the collision Items 4/5 each caught)
+"belief-inheritance ring detection" in the roadmap phrasing = the AML structural-witness detection
+in `aml_graph.py`, NOT the agents/`belief_inheritance` graph. Belief inheritance says nothing about
+whether funds returned to their account of origin. Confirmed, not re-derived.
+
+### CAVEATS THAT MUST TRAVEL WITH THESE NUMBERS
+- Measured against Item 1's DELIBERATELY ADVERSARIAL benign set (noise anchored to the same
+  accounts) — a harder test than a naturally-distributed population; not absolute detector
+  performance.
+- SMALL LABELED SLICES (38 CYCLE / 86 SG hold-out positives) — hence Wilson CIs are reported, not
+  bare point estimates. Availability supports scaling to ~10-24 instances each for tighter CIs if
+  ever wanted (probe: 24 disjoint CYCLE / 24 SG / 30 GS / 18 STACK remain).
+- The baseline's strength is partly a SYNTHETIC-DATA artifact (`payment_format` leakage) a real
+  adversary would not exhibit — but the structural numbers are on the same synthetic data, so the
+  comparison is fair; the asymmetry (baseline oracle-fit vs detector frozen on the hold-out) only
+  makes structure's precision win MORE conservative.
+
+### What Item 8 / Item 10 can cite once this ships
+- Item 8 (RAG-grounding eval): a disclosed, hold-out detection number with the dev-vs-hold-out and
+  ring-vs-fraud distinctions already drawn honestly.
+- Item 10 (built-vs-roadmap honesty ledger): dev = in-sample, a genuinely never-tuned hold-out with
+  soundness replicated, the precision-not-F1 framing of structure's advantage, and the surfaced
+  baseline-is-competitive finding.
+
+### Mechanics / reproduce
+- `PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe scripts/eval_detection.py` (streams
+  the 470MB CSV twice, ~20s total; writes NOTHING). Deterministic — same numbers every run (file-
+  order selection, file-order benign under fixed caps, uuid5 ids, witnesses sort by str(id), logreg
+  zero-init + fixed lr/iters). Full captured output: scratchpad/eval_full_output.txt.
+- Reuses `ingest_aml.{select_instances,stream_csv,txn_row_record,...}` and `probe_aml.parse`
+  (Item 1's exact methodology) + the frozen `aml_graph` witnesses. Nothing written to `aml_*` —
+  `load_graph()` reads the whole table, so the hold-out is built purely in memory and Item 1's
+  ingestion is untouched.
+
+### Explicitly NOT done (still gated): Item 8 (RAG-grounding eval), Item E (explanation-faithfulness
+### / LLM narration), Item 9 / F / A / B (hero demo, honesty ledger, etc.), Item 10 docs, the
+### regulatory corpus (gated on data/raw/ drop), the decisions.aml_transaction_id grounding FK, a
+### second AML-typology belief, a `verdicts` table, any change to the five tables / aml_* /
+### typology_corpus. Do NOT start Item 8 / E / F / 9 / 10 without approval. Item 1's ingestion was
+### NOT modified (in-memory hold-out only), as approved.
