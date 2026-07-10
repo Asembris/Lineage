@@ -1477,6 +1477,15 @@ SQL, not by assumption.
 - `content_hash`/`_json_default` are kept LOCAL to app/services/replay.py (mirroring certificate.py's
   canonical-digest discipline) rather than importing certificate's private helpers — replay is
   app-side, certificate is deliberately import-safe for the Lambda; coupling them buys nothing.
+  **[REVERSED by Item 6, 2026-07-10 — the reasoning above was correct for Item 2 and stopped being
+  correct the moment something needed to COMPARE the two hashes.** The certifier Lambda now
+  independently re-derives this exact closure hash and checks it against the one the certificate
+  embeds. If each side kept its own canonicalizer, that comparison would only ever prove "the two
+  implementations still agree" — a guarantee that evaporates silently the day one drifts, while the
+  check keeps reporting success. `canonical_json` / `canonical_digest` / `closure_world` now live in
+  certificate.py (already import-safe, so the Lambda reaches them) and replay.py calls them.
+  Serialization is byte-identical, so pre-existing replay hashes are unchanged. Recorded here rather
+  than overwritten: the original call was not a mistake, its premise expired. See "Roadmap Item 6".]
 - The belief lookup and the closure traversal run in the SAME explicit txn (after the one SET), so
   both read the identical MVCC snapshot — a belief that flipped between two reads can't produce a
   belief/closure mismatch within one call.
@@ -1966,3 +1975,212 @@ today.
 ### data/raw/ drop), any frontend wiring, the decisions.aml_transaction_id grounding FK, a
 ### `verdicts` table, any change to the five tables / aml_* / typology_corpus.
 ### Do NOT start Item 6 / E / 7 / F without approval.
+
+## Roadmap Item 6 — content-addressed pre-kill state + an earned certifier (2026-07-10)
+
+Item 6 delivered: the certificate's `pre_invalidation_state` now CONTENT-ADDRESSES the pre-kill
+world instead of merely counting it, and the certifier Lambda independently RE-DERIVES that
+content address on AWS compute and reports whether it agrees. No migration, no new table, no
+change to the five-table moat / `aml_*` / `typology_corpus`, no AML read, no LLM call anywhere on
+the invalidation path. Certificate schema 1.0 -> 1.1, additive only.
+
+### Two of Item 6's own phrases described already-solved problems. Investigated BEFORE building.
+Same posture Item 5 took toward its roadmap wording, and it paid off the same way. The roadmap
+text predates Items 1-5 and there is no ROADMAP.md in this repo, so intent was resolved against
+the code.
+
+- **"not a hardcoded-secret HMAC" is a STALE concern, not a gap.** `certificate.py`'s docstring
+  has opened with `Integrity model (no HMAC, per plan)` since Phase 3. There is no `hmac` import,
+  no secret, and no key material in `certificate.py`, `s3_audit.py`, or the Lambda handler.
+  Confirmed by reading, not by trusting this file's Phase-3 note.
+- **"lineage state exists, grounded evidence attached" means the belief_inheritance closure +
+  Item 2's replay (reading a), NOT Items 4/5's AML evidence (reading b).** Reading (b) was
+  considered seriously and REJECTED — see below. It is the more impressive-sounding reading and
+  it is the one that would have failed inspection.
+
+### Why reading (b) — "attach a real FLAG verdict to the certificate" — was rejected
+The proposal: a real `evaluate_transaction()` FLAG (a genuine structural witness against a real
+IBM AML transaction) should serve as external, grounded justification for invalidating the belief,
+with the witness path and cited typology embedded in the certificate. It would be the first time a
+certificate's "why" pointed at an independent real-world dataset rather than the project's own
+internal `belief_performance` curve.
+
+**It cannot be done honestly with what Items 1-5 built, because the belief has never touched an
+AML transaction and no relation in the schema says it did.** Verified from source, not assumed:
+
+- The one belief is `"merchant category 5411 under $180 is safe if account age > 6 months"`
+  (`seed/seed.py:44`) — a CARD-AUTHORIZATION heuristic formed by crimson-0.
+- The decisions it drove carry synthetic `txn_ref` values like `txn-w5-p0012`
+  (`app/sim/transactions.py:147`), with NOT NULL `merchant` / `amount` card columns.
+- The AML evidence layer is BANK-TO-BANK money flow: ACH / Cheque / Bitcoin transfers between
+  `(bank, account)` pairs. No merchant, no MCC, no account age.
+- **`decisions.aml_transaction_id` does not exist.** Migration 0004's header says so explicitly,
+  and Items 1/3/4/5 each defer it. NOTES Item 1 calls it "the ONE real seam."
+
+So no AML transaction was ever evaluated by, approved by, or measured against this belief. The
+roadmap's phrase "the belief that approved similar transactions" presupposes an approval relation
+that is not in the data. Embedding the (real, verified) FLAG exhibit
+`3cda6d1d-f765-5001-9342-0478b1a92232` into a certificate for belief `898ad0e5-...` would produce a
+document in which **every field is individually true and the juxtaposition is fabricated** — it
+would assert that a six-hop cycle among bank accounts justifies invalidating a rule about merchant
+category 5411. That is strictly worse than today's self-referential certificate, because it *looks*
+externally grounded. The roadmap's own framing ("weaker projects overclaim here; you gain on
+inspection") argues AGAINST it. Same forced-fit fabrication the Item-1 spike, Item 4's verdicts
+table, and Item 5's no-table decision each refused.
+
+### THE HONEST PATH TO A REAL (b) — for Items 7/F, so it is recognised and not reinvented
+A version of (b) IS real. It is not a wiring job; it is a data-model job, and it walks the deferred
+seam forward in this order:
+1. Add the nullable `decisions.aml_transaction_id` FK (a FIVE-TABLE MOAT change — the first one
+   since Phase 1; needs its own explicit reasoning, not a drive-by migration).
+2. Seed a SECOND belief that is actually about laundering typologies. The Item-1 spike already
+   drafts the sentence: *"cyclic flows returning to origin within N hops via shared intermediaries
+   indicate laundering."* Inherit it down a bloodline the same way.
+3. Have an agent apply THAT belief to real `aml_transactions` rows, writing `decisions` whose
+   `is_fraud` is sourced from `aml_transactions.is_laundering` (real ground truth, not simulation).
+4. Recompute `belief_performance` from those real outcomes. The staleness curve is then measured
+   against a real labeled dataset.
+5. ONLY THEN does a FLAG contradicting that belief constitute external, grounded justification, and
+   only then may a certificate cite it.
+
+Note what step 3 buys that nothing before it does: `decisions.verdict` is
+`approve|decline|blocked` and `agent_id` is NOT NULL FK->agents, so a laundering decision needs a
+real fleet agent and a verdict vocabulary that fits (Item 4 already measured this mismatch). Steps
+1-4 are Items 7/F territory. Do NOT attempt them as part of a certificate change.
+
+### What shipped instead: the pre-kill claim became reproducible, not just recorded
+`pre_invalidation_state` carried two integers — `closure_edge_total` / `closure_edge_open` ("8 of 8
+open"). Item 2 built `replay.closure_snapshot()`, which reconstructs the ENTIRE closure (belief row
++ every edge's revocation state) at an arbitrary MVCC instant and emits a canonical `content_hash`
+proven byte-identical across independent reads. **The certificate did not carry that hash, and the
+certifier re-verified counts, never the reconstructed world.** Now:
+
+- The endpoint replays the closure `AS OF snapshot_hlc` post-commit and embeds
+  `pre_invalidation_state.closure_content_hash`. Hash-covered like everything else.
+- **Computed in the ROUTER, not inside `invalidate_belief`.** `snapshot_hlc` is captured on a
+  separate connection strictly BEFORE the write txn opens, so the write txn's read snapshot is at
+  or after it. Hashing what that txn sees would content-address a subtly different world than the
+  one the Lambda replays at `snapshot_hlc`. The two must be the same world BY MVCC, not because
+  nothing happened in between.
+- Best-effort: a failed replay leaves the field null, and null is honest (the counts still stand,
+  hash-covered). The invalidation is already durable; provenance enrichment must never 500 the one
+  governed write after it has committed.
+- The Lambda reconstructs the same world at the same instant with sync psycopg, hashes it with the
+  SHARED canonicalizer, and stamps a hash-covered `closure_verification` block.
+
+### Hash-coverage proves a document has not CHANGED. It can never prove the document was TRUE.
+This is the answer to "does embedding the already-verified value suffice, since the hash covers
+it?" — no, and it is the same question the brake answered once. `aml_graph.py` recomputes structure
+from the unlabeled edge set and selects no label column, because trusting the label makes the
+reasoning decorative. A certifier that embedded an app-computed closure hash and signed over it
+would be attesting to the one claim it took on faith, inside a document whose entire reason to
+exist is independent verification (its own docstring: "trusting CockroachDB's own history rather
+than any in-memory result"). So it re-derives.
+
+**Agreement is a TRI-STATE, never a silent pass:** `agreed` / `disagreed` / `unavailable`. The last
+fires when the endpoint's certificate never reached S3 (`cert_status='failed'`) or predates schema
+1.1 and carries no closure hash. A missing counterparty reading as success would be a lie by
+omission — the same failure mode `INSUFFICIENT_COVERAGE` exists to prevent in the brake. Disagreement
+is REPORTED, not raised: a certificate recording a mismatch is worth far more to an auditor than a
+Lambda that crashed. `compared_against_source` is also stamped, because the Lambda overwrites
+`audit_log.cert_s3_key`, so a SECOND certifier run compares against a previous LAMBDA certificate
+rather than the endpoint's — still a real comparison, but the reader is told whose word was checked.
+
+### The canonicalizer had to be SHARED, and that reverses an Item-2 decision on purpose
+Item 2 deliberately kept `replay.py`'s digest local ("coupling them buys nothing"). Correct then;
+its premise expired the moment something needed to compare two hashes. Two independently-implemented
+canonicalizers that happen to agree today make the endpoint-vs-Lambda check a **false guarantee**
+waiting to silently diverge — the check would keep passing while proving nothing. `canonical_json` /
+`canonical_digest` / `closure_world` moved into `certificate.py` (already import-safe with zero app
+deps, which is exactly why the Lambda can reach them). The Item-2 note is annotated in place, not
+overwritten. `closure_world` also fixes the DICT SHAPE, so the two halves can differ only in what
+they read from CockroachDB — which is precisely what the comparison is supposed to be testing.
+
+### VERIFIED, not assumed: the async and sync halves hash identically
+`scratchpad/probe_closure_hash_parity.py` ran BOTH reads against the live cluster — `replay.
+closure_snapshot()` (async SQLAlchemy) vs the handler's `_BELIEF_SQL`/`_CLOSURE_SQL` through raw
+sync psycopg — at current state AND at a past HLC via AOST. Identical digests, 9/9 closure nodes.
+This was the real risk (timestamptz rendering, uuid casing, `depth` typing, row ordering) and it is
+now measured rather than hoped. `tests/test_certifier_closure_verification.py` additionally asserts
+the two halves' SELECTs project the same column sets, so a column added to one and forgotten in the
+other fails loudly instead of producing a spurious `disagreed` on an honest invalidation.
+
+### Q4 answered plainly: WHICH pre_state fields are now cross-checked, and which are NOT
+The wrinkle "the Lambda's `pre_state` is never cross-checked against the endpoint's" is closed **for
+the closure-state portion only, and only when a counterparty certificate exists.**
+- **Now cross-checked:** the belief row (id, rule_text, status, originating_agent_id, formed_at,
+  invalidated_at) and every closure edge's (depth, agent, generation, bloodline, status,
+  from_agent_id, inherited_at, edge_invalidated_at) — everything `closure_world` covers, at
+  `snapshot_hlc`, by two implementations reading independently.
+- **Still NOT cross-checked:** `staleness_evidence` (BOTH sides read `belief_performance` at CURRENT
+  committed state, not AOST — so neither is a check on the other), `issued_at`, `actor`, `source`,
+  and the `affected_closure` agent/living counts (read at current state in the Lambda, in-txn in the
+  endpoint). Do not describe Item 6 as "the certificate is fully independently verified."
+
+### DEFERRED FINDING (do not rediscover): there is no single canonical certificate per invalidation
+The endpoint and the Lambda each build and PUT their OWN certificate for the same event — different
+`certificate_id`, different `issued_at`, `source='issue-time-read'` vs `'aost-replay'`, different S3
+keys. Both objects persist; `audit_log.cert_status` / `content_hash` / `cert_s3_key` point at
+whichever ran LAST. So "the certificate for invalidation X" is ambiguous, and a second certifier run
+silently repoints the audit row at itself. Not fixed this session — content-addressing the closure
+state was the scope, and reconciling the two-document model (one canonical cert with an appended
+countersignature? the Lambda writing only a verification record?) is a real design decision, not a
+cleanup. Flagged so Item 9's honesty ledger states it rather than a later session rediscovering it.
+
+### DEFERRED FINDING: unkeyed sha256 proves INTEGRITY, never AUTHORSHIP
+`content_hash` is an unkeyed digest. Anyone can forge a certificate wholesale and compute a perfectly
+self-consistent hash for it; `verify()` returns True. What actually anchors authenticity is the
+DATABASE — `audit_log.content_hash` holds the expected digest, and within the GC window the AOST
+replay reproduces the claimed world from CRDB's own MVCC history. A forgery has neither.
+**Residual gap:** an offline third party holding ONLY the JSON, with no cluster access, cannot verify
+authorship. Asymmetric signing (the certifier signing the digest; the public half published) would
+close it. **HMAC would NOT** — a shared secret lets the verifier forge too, which is precisely why
+Phase 3 rejected it and why "not a hardcoded-secret HMAC" was never the real question. DOCUMENTED,
+NOT BUILT: it needs a new AWS service (KMS), which CLAUDE.md forbids adding unasked, and it does not
+advance this item's actual point. Recorded in `certificate.py`'s docstring too.
+
+### Tripwire hole found and closed (shipped regardless of the (a)/(b) decision)
+`tests/test_aml_routes.py`'s "no route invokes `evaluate_transaction()`" guard filtered routes on
+`path.startswith("/aml")`. `POST /beliefs/{id}/invalidate` is not an /aml route — so the guard had a
+hole exactly where reading (b) would have put a paid, non-deterministic OpenAI call: on the ONE
+governed write. Now asserted STATICALLY over the whole `app` package (zero callers of
+`evaluate_transaction` in application code, every branch, nothing executed) plus a namespace check on
+every registered route's module. **Verified the guard actually trips** by temporarily importing the
+function into `routers/beliefs.py` — it fails at the offending file:line. A guard that cannot fail is
+theatre.
+
+### If reading (b) is ever revisited: it must be the DETERMINISTIC witness, never the LLM verdict
+Recorded because it inverts the obvious approach. `interrogate_transaction()` (Item 5) is
+deterministic, free, and offline-replayable. `evaluate_transaction()`'s output embeds the MODEL's
+claim — which NOTES Item 5 names as the one artifact this design cannot re-derive, and as the precise
+trigger for a `verdicts` table. A certificate is a durable, hash-covered document someone is held to;
+embedding a non-reproducible model claim in one would CREATE the persistence requirement this project
+has now deliberately deferred twice. And per the section above, the certifier would then have to
+re-derive the AML witness itself (porting the whole `aml_graph` witness machinery to sync psycopg in a
+4.7 MB zip), because embedding an unverified witness is exactly the "trust the label" move the brake
+refuses.
+
+### Mechanics / gotchas
+- `SCHEMA_VERSION` 1.0 -> 1.1. Additive by construction: `_digest` hashes whatever keys are present
+  and `verify()` re-derives over the same set, so 1.0 certificates still verify unchanged. This is
+  why `build_certificate`'s `extra` (merged BEFORE hashing) was the right existing seam — the Lambda
+  already used it for `aost_verification`; `closure_verification` rides the same mechanism.
+- A `derived` pre_state (caller supplied none) sets `closure_content_hash: None` — present-and-null,
+  never absent, so a consumer distinguishes "no hash" from "field missing" without knowing which
+  caller built the document.
+- `tests/test_certifier_closure_verification.py` loads the Lambda handler by path with `certificate`
+  shimmed onto `app.services.certificate` (the zip packs it flat) and stubs boto3. ZERO AWS, ZERO
+  cluster — CI-safe, and it never calls `run_seed`, so it cannot wipe the moat backfill.
+- **The Lambda was NOT redeployed this session** (`lambda/certifier/deploy.py` pushes to the live
+  `lineage-certifier` function). Handler changes are committed but the deployed function still runs
+  the pre-Item-6 code. Redeploy with `python lambda/certifier/build.py && python lambda/certifier/
+  deploy.py`, then `scripts/demo_certifier.py` to see `closure_hash_agreement: "agreed"` live.
+- `tests/test_atomic_invalidation.py` reseeds `defaultdb` — it wiped the 4000-row backfill again this
+  session, restored afterwards with `python -m seed.backfill_decisions` (via `.venv`).
+
+### Explicitly NOT done (still gated): Item E (explanation-faithfulness / LLM narration), Item 7
+### (headline eval), Item F (hero attack demo), the regulatory corpus (gated on the data/raw/ drop),
+### any frontend wiring, the decisions.aml_transaction_id grounding FK, a second AML-typology belief,
+### a `verdicts` table, asymmetric certificate signing, reconciling the two-certificate model, any
+### change to the five tables / aml_* / typology_corpus.
+### Do NOT start Item E / 7 / F without approval.
