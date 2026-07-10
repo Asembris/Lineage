@@ -28,6 +28,7 @@ from sqlalchemy import text
 from app.corpus_models import SOURCE
 from app.db import engine
 from app.services import aml_graph
+from app.services.aml_agent import neighbourhood
 from app.services.aml_graph import FLAG_CAPABLE, Outcome, load_graph
 from app.services.corpus import retrieve_typology
 from app.services.verdict_guard import Claim, Verdict, evaluate_claim
@@ -132,6 +133,38 @@ def test_witness_soundness_and_benign_false_positive_rates():
     # The allowlist IS the measurement. If a future ingestion changes graph density, this fails
     # and turning a typology's FLAG capability on becomes a deliberate decision.
     assert sound == set(FLAG_CAPABLE), f"FLAG_CAPABLE is stale: measured-sound = {sound}"
+
+
+def test_neighbourhood_contains_every_flag_capable_witness():
+    """The model can only cite edges the prompt shows it. If a witness edge falls outside the
+    neighbourhood, the brake rejects a TRUE structure as an unfaithful citation — a silent false
+    negative. That bug shipped once (a 2-hop neighbourhood vs a 10-edge cycle) and this is what
+    would have caught it.
+
+    NEIGHBOURHOOD_HOPS is derived (ceil(MAX_CYCLE_HOPS/2)), but NEIGHBOURHOOD_LIMIT is a prompt-
+    size cap: today the largest neighbourhood hits it exactly (120 edges) and nothing is lost,
+    because edges are ordered by distance from the subject. A denser graph could truncate a
+    witness away. This test is the guard on that, not a proof it cannot happen.
+    """
+
+    async def _run():
+        g = await load_graph()
+        escaped = []
+        for e in g.by_id.values():
+            for typology in sorted(FLAG_CAPABLE):
+                res = aml_graph.WITNESS[typology](g, e)
+                if not res.matched:
+                    continue
+                citable = {x.id for x in neighbourhood(g, e)}
+                missing = [t for t in res.witness_txn_ids if t not in citable]
+                if missing:
+                    escaped.append((str(e.id), typology, len(missing)))
+        assert not escaped, (
+            f"{len(escaped)} witness(es) are not fully citable from the prompt neighbourhood — "
+            f"the brake would reject true structures as unfaithful citations: {escaped[:5]}"
+        )
+
+    asyncio.run(_run())
 
 
 def test_flag_requires_a_real_witness_on_a_real_cycle():

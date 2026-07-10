@@ -1679,6 +1679,14 @@ Also measured: you CANNOT retrieve a typology by embedding a raw transaction row
 CYCLE at 0.680; an off-topic chargeback complaint retrieves CYCLE at 0.743 — both are just "nearest of
 four distant things". Hence `structure_text()`.
 
+**CONSEQUENCE, stated because the approved plan said otherwise:** "degenerate retrieval" is NO LONGER a
+reachable INSUFFICIENT_COVERAGE reason. The plan named "a nonsense query's 0.0014 margin" as a test case
+for that path; the path was removed, and the test was INVERTED rather than deleted —
+`test_a_degenerate_retrieval_margin_does_not_block_a_witnessed_flag` feeds a 0.0014 margin alongside a
+real witness and asserts the verdict is **FLAG**, with the margin recorded on the outcome. The four
+reachable INSUFFICIENT_COVERAGE reasons are now exactly: `typology_not_retrieved`,
+`typology_not_decidable`, `search_reached_extract_boundary`, `unfaithful_citation`.
+
 ### FLAG_CAPABLE = {CYCLE, SCATTER-GATHER} — measured, not hand-picked, and TEST-ENFORCED
 The criterion is "the witness never fires on an edge belonging to a DIFFERENT typology", evaluated
 over all 1,500 edges. Precision/recall, stated plainly because Item 7's headline eval inherits them:
@@ -1690,7 +1698,18 @@ over all 1,500 edges. Precision/recall, stated plainly because Item 7's headline
 | GATHER-SCATTER | 64/77 = 83.1% | 6/223          | 37/1200    | 64/107 = 59.8%    |
 | STACK          | 6/84 = 7.1%   | 27/216         | 2/1200     | 6/35 = 17.1%      |
 
-"Sound" would undersell this: CYCLE has a real ~25% false-positive rate.
+**THE TWO SHIPPABLE LIMITATIONS, STATED SO ITEM 7 CANNOT INHERIT THEM BY SURPRISE.** The two
+FLAG-capable typologies fail in OPPOSITE directions, and neither number may be quoted alone:
+- **CYCLE flags a benign transaction roughly one time in four.** Precision **75.4%** — 14 of the 57
+  edges it fires on are benign. It catches every real cycle (100% recall) and pays for it in false
+  positives.
+- **SCATTER-GATHER misses well over half of all real scatter-gather edges.** Recall **40.6%** — it
+  finds 39 of 96. When it does fire it is nearly always right (92.9% precision), but a detector that
+  silently passes 57 of 96 true positives has a false-NEGATIVE problem, not a precision success.
+  This is an honest limitation of this slice, not a bug: the witness requires the SUBJECT edge to
+  participate, so the gather-leg edges of a real scatter-gather never fire on their own.
+
+"Sound" would undersell all of this.
 `tests/test_aml_brake.py::test_witness_soundness_and_benign_false_positive_rates` asserts ALL of these
 counts, because soundness (zero cross-typology confusion) and benign false-positive rate are
 **different properties** — the first selects FLAG_CAPABLE, the second is what a real detector lives or
