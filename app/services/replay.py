@@ -19,9 +19,12 @@ Scope + honesty (see NOTES "Roadmap Item 2"):
   * BYTE-IDENTICAL as a falsifiable claim: `content_hash` is sha256 over the canonical
     (sorted-key) JSON of the RECONSTRUCTED WORLD (belief + closure) only — not the input
     `as_of` nor the resolved read HLC. Two independent reads at the same timestamp reproduce
-    the same world => the same hash (tests/test_replay.py). The canonical-digest discipline
-    mirrors certificate.py; it is kept LOCAL here so app-side replay does not couple to the
-    import-safe Lambda cert module.
+    the same world => the same hash (tests/test_replay.py).
+  * The world-builder and the digest come from app/services/certificate.py, NOT from a local
+    copy. Item 2 deliberately kept them local ("coupling them buys nothing"); Item 6 REVERSED
+    that, because the certifier Lambda now re-derives this exact hash on independent compute
+    and compares it against the one the certificate embeds. Two canonicalizers that merely
+    happen to agree today would make that comparison a false guarantee. See NOTES.md Item 6.
 
 Why per-belief-closure is the right granularity (foundational for later items B and D):
   A belief IS the unit of inheritance and the unit of invalidation — belief_inheritance
@@ -33,15 +36,13 @@ Why per-belief-closure is the right granularity (foundational for later items B 
 
 from __future__ import annotations
 
-import datetime as dt
-import hashlib
-import json
 import uuid
 
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from app.db import engine
+from app.services.certificate import canonical_digest, closure_world
 from app.services.time_travel import _AOST_RANGE_ERRORS, normalize_as_of
 
 # Same recursive belief-closure traversal as app/services/lineage.py, with the per-edge
@@ -130,28 +131,10 @@ async def closure_snapshot(belief_id: uuid.UUID, as_of: str | None = None) -> di
     # The reconstructed world — everything the hash covers. `as_of` (an INPUT) and `read_hlc`
     # (provenance) are deliberately NOT hashed: the claim is that the reconstructed CLOSURE at
     # a given time is byte-identical, and the world at two equal timestamps is the same world.
-    world = {
-        "belief": dict(belief),
-        "origin_agent_id": origin_id,
-        "closure": [dict(r) for r in rows],
-    }
+    world = closure_world(belief, rows)
     return {
         "as_of": as_of,
         "read_hlc": read_hlc,
-        "content_hash": _content_hash(world),
+        "content_hash": canonical_digest(world),
         **world,
     }
-
-
-def _content_hash(world: dict) -> str:
-    """sha256 over canonical (sorted-key) JSON of the reconstructed world."""
-    blob = json.dumps(world, sort_keys=True, separators=(",", ":"), default=_json_default)
-    return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
-
-
-def _json_default(o):
-    if isinstance(o, dt.datetime):
-        return o.isoformat()
-    if isinstance(o, uuid.UUID):
-        return str(o)
-    raise TypeError(f"not JSON-serializable: {type(o)}")

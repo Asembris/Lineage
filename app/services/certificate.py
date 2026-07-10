@@ -19,6 +19,23 @@ Integrity model (no HMAC, per plan):
      snapshot ages past the GC TTL this replay no longer resolves — which is exactly why the
      self-contained record in (1) exists: the certificate does not silently lose its integrity
      guarantee after 75 minutes.
+  4. pre_invalidation_state.closure_content_hash CONTENT-ADDRESSES the pre-kill world
+     (Item 6). The counts in (1) say "8 of 8 edges were open"; this says WHICH world those
+     counts summarize — sha256 over the canonically-serialized belief row plus every closure
+     edge's revocation state, the same digest `GET /beliefs/{id}/replay` returns. The certifier
+     Lambda reconstructs that world independently via its own AOST replay and compares hashes,
+     so the pre-kill claim is re-derived on separate compute rather than taken on the app's
+     word. See `closure_world` / `canonical_digest` below.
+
+What this integrity model does NOT provide, stated so nobody mistakes it for more (Item 6):
+  content_hash is an UNKEYED digest, so it proves nothing about AUTHORSHIP. Anyone can forge a
+  certificate and compute a perfectly self-consistent hash for it; `verify()` would return True.
+  What actually anchors authenticity is the DATABASE — audit_log.content_hash holds the expected
+  digest, and within the GC window the AOST replay reproduces the claimed world from CRDB's own
+  MVCC history. A forgery has neither. The residual gap is that an offline third party holding
+  ONLY the JSON, with no cluster access, cannot verify authorship. Asymmetric signing would close
+  it (HMAC would not — a shared secret lets the verifier forge too). Deliberately not built: it
+  needs a new AWS service, which CLAUDE.md forbids adding unasked. See NOTES.md "Roadmap Item 6".
 """
 
 from __future__ import annotations
@@ -139,11 +156,49 @@ def build_certificate(inv: dict, staleness: dict, extra: dict | None = None) -> 
     return cert
 
 
+def canonical_json(obj) -> bytes:
+    """The project's ONE canonical serialization: sorted keys, no incidental whitespace.
+
+    Every content hash in this system — the certificate's, and the replay snapshot's — is a
+    digest of this function's output. It lives here because this module is the import-safe one
+    (see the note above): app-side code and the certifier Lambda can both reach it.
+    """
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), default=_json_default
+    ).encode("utf-8")
+
+
+def canonical_digest(obj) -> str:
+    """sha256 over canonical_json(obj), prefixed with its algorithm."""
+    return "sha256:" + hashlib.sha256(canonical_json(obj)).hexdigest()
+
+
+def closure_world(belief: dict, closure: list[dict]) -> dict:
+    """The reconstructed world a closure hash covers: one belief row + its inheritance closure.
+
+    Shared, not duplicated, and that is the whole point. Two parties hash this world: the app
+    (app/services/replay.py, async SQLAlchemy) and the certifier Lambda (sync psycopg, its own
+    independent AOST replay). If each built the dict and the digest with its own code, a
+    hash-equality check between them would only ever prove the two implementations still agree
+    — a guarantee that silently evaporates the day one of them drifts. Both call THIS, so the
+    only thing that can differ between them is what they read from CockroachDB, which is
+    precisely what the comparison is supposed to be testing.
+
+    The two callers' SELECTs must therefore produce the same column sets: belief =
+    (id, rule_text, status, originating_agent_id, formed_at, invalidated_at); each closure row =
+    (depth, agent_id, generation, bloodline, status, from_agent_id, inherited_at,
+    edge_invalidated_at), in the total order (depth, generation, agent_id).
+    """
+    return {
+        "belief": dict(belief),
+        "origin_agent_id": belief["originating_agent_id"],
+        "closure": [dict(r) for r in closure],
+    }
+
+
 def _digest(cert: dict) -> str:
     """sha256 over the canonical JSON of every field except content_hash."""
-    payload = {k: v for k, v in cert.items() if k != "content_hash"}
-    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=_json_default)
-    return "sha256:" + hashlib.sha256(blob.encode("utf-8")).hexdigest()
+    return canonical_digest({k: v for k, v in cert.items() if k != "content_hash"})
 
 
 def verify(cert: dict) -> bool:
