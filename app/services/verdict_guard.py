@@ -34,7 +34,16 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 
-from app.services.aml_graph import FLAG_CAPABLE, Check, Edge, Graph, Outcome, check, verify_witness_path
+from app.services.aml_graph import (
+    FLAG_CAPABLE,
+    WITNESS,
+    Check,
+    Edge,
+    Graph,
+    Outcome,
+    check,
+    verify_witness_path,
+)
 
 # Retrieval distance is REPORTED as provenance and gates NOTHING. Two measurements forced this,
 # and together they are the strongest form of "only structure may authorize a flag":
@@ -82,6 +91,9 @@ class VerdictOutcome:
     structural_check: Check | None = None
     # Provenance only — see the note on retrieval distance above. Never gates the verdict.
     retrieval_margin: float | None = None
+    # Every OTHER typology that independently witnesses this subject (Item 5). Provenance on
+    # every branch; see competing_witnesses() for why it must never gate.
+    competing_typologies: list[str] = field(default_factory=list)
 
     @property
     def flagged(self) -> bool:
@@ -92,13 +104,27 @@ def _doc_for(retrieved: list[dict], typology: str) -> dict | None:
     return next((r for r in retrieved if r["typology"] == typology), None)
 
 
-def _competing_match(g: Graph, subject: Edge, claimed: str) -> str | None:
-    """Does some OTHER flag-capable typology witness this edge? That turns a bare 'no
-    corroboration' into an actual contradiction — the evidence supports a different story."""
-    for t in sorted(FLAG_CAPABLE):
-        if t != claimed and check(g, subject, t).matched:
-            return t
-    return None
+def competing_witnesses(g: Graph, subject: Edge, claimed: str) -> list[str]:
+    """Every OTHER typology that independently witnesses this edge (Item 5).
+
+    Widened from the original flag-capable-only, first-hit-wins helper, for two reasons the
+    live extract makes concrete. Measured over all 1,500 edges:
+
+      * 26 edges carry >= 2 competing witnesses, and NONE of them is a CYCLE/SCATTER-GATHER
+        pair — the two flag-capable typologies never co-witness (asserted in
+        tests/test_aml_interrogate.py). Restricting to FLAG_CAPABLE therefore hides every
+        real conflict this extract actually contains.
+      * The old helper ran only on the CONCLUSIVE_NO branch, so on the 42 SCATTER-GATHER
+        witnesses (where CYCLE is INCONCLUSIVE, never CONCLUSIVE_NO) a live competing witness
+        sat on the subject and was never mentioned.
+
+    SURFACING IS NOT GATING. This result is attached to every outcome as provenance and is
+    read by exactly one decision: the pre-existing CONCLUSIVE_NO downgrade below, which still
+    requires a FLAG_CAPABLE contradictor. Letting a non-flag-capable witness withhold a FLAG
+    would silently repeat the MARGIN_FLOOR mistake — evidence that gates nothing must not
+    start gating.
+    """
+    return [t for t in sorted(WITNESS) if t != claimed and check(g, subject, t).matched]
 
 
 def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim: Claim) -> VerdictOutcome:
@@ -106,6 +132,10 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
     typology = claim.typology
     doc = _doc_for(retrieved, typology)
     margin = retrieved[1]["distance"] - retrieved[0]["distance"] if len(retrieved) >= 2 else None
+    # Provenance for EVERY branch, including the two that never consult the graph to decide.
+    # What the graph independently witnesses here is worth reporting even when the claim is
+    # rejected on retrieval grounds alone.
+    competing = competing_witnesses(graph, subject, typology)
 
     # Gate 0 — the cited typology must be one retrieval actually returned. Retrieve with k=3
     # against a 4-document corpus, otherwise the "retrieved set" is the whole corpus and this
@@ -117,6 +147,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             typology,
             validation_errors=[f"{typology!r} is not among the retrieved candidates"],
             retrieval_margin=margin,
+            competing_typologies=competing,
         )
 
     # Gate 1a — some typologies are not structurally decidable in this extract. GATHER-SCATTER's
@@ -133,6 +164,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             corpus_doc=doc,
             validation_errors=[f"{typology} has no sound structural witness in this evidence layer"],
             retrieval_margin=margin,
+            competing_typologies=competing,
         )
 
     # Gate 1b — the graph is the authority on whether the structure is there.
@@ -147,15 +179,24 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             boundary_account=result.boundary_account,
             structural_check=result,
             retrieval_margin=margin,
+            # On the 42 SCATTER-GATHER witnesses CYCLE is INCONCLUSIVE, so a live competing
+            # witness reaches this branch. It is now reported instead of silently dropped.
+            competing_typologies=competing,
         )
 
     if result.outcome is Outcome.CONCLUSIVE_NO:
-        competing = _competing_match(graph, subject, typology)
-        reason = "contradicted_by_competing_structure" if competing else "no_corroborating_structure"
-        errors = [f"evidence supports {competing}, not {typology}"] if competing else []
+        # UNCHANGED semantics: only a FLAG_CAPABLE competitor turns "no corroboration" into an
+        # actual contradiction. A GATHER-SCATTER/STACK witness is reported (above) but is not
+        # sound enough in this extract to contradict anything.
+        contradictors = [t for t in competing if t in FLAG_CAPABLE]
+        reason = "contradicted_by_competing_structure" if contradictors else "no_corroborating_structure"
+        errors = (
+            [f"evidence supports {', '.join(contradictors)}, not {typology}"] if contradictors else []
+        )
         return VerdictOutcome(
             Verdict.NO_FLAG, reason, typology, corpus_doc=doc,
             validation_errors=errors, structural_check=result, retrieval_margin=margin,
+            competing_typologies=competing,
         )
 
     # A witness exists. Now the model's OWN cited path must independently hold up, or we do
@@ -172,8 +213,13 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             validation_errors=[err],
             structural_check=result,
             retrieval_margin=margin,
+            competing_typologies=competing,
         )
 
+    # A witness exists and the citation holds. `competing_typologies` may be non-empty here (10
+    # edges FLAG on CYCLE while STACK and/or GATHER-SCATTER also witness) and DOES NOT gate:
+    # neither is flag-capable, so neither may withhold a corroborated flag. It is disclosed so a
+    # reviewer sees the structure was not unambiguous.
     return VerdictOutcome(
         Verdict.FLAG,
         result.detail or "structure corroborated",
@@ -182,4 +228,5 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
         witness_txn_ids=claim.evidence_txn_ids,
         structural_check=result,
         retrieval_margin=margin,
+        competing_typologies=competing,
     )
