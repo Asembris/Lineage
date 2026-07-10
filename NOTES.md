@@ -1610,3 +1610,170 @@ SAME `embed_text()` the agent already uses; nothing here calls OpenAI except the
 ### retrieve_typology to ground a verdict), Item E (explanation-faithfulness guard), the
 ### decisions.aml_transaction_id grounding FK, any change to the five tables or the aml_* schema.
 ### Do NOT start Item 4 / E without approval.
+
+## Roadmap Item 4 — grounded AML agent with STRICT-BRAKE (2026-07-10)
+
+Item 4 delivered: a retrieval-cited AML verdict with a three-way brake that can never flag
+without a witness, plus a DETERMINISTIC verdict validator. No migration, no new table, no change
+to the five-table moat, `aml_*`, or `typology_corpus`. 13 tests pass (CI-safe, read-only); FLAG
+verified end to end against a live OpenAI call.
+
+### The terminology collision, resolved before a line of brake logic was written
+This codebase uses "lineage" for BELIEF INHERITANCE among agents (`belief_inheritance`, walked by
+lineage.py, replayed by `replay.closure_snapshot()`). The roadmap's "no corroborating lineage
+evidence" does NOT mean that graph — belief inheritance has nothing to say about whether funds
+returned to their account of origin. The brake checks the AML MONEY-FLOW graph
+(`aml_transactions`, self-joined on from/to account). Confirmed live, not assumed: every FK
+touching the evidence layer stays inside it (aml_transactions->aml_accounts,
+aml_pattern_members->{aml_pattern_instances,aml_transactions}); `typology_corpus` has ZERO FKs;
+`closure_snapshot()` reads only agents/beliefs/belief_inheritance. Wiring the brake against
+agents/beliefs would have "worked" — it would have returned rows — and been silently wrong.
+
+### `aml_pattern_members` is the ANSWER KEY, not evidence (the load-bearing discipline)
+A membership row says "this transaction belongs to a block the generator labeled SCATTER-GATHER".
+A structural check that consults it is a ground-truth lookup wearing a graph's clothes: the LLM's
+reasoning becomes decorative and the "grounded agent" claim is hollow. So `app/services/aml_graph.py`
+recomputes structure from the unlabeled edge set and **selects no label column at all**;
+`aml_pattern_members` / `is_laundering` are read ONLY by tests, as a scoring oracle, and by the demo
+to print an oracle column after the fact. Consequence, decided explicitly: the proposed check "does
+the cited pattern-instance id exist and match the claimed typology" was REJECTED. Verifying an
+instance id means reading the label; instance ids are never in the prompt, so the model can only
+produce one by hallucination (vacuous-or-failing), and putting them in the prompt hands over the
+answer key. The agent cites unlabeled transaction rows; the structure is recomputed.
+
+### The brake (app/services/verdict_guard.py) — FLAG requires a witness, always
+Gate 0: the claimed typology must be one retrieval actually returned. `k=3` against a 4-document
+corpus — at k=4 the "retrieved set" IS the corpus and the gate can never fire. The claim's typology
+is a free string in the JSON schema, NOT an enum, for the same reason (an enum makes the
+hallucinated-citation gate unfalsifiable).
+Gate 1a: the typology must be structurally decidable here (FLAG_CAPABLE, below).
+Gate 1b: the graph decides. `MATCH` -> FLAG; `CONCLUSIVE_NO` -> NO_FLAG; `INCONCLUSIVE` -> INSUFFICIENT.
+Then: the model's OWN cited path is re-derived from the rows (`verify_witness_path`) — real evidence
+plus an unfaithful citation is still an unsupported assertion, so the flag is withheld
+(`unfaithful_citation`). The graph, not the citation, is the authority: citing a genuinely real cycle
+from elsewhere does NOT make the subject part of one (test asserts NO_FLAG, not FLAG).
+
+### Why the three outcomes exist: the evidence layer is a BOUNDED extract
+1,500 edges out of a 5,078,345-row universe, and **220 of 648 accounts are sinks** (no outgoing edge
+in the slice). So "the cycle search found nothing" has two meanings, and conflating them is how a
+detector lies. A negative is CONCLUSIVE only if the search closed WITHOUT touching a sink; if it hit
+one, the honest answer is INSUFFICIENT_COVERAGE and the boundary account is named in the outcome.
+This — not a confidence threshold — is what "genuine uncertainty" means here. Measured split of the
+CYCLE search over all 1,500 edges: benign 458 conclusive-no / 728 inconclusive / 14 match;
+CYCLE members 43 match; SCATTER-GATHER 96 inconclusive; STACK 84 inconclusive.
+
+### FINDING — retrieval distance is NOT a coverage signal, in either direction. It gates nothing.
+Two independent measurements, and together they are the strongest form of "only structure may
+authorize a flag":
+- A description of a FAN-IN funnel typology the corpus does NOT contain retrieves GATHER-SCATTER at
+  cosine **0.391 — closer than EVERY in-corpus query (0.463-0.505)**, because "many accounts pay into
+  one" is literally the gather half. A `distance < tau => confident` rule would have confidently
+  grounded a verdict on a typology the corpus cannot cover.
+- The agent's real query is a NEUTRAL structural summary (degrees, path lengths — no typology words),
+  and those separate the top-2 documents by only **0.0005-0.02**. An early `MARGIN_FLOOR = 0.01` gate
+  rejected a real STACK subject at margin 0.0005 — a reason with no bearing on whether the structure
+  exists. Gating on it made the brake a wall, not a brake. The margin is now recorded as provenance
+  (`VerdictOutcome.retrieval_margin`) and decides nothing. Safety is preserved because a witness is
+  still required for FLAG.
+Also measured: you CANNOT retrieve a typology by embedding a raw transaction row. A bare row retrieves
+CYCLE at 0.680; an off-topic chargeback complaint retrieves CYCLE at 0.743 — both are just "nearest of
+four distant things". Hence `structure_text()`.
+
+### FLAG_CAPABLE = {CYCLE, SCATTER-GATHER} — measured, not hand-picked, and TEST-ENFORCED
+The criterion is "the witness never fires on an edge belonging to a DIFFERENT typology", evaluated
+over all 1,500 edges. Precision/recall, stated plainly because Item 7's headline eval inherits them:
+
+| typology       | recall        | cross-typology | benign FP  | precision         |
+|----------------|---------------|----------------|------------|-------------------|
+| CYCLE          | 43/43 = 100%  | **0**/257      | 14/1200    | 43/57 = **75.4%** |
+| SCATTER-GATHER | 39/96 = 40.6% | **0**/204      | 3/1200     | 39/42 = **92.9%** |
+| GATHER-SCATTER | 64/77 = 83.1% | 6/223          | 37/1200    | 64/107 = 59.8%    |
+| STACK          | 6/84 = 7.1%   | 27/216         | 2/1200     | 6/35 = 17.1%      |
+
+"Sound" would undersell this: CYCLE has a real ~25% false-positive rate.
+`tests/test_aml_brake.py::test_witness_soundness_and_benign_false_positive_rates` asserts ALL of these
+counts, because soundness (zero cross-typology confusion) and benign false-positive rate are
+**different properties** — the first selects FLAG_CAPABLE, the second is what a real detector lives or
+dies by, and soundness says nothing about it. Neither may be silently re-baselined.
+
+**CAVEAT THAT MUST TRAVEL WITH THESE NUMBERS WHEREVER THEY ARE CITED:** they are measured against Item
+1's *deliberately adversarial* benign set — noise anchored to the SAME accounts as the fraud, capped at
+8/account. Measured consequence: on labeled accounts, benign edges contribute **783** degree endpoints
+versus **598** from the labeled edges themselves, i.e. the noise manufactures hub structure around
+exactly what a hub-detector examines. That is the right choice for a harder test, but these numbers
+would likely look better against a naturally-distributed benign population. Do not quote them as
+absolute detector performance.
+
+**FORWARD POINTER — GATHER-SCATTER/STACK FLAG-incapability is DATA-DEPENDENT, not architectural.**
+GATHER-SCATTER fails on two independent counts (its witness fires on 37/1200 benign rows, and retrieval
+cannot separate it from SCATTER-GATHER: the gather-scatter description retrieves the SCATTER-GATHER
+document top-1, 0.505 vs 0.536). Every ingested STACK instance is internally disjoint (num_components
+4..11, Item 1), so it has no single connected path to witness. If a later ingestion changes graph
+density, the asserted counts shift, the soundness test FAILS, and turning a typology's FLAG capability
+on becomes a deliberate decision — never a silent flip. That test failing is a capability change to
+notice, not a number to update.
+
+### Overlap with Item E — stated, not left to be discovered
+This validator IS the citation-and-structure half of Item E, built now and meant to be SUBSUMED, not a
+parallel design. What deterministic checks catch: a typology retrieval never returned; a transaction id
+that does not exist; a cited path that does not form the claimed structure (re-derived from the rows,
+never compared against our own search's answer); a FLAG asserted without a witness. What they cannot
+catch is unfaithful PROSE — "funds returned within 24 hours through a shell company" is a claim about
+timing and corporate form that no cited edge supports. That is Item E's genuinely different half and the
+only place an LLM judge earns its place. No second LLM call was added here; instead the response schema
+keeps the rationale in evidence-referencing slots to shrink the surface for drift.
+
+### Verdicts are EPHEMERAL — no table, deliberately (the Item-1 call, restated)
+`decisions` is the wrong shape, verified against the live schema: `agent_id` is NOT NULL FK->agents (an
+AML verdict has no fleet agent), `merchant`/`amount` are NOT NULL card fields, and `verdict` is
+`approve|decline|blocked` — a payment-authorization vocabulary that cannot express
+FLAG/NO_FLAG/INSUFFICIENT_COVERAGE. Forcing it in would need a synthetic agent and a fake merchant: the
+exact forced-fit fabrication the Item-1 spike refused. A dedicated `verdicts` table is the right eventual
+answer, but its columns are determined by what Item 5 reads back. Decisively: a verdict is a pure function
+of (subject, corpus@T, graph@T), and all three are reproducible at a past instant via AS OF SYSTEM TIME —
+a derivable, reproducible result needs no storage to be trustworthy. Persist when a verdict becomes a
+consequential act someone is held to (Item 5's call, or a certificate). The `decisions.aml_transaction_id`
+grounding FK remains deferred.
+
+### Three defects found by RUNNING the agent, not by reading it (all fixed; banked)
+1. The prompt rendered candidates as `[TYP] title`, so the model copied
+   `"[SCATTER-GATHER] Scatter-gather laundering typology"` and Gate 0 fired on our own formatting.
+   Fixed the rendering (`typology: CYCLE` on its own line), NOT the gate.
+2. The far side of a 10-edge cycle is 5 hops from the subject, but the prompt carried a 2-hop
+   neighbourhood — the model was asked to cite edges it had never been shown, so every cycle claim was
+   rejected as `unfaithful_citation`. `neighbourhood()` now covers the searchable region (hops=6,
+   limit=120), ordered by distance from the subject so truncation drops distant distractors, not the path.
+   Handing over the searchable region is not handing over the answer: the path arrives mixed with every
+   distractor in the same radius.
+3. gpt-4o-mini initially cited a SUPERSET — the correct 6 cycle edges plus one unrelated inbound edge to
+   an intermediary. `verify_witness_path` rejects supersets ON PURPOSE (accepting them lets a model cite
+   the whole neighbourhood and always "contain" a cycle). Fixed by an explicit prompt contract ("a cited
+   path with one extra transaction is rejected exactly like a fabricated one"), never by weakening the
+   check. The model then cited exactly the 6 edges and the brake FLAGged.
+
+### Mechanics / gotchas
+- `MAX_CYCLE_HOPS=12` covers every ingested cycle (observed lengths 6, 7, 10 = the instance sizes) with
+  headroom. `MIN_CYCLE_LEN=3` — length 2 would accept a reciprocal ping-pong pair (2 exist).
+- Self-loops (447 rows, 446 benign "Reinvestment" transfers, from==to) are excluded from all adjacency:
+  an account paying itself is not a transfer. They land in CONCLUSIVE_NO. An early probe that did NOT
+  exclude them inflated the GATHER-SCATTER/STACK benign counts (49/60 vs the correct 37/2).
+- The shipped SCATTER-GATHER witness requires the SUBJECT to participate in the witness (not merely sit
+  near one). That is stricter than the design probe and moves its numbers: recall 48->39, benign FP 24->3.
+- `tests/test_aml_brake.py` is CI-SAFE: no OpenAI (claims built directly; retrieval queries with a
+  document's OWN stored embedding, the test_corpus trick) and read-only — unlike the replay/consistency
+  tests it never calls `run_seed`, so it cannot wipe the moat backfill.
+- Live demo: `PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe scripts/demo_grounded_agent.py`.
+  The brake's outcome depends on what the model CLAIMS, so a subject does not map to a fixed verdict; each
+  branch is exercised deterministically in the tests.
+
+### What Item 5 can call once this ships
+`app.services.aml_agent.evaluate_transaction(txn_id, *, as_of=None) -> VerdictOutcome`, carrying
+`verdict` (FLAG|NO_FLAG|INSUFFICIENT_COVERAGE), `reason`, `claimed_typology`, `corpus_doc` (the cited
+definition + its cosine distance), `witness_txn_ids` (real `aml_transactions` ids — click-to-interrogate
+resolves each to a real row), `boundary_account` when inconclusive, `retrieval_margin`, and
+`validation_errors`. `as_of` time-travels the corpus retrieval through Item 3's proven AOST path.
+
+### Explicitly NOT done (still gated): Item 5 (click-to-interrogate), Item E (explanation-faithfulness
+### guard — this is its citation half only), Item 7 (headline eval), the regulatory corpus (still gated on
+### the data/raw/ drop), the decisions.aml_transaction_id grounding FK, any change to the five tables,
+### aml_* schema, or typology_corpus. Do NOT start Item 5 / E / 7 without approval.
