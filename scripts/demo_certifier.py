@@ -1,9 +1,22 @@
-"""Real invocation of the deployed certifier Lambda (Phase 3, step 8 gate).
+"""Real invocation of the deployed certifier Lambda (Phase 3 step 8; Item 6 closure check).
 
-Seeds + a real belief_performance curve, invalidates via the SERVICE (leaves audit_log
-cert_status='pending' — the endpoint's inline cert path is untouched), then INVOKES the
-deployed AWS Lambda. The Lambda re-verifies the closure AS OF SYSTEM TIME and writes the
-certificate to S3. We then re-fetch that S3 object and re-verify its sha256 locally.
+Seeds + a real belief_performance curve, invalidates, then INVOKES the deployed AWS Lambda,
+which re-verifies the closure AS OF SYSTEM TIME and writes the certificate to S3. We re-fetch
+that S3 object and re-verify its sha256 locally.
+
+TWO scenarios, because Item 6's closure-hash cross-check is a TRI-STATE and a demo that only
+ever shows the happy path proves the check can pass, never that it can fail to find a
+counterparty:
+
+  A. invalidate via the SERVICE  -> audit_log cert_status='pending', no cert in S3
+     => the Lambda has nothing to compare against => agreement = 'unavailable'
+        (this is the honest answer, NOT a pass. A missing counterparty must never read as
+        a successful check.)
+
+  B. invalidate via the real POST /beliefs/{id}/invalidate endpoint, which writes its own
+     certificate carrying pre_invalidation_state.closure_content_hash
+     => the Lambda independently re-derives that hash from its own AOST replay and compares
+     => agreement = 'agreed'
 
 Run:  PYTHONPATH=. .venv/Scripts/python.exe scripts/demo_certifier.py
 """
@@ -46,18 +59,15 @@ def _rows(at, n, frauds):
     ]
 
 
-async def main():
+async def _reseed():
     await run_seed()
     async with engine.begin() as c:
         await c.execute(insert(Decision), _rows(EARLY[0] + dt.timedelta(days=5), 200, 10))
         await c.execute(insert(Decision), _rows(LATE[0] + dt.timedelta(days=5), 200, 110))
     await recompute_belief_performance(ORIGIN, [EARLY, LATE])
 
-    inv = await invalidate_belief(ORIGIN, ACTOR)
-    print(f"\n[local] invalidated belief {ORIGIN}  (audit {inv['audit_id']}, cert pending)")
-    print(f"[local] snapshot_hlc = {inv['snapshot_hlc']}")
 
-    # --- invoke the DEPLOYED Lambda ---
+def _invoke_certifier() -> dict | None:
     print("\n[aws] invoking lineage-certifier ...")
     lam = aws_client.client("lambda")
     resp = lam.invoke(
@@ -68,13 +78,13 @@ async def main():
     if resp.get("FunctionError"):
         print("[aws] FUNCTION ERROR:")
         print(json.dumps(payload, indent=2)[:2000])
-        await engine.dispose()
-        return
-
+        return None
     print("[aws] Lambda returned:")
     print(json.dumps(payload, indent=2))
+    return payload
 
-    # --- re-fetch the cert the Lambda wrote to S3 and re-verify its hash locally ---
+
+async def _verify_s3(payload: dict, audit_id) -> dict:
     fetched = await asyncio.to_thread(s3_audit.get_certificate, payload["s3_key"])
     ok = certificate.verify(fetched)
     print("\n[verify] GET s3://%s/%s" % (payload["s3_bucket"], payload["s3_key"]))
@@ -86,15 +96,83 @@ async def main():
           f" -> {fetched['staleness_evidence'].get('confidence_now')}, "
           f"frauds_last={fetched['staleness_evidence'].get('frauds_approved_last_window')}")
 
-    # --- confirm the Lambda closed the audit loop in CRDB ---
+    # The Item-6 verdict, stated as a headline rather than left as one key among eight. A
+    # 'disagreed' certificate is otherwise easy to miss: the Lambda still stamps
+    # audit_log.cert_status='written' either way (see NOTES "no single canonical certificate").
+    cv = fetched["closure_verification"]
+    banner = {"agreed": "AGREED", "disagreed": "*** DISAGREED ***", "unavailable": "UNAVAILABLE"}
+    print(f"\n[closure]  {banner.get(cv['agreement'], cv['agreement'])}")
+    print(f"[closure]  re-derived by Lambda (AOST @ {cv['snapshot_hlc']}):")
+    print(f"[closure]    {cv['rederived_closure_hash']}")
+    print(f"[closure]  issue-time hash it was checked against:")
+    print(f"[closure]    {cv['issue_time_closure_hash']}  (source: {cv['compared_against_source']})")
+    if cv["agreement"] == "unavailable":
+        print("[closure]  -> no counterparty certificate existed to compare against.")
+        print("[closure]     This is NOT a pass. The Lambda re-derived the world and said so.")
+    elif cv["agreement"] == "disagreed":
+        print("[closure]  -> the certificate's pre-kill claim does NOT match the cluster's history.")
+
     async with engine.connect() as c:
         row = (
             await c.execute(
-                text("SELECT cert_status, cert_s3_key FROM audit_log WHERE id=:i"),
-                {"i": inv["audit_id"]},
+                text("SELECT cert_status FROM audit_log WHERE id=:i"), {"i": audit_id}
             )
         ).mappings().one()
     print(f"\n[db] audit_log.cert_status = {row['cert_status']}  (Lambda stamped it)")
+    return fetched
+
+
+async def main():
+    # === Scenario A: no counterparty certificate => 'unavailable' ===============
+    print("=" * 78)
+    print("SCENARIO A — invalidate via the SERVICE (no certificate written to S3)")
+    print("=" * 78)
+    await _reseed()
+    inv = await invalidate_belief(ORIGIN, ACTOR)
+    print(f"\n[local] invalidated belief {ORIGIN}  (audit {inv['audit_id']}, cert pending)")
+    print(f"[local] snapshot_hlc = {inv['snapshot_hlc']}")
+    payload = _invoke_certifier()
+    if payload is None:
+        await engine.dispose()
+        return
+    await _verify_s3(payload, inv["audit_id"])
+
+    # === Scenario B: the endpoint certified first => 'agreed' ===================
+    print("\n\n" + "=" * 78)
+    print("SCENARIO B — invalidate via POST /beliefs/{id}/invalidate (endpoint certifies)")
+    print("=" * 78)
+    await _reseed()
+
+    import httpx  # local: the demo drives the REAL app, not a reimplementation
+
+    from app.main import app
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://demo") as client:
+        r = await client.post(f"/beliefs/{ORIGIN}/invalidate", json={"actor_id": str(ACTOR)})
+    r.raise_for_status()
+    body = r.json()
+    pre = body["pre_invalidation_state"]
+    print(f"\n[endpoint] status={body['certificate_status']}  key={body['certificate_s3_key']}")
+    print(f"[endpoint] pre-kill closure {pre['closure_edge_open']}/{pre['closure_edge_total']} open"
+          f"  source={pre['source']}")
+    print(f"[endpoint] closure_content_hash = {pre['closure_content_hash']}")
+
+    payload = _invoke_certifier()
+    if payload is None:
+        await engine.dispose()
+        return
+    fetched = await _verify_s3(payload, uuid.UUID(body["audit_id"]))
+
+    # The headline claim, asserted rather than eyeballed.
+    cv = fetched["closure_verification"]
+    assert cv["agreement"] == "agreed", cv
+    assert cv["rederived_closure_hash"] == pre["closure_content_hash"], cv
+    print("\n[PROOF] The endpoint hashed the pre-kill world at issue time.")
+    print("[PROOF] The Lambda, on AWS compute, replayed that same instant AS OF SYSTEM TIME,")
+    print("[PROOF] rebuilt the world from CockroachDB's own MVCC history, and hashed it.")
+    print("[PROOF] The two hashes are identical. Nothing was taken on faith.")
+
     await engine.dispose()
 
 
