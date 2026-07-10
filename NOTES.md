@@ -2160,7 +2160,45 @@ re-derive the AML witness itself (porting the whole `aml_graph` witness machiner
 4.7 MB zip), because embedding an unverified witness is exactly the "trust the label" move the brake
 refuses.
 
+### DEPLOYED + VERIFIED END TO END ON REAL AWS (2026-07-10) — both tri-state branches
+Local parity was not accepted as done, matching Phase 3's standard (a real invocation, not
+"should work"). `build.py` -> `deploy.py` -> `scripts/demo_certifier.py`, which now runs BOTH
+branches against the deployed `lineage-certifier`:
+- **Scenario A** (invalidate via the SERVICE, so no certificate is ever written to S3):
+  `closure_hash_agreement: "unavailable"`, `issue_time_closure_hash: null`. The Lambda still
+  re-derived the world and said so. A missing counterparty does NOT read as a pass.
+- **Scenario B** (invalidate via the real `POST /beliefs/{id}/invalidate`, which certifies):
+  `closure_hash_agreement: "agreed"`, `aost_verified: true`. The endpoint's issue-time hash and
+  the Lambda's AOST-replayed hash are the SAME value —
+  `sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` — computed on
+  different machines, in different languages' async/sync stacks, from different reads.
+  `compared_against_source: "issue-time-read"`. Certificate re-fetched from S3 and its sha256
+  re-verified locally.
+- **The two scenarios produce the SAME closure hash at DIFFERENT snapshot HLCs.** Expected, not a
+  bug: each scenario reseeds deterministically (uuid5 ids, fixed timestamps), so the reconstructed
+  world genuinely is the same world. This is Item 2's claim restated — the hash covers the world,
+  not the timestamp.
+
+### GOTCHA — `deploy.py` had a latent CREATE-only-parameter bug, exposed by the FIRST re-deploy
+`Architectures=["x86_64"]` is valid on `create_function` but `update_function_configuration`
+rejects it outright (`ParamValidationError: Unknown parameter in input: "Architectures"`). Phase 3
+only ever ran the CREATE path, so this sat dormant for months. It fires AFTER
+`update_function_code` has already succeeded, so the failure leaves NEW CODE deployed against a
+FAILED config call — a half-applied deploy that reports as an error. Fixed: `Architectures` moved
+to a create-only dict, and a second `function_updated` waiter added after the config update.
+Verified by a clean re-run (`state=Active last=Successful`).
+
 ### Mechanics / gotchas
+- **A `disagreed` result is STRUCTURALLY RECORDED but NOT PROMINENTLY SURFACED. Do not overstate
+  this.** It lives in the hash-covered certificate body (`closure_verification.agreement`) and in
+  the Lambda's return payload (`closure_hash_agreement`) — an auditor must know to look. It is
+  NOT in the endpoint's `InvalidateResponse` (the endpoint never sees the Lambda), and there is NO
+  `audit_log` column for it. Worse: **the Lambda stamps `cert_status='written'` regardless**, so a
+  certificate recording a mismatch is logged in the database as a clean write. `demo_certifier.py`
+  now prints the agreement as a headline banner (`*** DISAGREED ***`) rather than one key among
+  eight, which is the only surface where it is hard to miss. Properly fixing this means an
+  `audit_log` column and/or reconciling the two-certificate model — see the deferred finding above;
+  both were out of Item 6's scope.
 - `SCHEMA_VERSION` 1.0 -> 1.1. Additive by construction: `_digest` hashes whatever keys are present
   and `verify()` re-derives over the same set, so 1.0 certificates still verify unchanged. This is
   why `build_certificate`'s `extra` (merged BEFORE hashing) was the right existing seam — the Lambda
@@ -2171,12 +2209,12 @@ refuses.
 - `tests/test_certifier_closure_verification.py` loads the Lambda handler by path with `certificate`
   shimmed onto `app.services.certificate` (the zip packs it flat) and stubs boto3. ZERO AWS, ZERO
   cluster — CI-safe, and it never calls `run_seed`, so it cannot wipe the moat backfill.
-- **The Lambda was NOT redeployed this session** (`lambda/certifier/deploy.py` pushes to the live
-  `lineage-certifier` function). Handler changes are committed but the deployed function still runs
-  the pre-Item-6 code. Redeploy with `python lambda/certifier/build.py && python lambda/certifier/
-  deploy.py`, then `scripts/demo_certifier.py` to see `closure_hash_agreement: "agreed"` live.
-- `tests/test_atomic_invalidation.py` reseeds `defaultdb` — it wiped the 4000-row backfill again this
-  session, restored afterwards with `python -m seed.backfill_decisions` (via `.venv`).
+- Redeploy with `python lambda/certifier/build.py && python lambda/certifier/deploy.py`, then
+  `PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe scripts/demo_certifier.py`.
+- `tests/test_atomic_invalidation.py` reseeds `defaultdb`, and `demo_certifier.py` reseeds AND runs
+  two real invalidations (it also overwrites `belief_performance` with its own 2-window curve). Both
+  wiped the 4000-row backfill this session; restored afterwards with `python -m
+  seed.backfill_decisions` (via `.venv`), curve reproduced byte-for-byte.
 
 ### Explicitly NOT done (still gated): Item E (explanation-faithfulness / LLM narration), Item 7
 ### (headline eval), Item F (hero attack demo), the regulatory corpus (gated on the data/raw/ drop),
