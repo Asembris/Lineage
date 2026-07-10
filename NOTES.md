@@ -2395,3 +2395,79 @@ whether funds returned to their account of origin. Confirmed, not re-derived.
 ### second AML-typology belief, a `verdicts` table, any change to the five tables / aml_* /
 ### typology_corpus. Do NOT start Item 8 / E / F / 9 / 10 without approval. Item 1's ingestion was
 ### NOT modified (in-memory hold-out only), as approved.
+
+## CI-speed cleanup — reseed via DELETE, not TRUNCATE (2026-07-10)
+
+Infrastructure maintenance, NOT a roadmap item (the same way Item 0 was infra). CI runtime had
+grown from ~13 min (36 tests, pre-roadmap) to ~36-40 min (89 tests) and a run had been CANCELLED
+twice at the old 30-min timeout. Dedicated session to fix suite speed WITHOUT weakening any test's
+assertions or isolation. Result: the full suite went from 36m32s to **2m39s** (89 passed, 0
+failed), from a ONE-LINE change in the single reset path.
+
+### The measured bottleneck was TRUNCATE, not test count, latency, or inserts
+Fresh `pytest --durations=0` (2192.22s / 36m32s / 89 passed) + a direct timing probe pinned it:
+- warm `engine.connect()` + `SELECT 1` = **0.18s** — connection/Frankfurt latency is NOT the cost.
+- bare `TRUNCATE belief_inheritance, decisions, belief_performance, beliefs, agents CASCADE` =
+  **143s**; a full `run_seed` (that TRUNCATE + 33 client-keyed inserts) = **~110s**. On CRDB
+  TRUNCATE is a schema change (drops/recreates every index on 5 tables), so it costs ~100-143s
+  regardless of the tiny row counts. The inserts and the assertions are a rounding error.
+- The suite reseeds ~23 times (20 defaultdb + 3 demo-db), so **~2100s / ~96% of wall time was
+  TRUNCATE.** Single-test files proved it: `test_lineage` spent 94.5s on a ms-scale recursive CTE;
+  `test_aost_hides_a_committed_write` 110.8s on one AOST read + one commit.
+
+### The fix: ordered child-first DELETEs in seed.seed() (the ONLY executed TRUNCATE in the repo)
+`DELETE FROM` each of belief_inheritance, decisions, belief_performance, **audit_log**, beliefs,
+agents — measured **0.6-1.7s** for the identical empty baseline. No FK has ON DELETE CASCADE so
+order matters; audit_log references beliefs and had to be added explicitly (the old TRUNCATE ...
+CASCADE reached it implicitly — it was NOT in the TRUNCATE list). `seed.seed()` is the only
+executed TRUNCATE anywhere (grep-confirmed; other hits are comments / the resilience classifier
+string / a test string), so this one change flows to every defaultdb reseed, the isolated demo-db
+reseeds, and the decisions backfill. Verified the CRDB self-referential `agents.parent_id` FK is
+fine under a single delete-all statement.
+
+### DELETE-vs-TRUNCATE and AOST/MVCC — the load-bearing worry, empirically cleared
+The concern was that DELETE could change the MVCC history the time-travel tests read. It does — for
+the BETTER: DELETE is plain DML, so history is CONTINUOUS with no schema-change boundary (raw AOST
+cannot always read across a TRUNCATE schema change). All four AOST/MVCC-sensitive suites pass and
+are now fast: test_aost_hides_a_committed_write 110.8s->4.39s, test_replay byte-identical
+107.8s->4.10s, test_atomic_invalidation ×4 (~95-108s->3.9-8.6s incl. the S3 round-trip + the
+AOST-reproduces-pre-invalidation-state cert test), test_consistency_window ×3 (~97-113s->4.1-6.6s).
+Bonus: DELETE cannot produce the "indexes being dropped" schema-change collision (Phase 3 Step 7)
+that caused reseed flakes for three phases — that whole failure class is gone from the reset path.
+
+### The honest buckets (measured time-share, for future reference)
+- **Hermetic (no cluster / S3 / OpenAI): ~24 tests, ~3s.** test_eval_detection (5, no app import),
+  test_resilience (6), test_certificate (6), test_certifier_closure_verification (7, S3 stubbed) —
+  all ran <0.005s each and were hidden by pytest. Already free; nothing to optimize.
+- **Read-only live cluster (real reads, no reseed, no OpenAI): ~41 tests, ~29s.** aml_brake/
+  interrogate/routes + corpus — each opens a real connection and reads Item 1/3's ingested rows via
+  `load_graph()` etc., never mutating. `load_graph(conn=...)` already accepts an injected connection
+  so a session-scoped graph fixture COULD share one read, but at ~29s it isn't worth the coupling.
+- **Reseed/S3/fan-out bucket: was ~98% of wall time,** ~96% of that being TRUNCATE. Post-fix the
+  slowest tests are the genuinely-inherent ones and were left untouched: demo/SSE fan-out (~10s),
+  real S3 round-trip (~9s), eventual per-holder 0.5s×8 fan-out (~7s), AOST reads (ms).
+
+### Deliberately NOT done, and why (so a future session doesn't re-propose these)
+- **xdist / parallelization — rejected.** Live-cluster tests reseed SHARED tables; parallelizing
+  them against the one Cloud db races regardless of reset mechanism (DELETE just changes the
+  collision from schema-level to a row-level 40001). The hermetic bucket is parallelizable but
+  already runs in ~3s. No win, real risk given this project's reseed-collision history.
+- **Session-scoped reseed fixture (consolidation) — rejected.** Would trade each test's clean-
+  baseline isolation for ~15s now that a reseed is ~1s (23 × ~1s). Not worth it; isolation kept.
+- **Hermetic-vs-live CI job split — rejected.** A split earns its keep against a 40-min live tax;
+  against a 2m39s suite a second workflow to keep green is complexity for no payoff. One job kept.
+- **Timeout 60 -> 15 min** (ci.yml): honest ~2-3x headroom over the expected CI job time (pytest
+  wall + runner->Frankfurt latency + pip install), not the old 40-min-over-runtime cushion.
+
+### Left as-is on purpose
+`app/resilience.py` + `app/routers/demo.py` still classify/refer to the "indexes being dropped"
+TRUNCATE transient. Harmless and kept: it is a general CRDB-transient matcher and the SSE demo
+endpoint's own reseed path is unchanged in spirit; the reset simply can no longer PRODUCE that
+specific error. Not in scope to touch.
+
+### Cluster state after this session
+The `--durations` measurement run + the timing probes reseeded and then emptied `defaultdb`
+(the final DELETE probe left all tables at 0 rows; the verification suite reseeded genealogy-only
+and left the belief invalidated). Restore for the console/frontend with
+`python -m seed.backfill_decisions` (~4 min: 24 agents / active belief / 4000 decisions / 8 perf
+windows). Deferred to end-of-session per approval — restore once, after push is approved.
