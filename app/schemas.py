@@ -217,3 +217,68 @@ class BeliefPerformanceResponse(BaseModel):
     belief_id: uuid.UUID
     windows: list[BeliefPerformanceWindow]
     count: int
+
+
+# --- AML evidence layer — read-only interrogation surface (Roadmap Item 5) ------------------
+# Deliberately carries NO label field. `is_laundering` / pattern membership are the answer key
+# and are never served: app/services/aml_interrogate.py selects neither.
+
+
+class AmlAccountOut(BaseModel):
+    # Node identity in the money-flow graph is the compound (bank, account), never account alone.
+    id: uuid.UUID
+    bank: str
+    account: str
+
+
+class AmlTransactionOut(BaseModel):
+    # An EDGE of the money-flow graph: it runs between two accounts.
+    id: uuid.UUID
+    ts: dt.datetime
+    from_account_id: uuid.UUID
+    to_account_id: uuid.UUID
+    amount_paid: float
+    payment_currency: str
+    amount_received: float
+    receiving_currency: str
+    payment_format: str
+
+
+class AmlWitnessOut(BaseModel):
+    """One typology's structural verdict on the subject, with its traversal re-derived.
+
+    `kind` tells a client whether `transaction_ids` means anything as an order:
+      RING   — CYCLE: contiguous and closed; ids are the walk, subject first.
+      LEGS   — SCATTER-GATHER: use `legs`; `transaction_ids` is a set, not a path.
+      BUNDLE — GATHER-SCATTER / STACK: a real edge set with no single traversal.
+      NONE   — no witness.
+    """
+
+    typology: str
+    flag_capable: bool
+    outcome: str
+    kind: str
+    transaction_ids: list[uuid.UUID]
+    legs: dict[str, list[uuid.UUID]] | None
+    boundary_account_id: uuid.UUID | None
+    detail: str
+
+
+class AmlInterrogationResponse(BaseModel):
+    """Everything a click on one transaction resolves to. Deterministic; no model call.
+
+    `competing_typologies` lists every typology that independently witnesses this subject.
+    More than one (`has_competing_structure`) means the structural evidence genuinely supports
+    more than one story. It is reported, never used to suppress a verdict.
+    """
+
+    transaction_id: uuid.UUID
+    subject: AmlTransactionOut
+    witnesses: list[AmlWitnessOut]
+    competing_typologies: list[str]
+    has_competing_structure: bool
+    # Every transaction/account referenced above, resolved to a real row so a client renders
+    # the witness without a second round-trip per id.
+    transactions: dict[uuid.UUID, AmlTransactionOut]
+    accounts: dict[uuid.UUID, AmlAccountOut]
+    as_of: str | None

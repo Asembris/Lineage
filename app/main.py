@@ -14,7 +14,7 @@ if sys.platform == "win32":
 
 from app.db import engine  # noqa: E402
 from app.ratelimit import RateLimiter  # noqa: E402
-from app.routers import agents, beliefs, decisions, demo  # noqa: E402
+from app.routers import agents, aml, beliefs, decisions, demo  # noqa: E402
 
 
 @asynccontextmanager
@@ -62,6 +62,7 @@ app.add_middleware(
 
 
 app.include_router(agents.router)
+app.include_router(aml.router)
 app.include_router(beliefs.router)
 app.include_router(decisions.router)
 app.include_router(demo.router)
