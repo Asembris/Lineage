@@ -107,7 +107,7 @@ async def seed(session_factory=None) -> None:
 
     `session_factory` defaults to the app's global SessionLocal (defaultdb). The isolated demo
     stream passes its DemoSession so the SAME genealogy is seeded into the demo database — the
-    unqualified TRUNCATE/INSERTs resolve against whichever database the session is bound to.
+    unqualified DELETE/INSERTs resolve against whichever database the session is bound to.
     """
     make_session = session_factory if session_factory is not None else SessionLocal
     embedding = placeholder_embedding(get_settings().embedding_dim)
@@ -115,13 +115,23 @@ async def seed(session_factory=None) -> None:
     edges = build_inheritance()
 
     async with make_session() as s:
-        # Idempotent: wipe the tables (decisions/belief_performance empty in Phase 1).
-        await s.execute(
-            text(
-                "TRUNCATE belief_inheritance, decisions, belief_performance, "
-                "beliefs, agents CASCADE"
-            )
-        )
+        # Idempotent reset. Ordered DELETEs (child tables first), NOT TRUNCATE: on
+        # CockroachDB TRUNCATE is a schema change that drops/recreates every index and
+        # costs ~100s regardless of row count, while these DELETEs are plain DML (~1s).
+        # DELETE also leaves a continuous MVCC history — no schema-change boundary — which
+        # is what the AOST time-travel tests read, and it cannot hit the "indexes being
+        # dropped" schema-change collision (NOTES Phase 3, Step 7). No FK has ON DELETE
+        # CASCADE, so order matters; audit_log references beliefs and must be cleared
+        # explicitly here (the old TRUNCATE ... CASCADE reached it implicitly).
+        for table in (
+            "belief_inheritance",
+            "decisions",
+            "belief_performance",
+            "audit_log",
+            "beliefs",
+            "agents",
+        ):
+            await s.execute(text(f"DELETE FROM {table}"))
 
         s.add_all(agents.values())
         await s.flush()  # agents must exist before FKs reference them
