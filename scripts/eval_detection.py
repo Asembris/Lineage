@@ -406,6 +406,29 @@ def report_head_to_head(name: str, h2h: dict) -> None:
           flush=True)
 
 
+def report_format_crosstab(name: str, ext: Extract) -> None:
+    """Root-cause diagnostic for the baseline's near-100% recall: payment_format x label on the
+    eval set. If all positives concentrate in one format while benign spans many, the baseline's
+    'signal' is that separation -- a synthetic-generation + sampling artifact, not real behaviour."""
+    pos, neg = Counter(), Counter()
+    for e in ext.graph.by_id.values():
+        lab = ext.labels.get(e.id)
+        fmt = ext.features[e.id]["payment_format"]
+        if lab in ("CYCLE", "SCATTER-GATHER"):
+            pos[fmt] += 1
+        elif lab is None:
+            neg[fmt] += 1
+    print(f"\n--- {name}: payment_format x label (root-cause of the baseline's recall) ---", flush=True)
+    print(f"  {'format':14s} {'CYCLE/SG pos':>12s} {'benign neg':>11s} {'pos-rate':>9s}", flush=True)
+    for f in sorted(set(pos) | set(neg)):
+        p, n = pos[f], neg[f]
+        print(f"  {f:14s} {p:12d} {n:11d} {(p / (p + n) if p + n else 0):8.1%}", flush=True)
+    only = [f for f in pos if pos[f]]
+    print(f"  -> all {sum(pos.values())} positives use formats {only}; benign spans "
+          f"{len([f for f in neg if neg[f]])} formats. Separation is a generator+sampling artifact, "
+          f"not real behaviour (see NOTES Item 7).", flush=True)
+
+
 def main() -> None:
     print("=== Item 7 detection eval ===", flush=True)
     blocks = ingest.load_blocks_with_header()
@@ -458,6 +481,8 @@ def main() -> None:
     # independently (dev fit never transferred to the hold-out).
     report_head_to_head("DEVELOPMENT SET", head_to_head(dev))
     report_head_to_head("HOLD-OUT (never tuned)", head_to_head(hold))
+    report_format_crosstab("DEVELOPMENT SET", dev)
+    report_format_crosstab("HOLD-OUT (never tuned)", hold)
 
     print("\nNOTE: numbers are RING/TYPOLOGY detection against pattern-membership ground truth, on "
           "Item 1's deliberately adversarial benign set (noise anchored to the same accounts). Not "
