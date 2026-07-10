@@ -1741,6 +1741,31 @@ density, the asserted counts shift, the soundness test FAILS, and turning a typo
 on becomes a deliberate decision — never a silent flip. That test failing is a capability change to
 notice, not a number to update.
 
+### DEVELOPMENT-SET DISCLOSURE (added by Item 7, 2026-07-10) — these numbers were NOT a hold-out
+The precision/recall table above is measured on the SAME 1,500-edge extract that design decisions
+were made against. It is therefore a **development-set (in-sample)** result and must NOT be quoted
+as "a hold-out you never tuned." Item 7 investigated exactly what did and did not touch this extract,
+and the honest three-way split is:
+- **DERIVED-FROM-DOMAIN (clean, not fit to data):** the witness ALGORITHMS themselves
+  (`cycle_witness`, `scatter_gather_witness`, ...) come from the IBM/Altman typology definitions
+  (Item 3 corpus). A directed cycle returning to origin over >=3 accounts is the paper's definition,
+  not a shape reverse-engineered from the 43 CYCLE edges. Defensible as-is.
+- **SELECTED-BY-LOOKING-AT-RESULTS (in-sample decisions):** `FLAG_CAPABLE = {CYCLE, SCATTER-GATHER}`
+  was CHOSEN by measuring cross-typology soundness across all 1,500 edges (a discrete 2-of-4 pick on
+  the eval data); a GATHER-SCATTER predicate tightening was measured on this extract before being
+  rejected; and the shipped SCATTER-GATHER "subject must participate" tightening MOVED its numbers on
+  this extract (recall 48->39, benign FP 24->3). The final counts were then read off that same,
+  already-inspected set.
+- **SET-FROM-OBSERVED-DATA (low-stakes but informed by the extract):** `MAX_CYCLE_HOPS=12` and the
+  neighbourhood radius were fixed from observed cycle lengths (6, 7, 10). They only need to exceed
+  observed maxima, but they are choices informed by this data.
+Degrees of freedom are low (no continuous threshold was gradient-fit to maximize a metric; MARGIN_FLOOR
+and distance-tau gates were explicitly REJECTED), so this is not egregious leakage — but "never tuned"
+is false for this set. Item 7 earns the never-tuned headline on a genuinely fresh, account-disjoint
+slice; see the "Roadmap Item 7" section below. Ground-truth note restated for this table: it is scored
+against pattern-typology MEMBERSHIP (ring detection), and inside this extract `is_laundering=1` <=>
+pattern-member by construction, so it is a RING-detection number, not general fraud detection.
+
 ### Overlap with Item E — stated, not left to be discovered
 This validator IS the citation-and-structure half of Item E, built now and meant to be SUBSUMED, not a
 parallel design. What deterministic checks catch: a typology retrieval never returned; a transaction id
