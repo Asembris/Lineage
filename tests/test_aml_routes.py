@@ -13,8 +13,11 @@ surface exposes GET and nothing else, and no route reaches the paid OpenAI path.
 CI-SAFE / NON-DESTRUCTIVE: no OpenAI, read-only, never calls run_seed.
 """
 
+import ast
 import asyncio
+import sys
 import uuid
+from pathlib import Path
 
 import httpx
 
@@ -186,6 +189,57 @@ def test_the_aml_surface_is_read_only_and_never_reaches_the_paid_llm_path():
 
     assert not hasattr(svc, "get_openai")
     assert not hasattr(svc, "embed_text")
+
+
+def test_no_route_anywhere_on_the_app_reaches_the_paid_llm_verdict_path():
+    """The tripwire above only ever looked at routes whose path starts with '/aml'.
+
+    That left the hole exactly where the mistake is most tempting: Item 6 considered feeding a
+    real FLAG verdict into POST /beliefs/{id}/invalidate as 'grounded evidence'. That route is
+    not an /aml route, so nothing in the suite would have caught a paid, non-deterministic
+    OpenAI call being wired onto the one governed write. (The idea was rejected on separate
+    grounds — no relation links a belief to an AML transaction — but the guard should not have
+    depended on that.)
+
+    Asserted statically over the whole `app` package, so it holds for every route on every
+    router, on every branch, without executing any of them: `evaluate_transaction` has exactly
+    ZERO callers inside the application. It stays a callable, invoked deliberately by scripts
+    and tests. See NOTES.md "Roadmap Item 5" / "Roadmap Item 6".
+    """
+    app_root = Path(__file__).resolve().parents[1] / "app"
+    owner = app_root / "services" / "aml_agent.py"  # where it is DEFINED
+    offenders: list[str] = []
+
+    for path in sorted(app_root.rglob("*.py")):
+        if path == owner:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            hit = (
+                (isinstance(node, ast.Name) and node.id == "evaluate_transaction")
+                or (isinstance(node, ast.Attribute) and node.attr == "evaluate_transaction")
+                or (
+                    isinstance(node, ast.ImportFrom)
+                    and (node.module or "").endswith("aml_agent")
+                )
+                or (
+                    isinstance(node, ast.Import)
+                    and any(a.name.endswith("aml_agent") for a in node.names)
+                )
+            )
+            if hit:
+                offenders.append(f"{path.relative_to(app_root.parent)}:{node.lineno}")
+
+    assert not offenders, (
+        "the paid OpenAI verdict path is reachable from application code: "
+        + ", ".join(offenders)
+    )
+
+    # And no route on the app — not just /aml — carries it in its module namespace.
+    for module in {r.endpoint.__module__ for r in app.routes if hasattr(r, "endpoint")}:
+        mod = sys.modules[module]
+        assert not hasattr(mod, "aml_agent"), f"{module} imported aml_agent"
+        assert not hasattr(mod, "evaluate_transaction"), f"{module} imported evaluate_transaction"
 
 
 def test_unknown_transaction_never_reaches_the_llm_even_on_the_error_path():
