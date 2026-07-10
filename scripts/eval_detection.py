@@ -200,6 +200,51 @@ def score_witnesses(ext: Extract) -> dict:
 
 # --- selection ------------------------------------------------------------------------------
 
+def per_instance_detection(ext: Extract) -> dict:
+    """For each selected instance, how many of its labeled edges its OWN-typology witness fires on.
+    A different, more intuitive evaluation unit than per-edge: 'caught N/5 rings'."""
+    g = ext.graph
+    res: dict = {}
+    for b in ext.instances:
+        typ = b["typology"]
+        fn = aml_graph.WITNESS[typ]
+        ids = [ingest.txn_id(ingest.raw_key(tuple(r["n_rows"][0:10]))) for r in b["rows"]]
+        fired = sum(1 for tid in ids if fn(g, g.by_id[tid]).outcome is Outcome.MATCH)
+        res.setdefault(typ, []).append((b["instance_index"], len(ids), fired))
+    return res
+
+
+def report_set(name: str, scores: dict, per_inst: dict, dev_scores: dict | None = None) -> None:
+    print(f"\n=== {name} ===", flush=True)
+    print("per-edge precision / recall (95% Wilson CI), all four typologies:", flush=True)
+    for typ in TARGET:
+        (own, own_t), (cross, cross_t), (benign, benign_t) = scores[typ]
+        precision, recall = precision_recall(own, cross, benign, own_t)
+        _, pl, ph = wilson_ci(own, own + cross + benign)
+        _, rl, rh = wilson_ci(own, own_t)
+        cap = "FLAG-capable" if typ in aml_graph.FLAG_CAPABLE else "not flag-capable"
+        line = (f"  {typ:16s} recall {recall:5.1%} [{rl:.1%},{rh:.1%}] ({own}/{own_t})   "
+                f"precision {precision:5.1%} [{pl:.1%},{ph:.1%}] ({own}/{own + cross + benign})   "
+                f"cross={cross}/{cross_t} benign_FP={benign}/{benign_t}  [{cap}]")
+        print(line, flush=True)
+
+    sound = scores["_sound"]
+    verdict = "REPLICATES" if sound == set(aml_graph.FLAG_CAPABLE) else "DIVERGES"
+    print(f"soundness replication: measured-sound (0 cross-typology false witness) = {sorted(sound)} "
+          f"vs FLAG_CAPABLE {sorted(aml_graph.FLAG_CAPABLE)} -> {verdict}", flush=True)
+
+    print("per-instance detection (own-typology witness fires on how many of each ring's edges):", flush=True)
+    for typ in TARGET:
+        rows = per_inst.get(typ, [])
+        any_hit = sum(1 for _, n, f in rows if f > 0)
+        all_hit = sum(1 for _, n, f in rows if f == n and n > 0)
+        edges_fired = sum(f for _, _, f in rows)
+        edges_total = sum(n for _, _, n in rows)
+        detail = ", ".join(f"i{idx}:{f}/{n}" for idx, n, f in rows)
+        print(f"  {typ:16s} >=1 edge: {any_hit}/{len(rows)} rings   all edges: {all_hit}/{len(rows)}   "
+              f"edges {edges_fired}/{edges_total}   [{detail}]", flush=True)
+
+
 def select_disjoint(blocks, per_typology: int, reserved=frozenset()):
     """Greedy, file-order, mutually account-disjoint selection across TARGET, excluding any block
     that touches a `reserved` account. reserved=frozenset() reproduces Item 1's original 20."""
@@ -250,6 +295,31 @@ def main() -> None:
         raise SystemExit("DEV FIDELITY GATE FAILED — reconstruction does not match the persisted "
                          "extract; do not trust hold-out numbers until this passes.")
     print("[dev] fidelity gate PASSED — in-memory reconstruction is faithful.", flush=True)
+
+    # HOLD-OUT — fresh, account-disjoint from the original 20 and from each other. Never tuned.
+    dev_nodes = set().union(*(b["nodes"] for b in dev_sel))
+    hold_sel, hold_per = select_disjoint(blocks, PER_TYPOLOGY, reserved=dev_nodes)
+    hold_nodes = set()
+    for b in hold_sel:
+        assert not (b["nodes"] & dev_nodes), "hold-out instance overlaps the dev set — not a hold-out"
+        assert not (b["nodes"] & hold_nodes), "hold-out instances overlap each other"
+        hold_nodes |= b["nodes"]
+    print(f"\n[hold-out] selected {len(hold_sel)} fresh instances per_typology={dict(hold_per)} "
+          f"idx={{{', '.join(str(b['instance_index']) for b in hold_sel)}}}", flush=True)
+
+    hold = build_extract("hold-out", hold_sel)
+    hold_scores = score_witnesses(hold)
+
+    report_set("DEVELOPMENT SET (in-sample — design decisions saw this; NOT a hold-out)",
+               dev_scores, per_instance_detection(dev))
+    report_set("HOLD-OUT (fresh, account-disjoint, NEVER tuned — the headline)",
+               hold_scores, per_instance_detection(hold))
+
+    print("\nNOTE: numbers are RING/TYPOLOGY detection against pattern-membership ground truth, on "
+          "Item 1's deliberately adversarial benign set (noise anchored to the same accounts). Not "
+          "general fraud detection, not absolute detector performance. FLAG-capable headline is "
+          "CYCLE + SCATTER-GATHER; GATHER-SCATTER/STACK are reported only to re-test soundness.",
+          flush=True)
 
 
 if __name__ == "__main__":
