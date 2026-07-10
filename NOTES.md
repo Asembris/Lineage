@@ -1802,8 +1802,20 @@ resolves each to a real row), `boundary_account` when inconclusive, `retrieval_m
 Item 5 delivered: a DETERMINISTIC interrogation surface over the AML money-flow graph
 (`app/services/aml_interrogate.py`), competing-witness provenance on every verdict branch, and
 a read-only `GET /aml/transactions/{id}/interrogate`. No migration, no new table, no OpenAI
-call, no change to the five-table moat / `aml_*` / `typology_corpus`. 12 new tests; the 14
-Item-4 brake tests pass unchanged.
+call, no change to the five-table moat / `aml_*` / `typology_corpus`. 21 new tests (12 service in
+`test_aml_interrogate.py` + 9 HTTP in `test_aml_routes.py`); the 14 Item-4 brake tests pass with
+`tests/test_aml_brake.py` byte-unchanged. Verified after the fact, not inferred: `alembic current`
+= 0005 (head), and `information_schema` reports the same 12 tables with unchanged column counts.
+
+**Service tests are NOT route tests — a gap this session initially shipped.** The service test
+proving `interrogate_transaction()` returns `None` / raises `ValueError` says nothing about
+whether the ROUTER turns those into 404 / 400. That translation is router code, and an untested
+translation is how a `ValueError` becomes an opaque 500 on camera. `tests/test_aml_routes.py`
+drives the real app through `httpx.ASGITransport` and asserts the status codes, plus two
+route-level properties no service test can see: every `/aml` route is a GET, and a tripwire
+asserts no route ever invokes `aml_agent.evaluate_transaction()` (the paid OpenAI path) —
+including on the 404 path, so the obvious future mistake ("fall back to the agent on a miss")
+fails loudly.
 
 ### The wrong-graph trap, caught a second time
 The roadmap's Item-5 wording ("real inherited beliefs, ancestor rows... on belief conflict")
