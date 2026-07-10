@@ -241,7 +241,7 @@ def report_set(name: str, scores: dict, per_inst: dict, dev_scores: dict | None 
         any_hit = sum(1 for _, n, f in rows if f > 0)
         all_hit = sum(1 for _, n, f in rows if f == n and n > 0)
         edges_fired = sum(f for _, _, f in rows)
-        edges_total = sum(n for _, _, n in rows)
+        edges_total = sum(n for _, n, _ in rows)
         detail = ", ".join(f"i{idx}:{f}/{n}" for idx, n, f in rows)
         print(f"  {typ:16s} >=1 edge: {any_hit}/{len(rows)} rings   all edges: {all_hit}/{len(rows)}   "
               f"edges {edges_fired}/{edges_total}   [{detail}]", flush=True)
