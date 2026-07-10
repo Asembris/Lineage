@@ -342,23 +342,32 @@ def test_a_correct_citation_cannot_manufacture_a_flag_on_a_structureless_edge():
     asyncio.run(_run())
 
 
-def test_degenerate_ranking_is_not_a_retrieval():
-    """A collapsed top-2 margin is noise. Measured: a nonsense query separates by 0.0014 while
-    real structural queries separate by 0.019-0.114."""
+def test_a_degenerate_retrieval_margin_does_not_block_a_witnessed_flag():
+    """Retrieval distance is provenance, never a gate.
+
+    The agent queries with a NEUTRAL structural summary, and against the live corpus those
+    separate the top-2 documents by as little as 0.0005 — a real STACK subject measured exactly
+    that. If a margin floor gated the verdict, the brake would reject subjects whose structure
+    is fully witnessed, for a reason with no bearing on whether the structure exists. The margin
+    is recorded so a reader can see how weak the ranking was; it decides nothing."""
 
     async def _run():
         g = await load_graph()
         labels = await _oracle_labels()
         subject = _first(g.by_id.values(), lambda e: labels.get(e.id) == "CYCLE")
-        noise = [
+        witness = aml_graph.cycle_witness(g, subject)
+
+        # A ranking so flat it is effectively noise (the real nonsense-query margin: 0.0014).
+        flat = [
             {"typology": "CYCLE", "title": "t", "body": "b", "distance": 0.8822},
             {"typology": "SCATTER-GATHER", "title": "t", "body": "b", "distance": 0.8836},
         ]
         out = evaluate_claim(
-            subject=subject, graph=g, retrieved=noise,
-            claim=Claim("CYCLE", [subject.id], "nearest of four distant things"),
+            subject=subject, graph=g, retrieved=flat,
+            claim=Claim("CYCLE", witness.witness_txn_ids, "funds return to origin"),
         )
-        assert out.verdict is Verdict.INSUFFICIENT_COVERAGE
-        assert out.reason == "degenerate_ranking"
+        # The structure is really there and really cited, so the flag stands.
+        assert out.verdict is Verdict.FLAG
+        assert out.retrieval_margin == pytest.approx(0.0014, abs=1e-6)
 
     asyncio.run(_run())

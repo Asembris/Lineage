@@ -36,16 +36,22 @@ from enum import Enum
 
 from app.services.aml_graph import FLAG_CAPABLE, Check, Edge, Graph, Outcome, check, verify_witness_path
 
-# Top-2 cosine margin below which the ranking is noise rather than a preference. Measured on
-# the live 4-document corpus: real structural queries separate by 0.019-0.114, while a nonsense
-# query ("the quick brown fox...") separates by 0.0014. This gate catches only that pathology.
+# Retrieval distance is REPORTED as provenance and gates NOTHING. Two measurements forced this,
+# and together they are the strongest form of "only structure may authorize a flag":
 #
-# It is NOT a coverage test, and must never be used as one. Measured: a description of a
-# FAN-IN funnel typology the corpus does NOT contain retrieves GATHER-SCATTER at distance
-# 0.391 — closer than EVERY in-corpus query (0.463-0.505). Cosine distance to a 4-document
-# corpus therefore cannot tell you whether the corpus covers the question. Retrieval supplies
-# the definition to cite; only structure may authorize a flag.
-MARGIN_FLOOR = 0.01
+#  1. Distance is not a coverage signal. A description of a FAN-IN funnel typology the corpus
+#     does NOT contain retrieves GATHER-SCATTER at distance 0.391 — closer than EVERY in-corpus
+#     query (0.463-0.505). A "distance < tau => confident" rule would have confidently grounded
+#     a verdict on a typology the corpus cannot cover.
+#  2. The margin is near-degenerate for real subjects. The agent's query is a NEUTRAL structural
+#     summary (degrees, path lengths), not typology-flavoured prose, and against the live corpus
+#     those queries separate the top-2 documents by only 0.0005-0.02. An early version of this
+#     module gated on a 0.01 margin floor and rejected a real STACK subject at margin 0.0005 —
+#     for a reason that has no bearing on whether the structure exists. Gating on it would make
+#     the brake a wall rather than a brake.
+#
+# The genuine protections are: the typology must have been retrieved, it must be structurally
+# decidable, the graph must witness it, and the model's cited path must independently verify.
 
 
 class Verdict(str, Enum):
@@ -74,6 +80,8 @@ class VerdictOutcome:
     boundary_account: uuid.UUID | None = None
     validation_errors: list[str] = field(default_factory=list)
     structural_check: Check | None = None
+    # Provenance only — see the note on retrieval distance above. Never gates the verdict.
+    retrieval_margin: float | None = None
 
     @property
     def flagged(self) -> bool:
@@ -97,6 +105,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
     """Decide FLAG / NO_FLAG / INSUFFICIENT_COVERAGE. Never flags without a witness."""
     typology = claim.typology
     doc = _doc_for(retrieved, typology)
+    margin = retrieved[1]["distance"] - retrieved[0]["distance"] if len(retrieved) >= 2 else None
 
     # Gate 0 — the cited typology must be one retrieval actually returned. Retrieve with k=3
     # against a 4-document corpus, otherwise the "retrieved set" is the whole corpus and this
@@ -107,21 +116,10 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             "typology_not_retrieved",
             typology,
             validation_errors=[f"{typology!r} is not among the retrieved candidates"],
+            retrieval_margin=margin,
         )
 
-    # Gate 1 — a degenerate ranking is not a retrieval.
-    if len(retrieved) >= 2:
-        margin = retrieved[1]["distance"] - retrieved[0]["distance"]
-        if margin < MARGIN_FLOOR:
-            return VerdictOutcome(
-                Verdict.INSUFFICIENT_COVERAGE,
-                "degenerate_ranking",
-                typology,
-                corpus_doc=doc,
-                validation_errors=[f"top-2 cosine margin {margin:.4f} < {MARGIN_FLOOR}"],
-            )
-
-    # Gate 2a — some typologies are not structurally decidable in this extract. GATHER-SCATTER's
+    # Gate 1a — some typologies are not structurally decidable in this extract. GATHER-SCATTER's
     # witness fires on 37/1200 benign rows (Item 1's benign noise is anchored to the labeled
     # accounts, manufacturing hub structure around exactly what a hub-detector examines) and
     # retrieval cannot separate it from SCATTER-GATHER. Every ingested STACK instance is
@@ -134,9 +132,10 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             typology,
             corpus_doc=doc,
             validation_errors=[f"{typology} has no sound structural witness in this evidence layer"],
+            retrieval_margin=margin,
         )
 
-    # Gate 2b — the graph is the authority on whether the structure is there.
+    # Gate 1b — the graph is the authority on whether the structure is there.
     result = check(graph, subject, typology)
 
     if result.outcome is Outcome.INCONCLUSIVE:
@@ -147,6 +146,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             corpus_doc=doc,
             boundary_account=result.boundary_account,
             structural_check=result,
+            retrieval_margin=margin,
         )
 
     if result.outcome is Outcome.CONCLUSIVE_NO:
@@ -155,7 +155,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
         errors = [f"evidence supports {competing}, not {typology}"] if competing else []
         return VerdictOutcome(
             Verdict.NO_FLAG, reason, typology, corpus_doc=doc,
-            validation_errors=errors, structural_check=result,
+            validation_errors=errors, structural_check=result, retrieval_margin=margin,
         )
 
     # A witness exists. Now the model's OWN cited path must independently hold up, or we do
@@ -171,6 +171,7 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
             witness_txn_ids=result.witness_txn_ids,
             validation_errors=[err],
             structural_check=result,
+            retrieval_margin=margin,
         )
 
     return VerdictOutcome(
@@ -180,4 +181,5 @@ def evaluate_claim(*, subject: Edge, graph: Graph, retrieved: list[dict], claim:
         corpus_doc=doc,
         witness_txn_ids=claim.evidence_txn_ids,
         structural_check=result,
+        retrieval_margin=margin,
     )
