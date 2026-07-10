@@ -45,7 +45,10 @@ import hashlib
 import json
 import uuid
 
-SCHEMA_VERSION = "1.0"
+# 1.1 (Item 6) adds pre_invalidation_state.closure_content_hash + the certifier's
+# closure_verification stamp. Additive only: `_digest` hashes whatever keys are present and
+# `verify()` re-derives over the same set, so 1.0 certificates still verify unchanged.
+SCHEMA_VERSION = "1.1"
 
 # NOTE: this module is import-safe with ZERO app/SQLAlchemy dependencies at load time, so the
 # certifier Lambda can `import certificate` and reuse build_certificate/verify/storage_bytes
@@ -118,6 +121,10 @@ def build_certificate(inv: dict, staleness: dict, extra: dict | None = None) -> 
         "affected_agent_count": inv["affected_agent_count"],
         "living_holder_count": len(living),
         "snapshot_hlc": inv["snapshot_hlc"],
+        # A derived pre_state has no reconstructed world behind it, so it cannot content-address
+        # one. Present-and-null, never absent: a consumer distinguishes "no hash" from "field
+        # missing" without knowing which caller built the certificate.
+        "closure_content_hash": None,
         "source": "derived",
     }
     cert = {
