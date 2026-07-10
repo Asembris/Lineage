@@ -24,7 +24,14 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The full suite runs SEQUENTIALLY against the real Frankfurt cluster + S3, and each test
+    # reseeds (TRUNCATE CASCADE + reseed). Across Items 1-7 it grew from ~36 tests (~13 min) to
+    # 89, ~36 of them cluster-bound AML load_graph round-trips plus atomic-invalidation (~132s),
+    # consistency/SSE fan-out, replay and resilience suites. At 30 min it was CANCELLED mid-run
+    # (not failed) at the timeout; CI-runner→Frankfurt latency makes real duration ~30-40 min.
+    # 60 gives genuine headroom, not a squeak-by. If the suite ever nears this, consolidate the
+    # 16 independent per-file reseeds (risky — see NOTES reseed-timing flakes) before raising more.
+    timeout-minutes: 60
     env:
       # Real secrets (add these in GitHub → Settings → Secrets and variables → Actions):
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -32,8 +39,8 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
-      # Required only so app.config imports; NO test makes a real OpenAI call (all 18 are
-      # deterministic). A dummy value is deliberate — do NOT add the real key as a secret.
+      # Required only so app.config imports; NO test makes a real OpenAI call (all 89 are
+      # deterministic / OpenAI-free). A dummy value is deliberate — do NOT add the real key.
       OPENAI_API_KEY: sk-dummy-ci-openai-not-used
     steps:
       - uses: actions/checkout@v4
