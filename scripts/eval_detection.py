@@ -34,6 +34,8 @@ import sys
 from collections import Counter
 from decimal import Decimal
 
+import numpy as np
+
 if sys.platform == "win32":
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -267,6 +269,143 @@ def select_disjoint(blocks, per_typology: int, reserved=frozenset()):
     return sel, per
 
 
+# --- non-structural baseline (fit per set, oracle-advantaged, best-F1 operating point) -------
+# Deliberately the FAIREST possible strawman: it sees the labels of its OWN set and is scored at
+# its best threshold, so it cannot be accused of being rigged to lose. Fit INDEPENDENTLY within
+# each set -- the dev fit is never transferred to score the hold-out (Item 7 confirmation #3).
+
+def _best_f1(scores: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
+    """Best precision/recall/F1 over all thresholds `flag if score >= t`. Deterministic."""
+    P = int(y.sum())
+    if P == 0:
+        return (0.0, 0.0, 0.0)
+    order = np.argsort(-scores, kind="mergesort")
+    ys, ss = y[order], scores[order]
+    tp = fp = 0
+    best = (0.0, 0.0, 0.0)
+    i, n = 0, len(ys)
+    while i < n:
+        j = i
+        while j < n and ss[j] == ss[i]:
+            if ys[j] == 1:
+                tp += 1
+            else:
+                fp += 1
+            j += 1
+        prec = tp / (tp + fp) if (tp + fp) else 0.0
+        rec = tp / P
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+        if f1 > best[2]:
+            best = (prec, rec, f1)
+        i = j
+    return best
+
+
+def _target_encode(values: list[str], y: np.ndarray) -> np.ndarray:
+    """Category -> its positive rate on THIS set (oracle-advantaged encoding of a categorical)."""
+    pos, tot = Counter(), Counter()
+    for v, yi in zip(values, y):
+        tot[v] += 1
+        pos[v] += int(yi)
+    rate = {v: pos[v] / tot[v] for v in tot}
+    return np.array([rate[v] for v in values], dtype=float)
+
+
+def best_single_feature_rule(feats: list[dict], y: np.ndarray) -> tuple[str, tuple]:
+    """The literal 'raw amount/currency/format threshold' baseline: best single-feature rule."""
+    best_name, best = "none", (0.0, 0.0, 0.0)
+    ap = np.array([f["amount_paid"] for f in feats], dtype=float)
+    ar = np.array([f["amount_received"] for f in feats], dtype=float)
+    candidates = {
+        "amount_paid>=t": ap, "amount_paid<=t": -ap,
+        "amount_received>=t": ar, "amount_received<=t": -ar,
+        "payment_format": _target_encode([f["payment_format"] for f in feats], y),
+        "payment_currency": _target_encode([f["payment_currency"] for f in feats], y),
+        "receiving_currency": _target_encode([f["receiving_currency"] for f in feats], y),
+    }
+    for name, score in candidates.items():
+        r = _best_f1(score, y)
+        if r[2] > best[2]:
+            best_name, best = name, r
+    return best_name, best
+
+
+def logistic_regression_baseline(feats: list[dict], y: np.ndarray) -> tuple[float, float, float]:
+    """A non-structural logistic regression over ALL raw fields (given every advantage: fit on
+    this set, best-F1 threshold). Deterministic: zero init, fixed lr/iters, numpy only."""
+    ap = np.log1p(np.array([f["amount_paid"] for f in feats], dtype=float))
+    ar = np.log1p(np.array([f["amount_received"] for f in feats], dtype=float))
+
+    def _std(x):
+        s = x.std()
+        return (x - x.mean()) / s if s > 0 else x * 0.0
+
+    cols = [_std(ap), _std(ar)]
+    for key in ("payment_format", "payment_currency", "receiving_currency"):
+        vals = [f[key] for f in feats]
+        for cat in sorted(set(vals)):
+            cols.append(np.array([1.0 if v == cat else 0.0 for v in vals]))
+    X = np.column_stack([np.ones(len(feats))] + cols)
+    w = np.zeros(X.shape[1])
+    m = len(y)
+    for _ in range(3000):
+        p = 1.0 / (1.0 + np.exp(-X @ w))
+        w -= 0.2 * (X.T @ (p - y) / m + 1e-4 * w)
+    scores = 1.0 / (1.0 + np.exp(-X @ w))
+    return _best_f1(scores, y)
+
+
+def head_to_head(ext: Extract) -> dict:
+    """Binary task: separate FLAG-capable ring members (CYCLE/SG) from the benign noise, using
+    (structure) vs (raw fields only). GATHER-SCATTER/STACK edges are excluded -- they are neither
+    the target positive nor benign."""
+    g = ext.graph
+    y_list, feats = [], []
+    tp = fp = fn = 0
+    for e in g.by_id.values():
+        lab = ext.labels.get(e.id)
+        if lab in ("CYCLE", "SCATTER-GATHER"):
+            yi = 1
+        elif lab is None:
+            yi = 0
+        else:
+            continue  # GS / STACK: out of the flag-capable positive class
+        fired = (aml_graph.cycle_witness(g, e).outcome is Outcome.MATCH
+                 or aml_graph.scatter_gather_witness(g, e).outcome is Outcome.MATCH)
+        if fired and yi == 1:
+            tp += 1
+        elif fired and yi == 0:
+            fp += 1
+        elif not fired and yi == 1:
+            fn += 1
+        y_list.append(yi)
+        feats.append(ext.features[e.id])
+    y = np.array(y_list, dtype=float)
+    det_p = tp / (tp + fp) if (tp + fp) else 0.0
+    det_r = tp / (tp + fn) if (tp + fn) else 0.0
+    det_f1 = 2 * det_p * det_r / (det_p + det_r) if (det_p + det_r) else 0.0
+    return {
+        "n_pos": int(y.sum()), "n_neg": int((1 - y).sum()),
+        "structural": (det_p, det_r, det_f1),
+        "single_rule": best_single_feature_rule(feats, y),
+        "logreg": logistic_regression_baseline(feats, y),
+    }
+
+
+def report_head_to_head(name: str, h2h: dict) -> None:
+    print(f"\n--- {name}: structural vs non-structural baselines "
+          f"(CYCLE/SG members vs benign; pos={h2h['n_pos']} neg={h2h['n_neg']}) ---", flush=True)
+    p, r, f = h2h["structural"]
+    print(f"  structural (CYCLE or SG witness)      precision {p:5.1%}  recall {r:5.1%}  F1 {f:5.1%}",
+          flush=True)
+    rn, (rp, rr, rf) = h2h["single_rule"]
+    print(f"  best single raw-feature rule          precision {rp:5.1%}  recall {rr:5.1%}  F1 {rf:5.1%}"
+          f"   [{rn}]", flush=True)
+    lp, lrc, lf = h2h["logreg"]
+    print(f"  logistic regression (all raw fields)  precision {lp:5.1%}  recall {lrc:5.1%}  F1 {lf:5.1%}",
+          flush=True)
+
+
 def main() -> None:
     print("=== Item 7 detection eval ===", flush=True)
     blocks = ingest.load_blocks_with_header()
@@ -314,6 +453,11 @@ def main() -> None:
                dev_scores, per_instance_detection(dev))
     report_set("HOLD-OUT (fresh, account-disjoint, NEVER tuned — the headline)",
                hold_scores, per_instance_detection(hold))
+
+    # Structural detector vs a non-structural baseline, on the same head-to-head task, each set fit
+    # independently (dev fit never transferred to the hold-out).
+    report_head_to_head("DEVELOPMENT SET", head_to_head(dev))
+    report_head_to_head("HOLD-OUT (never tuned)", head_to_head(hold))
 
     print("\nNOTE: numbers are RING/TYPOLOGY detection against pattern-membership ground truth, on "
           "Item 1's deliberately adversarial benign set (noise anchored to the same accounts). Not "
