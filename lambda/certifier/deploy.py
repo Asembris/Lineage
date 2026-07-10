@@ -39,9 +39,13 @@ def main() -> int:
         Handler=HANDLER,
         Timeout=30,
         MemorySize=256,
-        Architectures=["x86_64"],
         Environment={"Variables": env},
     )
+    # Architectures is a CREATE-only parameter; update_function_configuration rejects it
+    # outright (ParamValidationError). Phase 3 only ever exercised the create path, so this
+    # only surfaced on the first real re-deploy — after update_function_code had already
+    # succeeded, leaving new code with a failed config call.
+    create_only = dict(Architectures=["x86_64"])
 
     try:
         lam.get_function(FunctionName=FUNCTION)
@@ -52,12 +56,12 @@ def main() -> int:
     if exists:
         print(f"[deploy] updating existing {FUNCTION}")
         lam.update_function_code(FunctionName=FUNCTION, ZipFile=zip_bytes, Publish=True)
-        waiter = lam.get_waiter("function_updated")
-        waiter.wait(FunctionName=FUNCTION)
+        lam.get_waiter("function_updated").wait(FunctionName=FUNCTION)
         lam.update_function_configuration(**cfg)
+        lam.get_waiter("function_updated").wait(FunctionName=FUNCTION)
     else:
         print(f"[deploy] creating {FUNCTION} against {ROLE_ARN}")
-        lam.create_function(**cfg, Code={"ZipFile": zip_bytes}, Publish=True)
+        lam.create_function(**cfg, **create_only, Code={"ZipFile": zip_bytes}, Publish=True)
 
     waiter = lam.get_waiter("function_active_v2")
     waiter.wait(FunctionName=FUNCTION)
