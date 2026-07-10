@@ -108,7 +108,24 @@ async def invalidate(belief_id: uuid.UUID, body: InvalidateRequest) -> Invalidat
             detail="database temporarily unavailable (transient); please retry",
         )
 
-    # Post-commit: build + write the certificate. Failure does not undo the invalidation.
+    # Post-commit: content-address the pre-kill world. inv["pre_state"] already carries the
+    # MEASURED counts ("8 of 8 edges open"); this says WHICH world those counts summarize, by
+    # replaying the closure AS OF the snapshot HLC the certificate already advertises. The
+    # certifier Lambda reconstructs the same world from the same instant on independent compute
+    # and compares this hash, so the pre-kill claim gets re-derived rather than trusted.
+    #
+    # Best-effort, and deliberately so: the invalidation is already durable, and a certificate
+    # whose closure_content_hash is null is honest (the counts still stand, hash-covered). The
+    # replay is seconds old so it is inside the GC window by construction; a transient failure
+    # must not turn the one governed write into a 500 after it has committed.
+    try:
+        snap = await replay.closure_snapshot(belief_id, as_of=inv["snapshot_hlc"])
+        if snap is not None:
+            inv["pre_state"]["closure_content_hash"] = snap["content_hash"]
+    except Exception:  # noqa: BLE001 — provenance enrichment, never a reason to fail the write
+        pass
+
+    # Build + write the certificate. Failure does not undo the invalidation.
     staleness = await certificate.gather_staleness_evidence(belief_id)
     cert = certificate.build_certificate(inv, staleness)
     cert_id: uuid.UUID | None = uuid.UUID(cert["certificate_id"])

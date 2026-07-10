@@ -120,6 +120,10 @@ class PreInvalidationState(BaseModel):
     affected_agent_count: int
     living_holder_count: int
     snapshot_hlc: str
+    # sha256 of the pre-kill world (belief row + every closure edge's revocation state) as of
+    # snapshot_hlc — the same digest GET /beliefs/{id}/replay returns. Null when the replay was
+    # unavailable, or on a 'derived' pre_state that has no reconstructed world behind it.
+    closure_content_hash: str | None = None
     source: str  # 'issue-time-read' (endpoint) | 'aost-replay' (Lambda) | 'derived'
 
 

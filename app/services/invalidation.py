@@ -185,6 +185,14 @@ async def invalidate_belief(
             "affected_agent_count": len(affected_agents),
             "living_holder_count": len(living),
             "snapshot_hlc": snapshot_hlc,
+            # Content-address of the pre-kill world (Item 6). Filled in by the CALLER, not
+            # here: it is the hash of the closure AS OF snapshot_hlc, and snapshot_hlc is an
+            # instant strictly BEFORE this transaction's read snapshot. Hashing what this txn
+            # sees would content-address a subtly different world than the one the certifier
+            # Lambda replays at snapshot_hlc, and the whole point is that the two must be the
+            # same world by MVCC, not merely because nothing happened in between. The key is
+            # always present so a consumer never has to guess whether it was omitted.
+            "closure_content_hash": None,
             "source": "issue-time-read",
         },
     }

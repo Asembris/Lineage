@@ -25,7 +25,7 @@ from sqlalchemy import insert, text
 from app.db import engine
 from app.main import app
 from app.models import Decision
-from app.services import certificate, s3_audit
+from app.services import certificate, replay, s3_audit
 from app.services.invalidation import (
     AlreadyInvalidated,
     invalidate_belief,
@@ -197,6 +197,21 @@ def test_certificate_round_trips_from_s3_and_hash_verifies():
             # the response to the same "proven identical, not looks-right" standard as every
             # other proof here: any drift between the two computation paths fails this.
             assert body["pre_invalidation_state"] == pre, (body["pre_invalidation_state"], pre)
+
+            # Item 6: the pre-kill record is CONTENT-ADDRESSED, not merely counted. The
+            # embedded hash must be the hash of the world an independent replay reconstructs
+            # AS OF the certificate's own pinned MVCC version — the same check the certifier
+            # Lambda performs on separate compute. If closure_content_hash were computed over
+            # anything other than the closure at db_snapshot_hlc, this fails.
+            assert pre["closure_content_hash"], pre
+            snap = await replay.closure_snapshot(ORIGIN, as_of=fetched["db_snapshot_hlc"])
+            assert snap["content_hash"] == pre["closure_content_hash"], (
+                snap["content_hash"], pre["closure_content_hash"]
+            )
+            # And that replayed world is genuinely the PRE-kill one, even though the belief is
+            # dead by now — otherwise the hash would be content-addressing the wrong instant.
+            assert snap["belief"]["status"] == "active", snap["belief"]
+            assert all(e["edge_invalidated_at"] is None for e in snap["closure"][1:]), snap
         finally:
             await engine.dispose()
 
