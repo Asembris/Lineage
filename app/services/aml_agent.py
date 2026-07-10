@@ -84,9 +84,24 @@ _SYSTEM_PROMPT = (
     "neighbourhood, and candidate laundering typology definitions retrieved from a reference "
     "corpus. Decide which candidate typology, if any, the structure matches.\n\n"
     "Rules you must follow:\n"
-    "- Copy the typology string EXACTLY from one of the candidate definitions.\n"
+    "- Set `typology` to the bare value of one candidate's `typology:` field, e.g. CYCLE. "
+    "Do not include the title, the definition text, or any brackets.\n"
     "- Cite in evidence_txn_ids the exact transaction ids that together form that structure, "
-    "including the subject transaction. Cite only ids listed in the neighbourhood.\n"
+    "including the subject transaction. Cite only ids listed in the neighbourhood. Cite NOTHING "
+    "else: a transaction that merely touches one of the accounts, without being a step of the "
+    "structure itself, must be left out. A cited path with one extra transaction in it is "
+    "rejected exactly like a fabricated one.\n"
+    "- evidence_txn_ids must contain ONE id per transaction in the structure. If the facts say "
+    "the funds return to the source after N transfers, a CYCLE claim needs exactly N ids. Do "
+    "not summarise the path in the rationale and then cite only a couple of ids.\n"
+    "- If you claim CYCLE: list the transactions in order, starting with the subject. Each "
+    "transaction must begin at the account where the previous one ended, and the last must end "
+    "at the account the subject started from. No account may appear twice as a sender. Work out "
+    "the hop sequence account by account, then write down the id of the transaction for each "
+    "hop.\n"
+    "- If you claim SCATTER-GATHER: cite the transactions from the one source account to each "
+    "intermediary, and the transactions from those same intermediaries into the one common "
+    "destination account.\n"
     "- If the facts do not support any candidate, say so in the rationale and cite no "
     "evidence. Never assert a structure you cannot point at.\n"
     "- Your rationale must refer only to the cited transactions and the stated facts."
@@ -174,29 +189,46 @@ def structure_text(g: Graph, e: Edge) -> str:
     return " ".join(lines)
 
 
-def neighbourhood(g: Graph, e: Edge, hops: int = 2, limit: int = 60) -> list[Edge]:
-    """The bounded set of real edges the model is allowed to cite. Deterministically ordered."""
-    reach = {e.src, e.dst}
+def neighbourhood(g: Graph, e: Edge, hops: int = 6, limit: int = 120) -> list[Edge]:
+    """The bounded set of real edges the model is allowed to cite.
+
+    `hops` must cover the SEARCHABLE region, not just the immediate surroundings: the far side
+    of a 10-edge cycle sits 5 steps from the subject, so a 2-hop neighbourhood physically cannot
+    contain the path we then ask the model to cite. An earlier version did exactly that and the
+    validator dutifully rejected every cycle claim as unfaithful — the model was being asked to
+    cite edges it had never been shown.
+
+    Handing over the searchable region is not handing over the answer: the cycle's edges arrive
+    mixed in with every distractor within the same radius, and the model must find the path.
+    Edges are ordered by distance from the subject, then by id, so truncation at `limit` drops
+    the most distant distractors first rather than silently dropping the path.
+    """
+    depth = {e.src: 0, e.dst: 0}
     frontier = {e.src, e.dst}
-    for _ in range(hops):
+    for d in range(1, hops + 1):
         nxt = set()
         for a in frontier:
             for x in g.out_edges.get(a, []):
                 nxt.add(x.dst)
             for x in g.in_edges.get(a, []):
                 nxt.add(x.src)
-        nxt -= reach
-        reach |= nxt
+        nxt -= depth.keys()
+        for a in nxt:
+            depth[a] = d
         frontier = nxt
+        if not frontier:
+            break
+
     edges = {
         x.id: x
-        for a in reach
+        for a in depth
         for x in (*g.out_edges.get(a, []), *g.in_edges.get(a, []))
-        if x.src in reach and x.dst in reach
+        if x.src in depth and x.dst in depth
     }
-    ordered = sorted(edges.values(), key=lambda x: str(x.id))
-    if e.id not in {x.id for x in ordered[:limit]}:
-        return [e] + [x for x in ordered if x.id != e.id][: limit - 1]
+    ordered = sorted(
+        edges.values(),
+        key=lambda x: (0 if x.id == e.id else max(depth[x.src], depth[x.dst]), str(x.id)),
+    )
     return ordered[:limit]
 
 
@@ -221,7 +253,10 @@ async def claim_for_transaction(txn_id: uuid.UUID, *, as_of: str | None = None) 
         f"  - id={x.id}: {_frag(x.src)} -> {_frag(x.dst)} ({x.amount} {x.payment_format})"
         for x in local
     )
-    defs = "\n\n".join(f"  [{r['typology']}] {r['title']}\n  {r['body']}" for r in retrieved)
+    defs = "\n\n".join(
+        f"  typology: {r['typology']}\n  title: {r['title']}\n  definition: {r['body']}"
+        for r in retrieved
+    )
     user_msg = (
         f"Subject transaction: id={subject.id} ({_frag(subject.src)} -> {_frag(subject.dst)})\n\n"
         f"Structural facts about its neighbourhood:\n{summary}\n\n"
