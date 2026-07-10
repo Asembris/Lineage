@@ -50,6 +50,21 @@ from app.services.verdict_guard import Claim, VerdictOutcome, evaluate_claim
 # hallucinated-citation gate could never fire. Three of four leaves one genuinely excluded.
 RETRIEVAL_K = 3
 
+# DERIVED, not tuned. The model can only cite edges we show it, so the neighbourhood must cover
+# every edge the witness search itself can reach. A cycle of length L has its far side at
+# ceil(L/2) undirected steps from the subject, and the search is bounded by MAX_CYCLE_HOPS, so
+# that radius is exactly what is required. (SCATTER-GATHER's witness lives within 2 steps.)
+# tests/test_aml_brake.py::test_neighbourhood_contains_every_flag_capable_witness holds this to
+# account: it asserts every real witness in the extract is fully citable from the prompt.
+NEIGHBOURHOOD_HOPS = -(-MAX_CYCLE_HOPS // 2)  # ceil(12 / 2) = 6
+
+# A prompt-size cap, and the ONE genuinely unprincipled constant here. Today the largest
+# neighbourhood hits it exactly (120) and no witness is lost, because edges are ordered by
+# distance from the subject so truncation drops the most distant distractors first. In a denser
+# graph it could drop a witness edge and the brake would reject a true cycle as an unfaithful
+# citation. The containment test above is what would catch that; it is not prevented by design.
+NEIGHBOURHOOD_LIMIT = 120
+
 _CLAIM_SCHEMA = {
     "name": "aml_typology_claim",
     "strict": True,
@@ -189,14 +204,17 @@ def structure_text(g: Graph, e: Edge) -> str:
     return " ".join(lines)
 
 
-def neighbourhood(g: Graph, e: Edge, hops: int = 6, limit: int = 120) -> list[Edge]:
+def neighbourhood(
+    g: Graph, e: Edge, hops: int = NEIGHBOURHOOD_HOPS, limit: int = NEIGHBOURHOOD_LIMIT
+) -> list[Edge]:
     """The bounded set of real edges the model is allowed to cite.
 
     `hops` must cover the SEARCHABLE region, not just the immediate surroundings: the far side
     of a 10-edge cycle sits 5 steps from the subject, so a 2-hop neighbourhood physically cannot
     contain the path we then ask the model to cite. An earlier version did exactly that and the
     validator dutifully rejected every cycle claim as unfaithful — the model was being asked to
-    cite edges it had never been shown.
+    cite edges it had never been shown. The radius is now derived from MAX_CYCLE_HOPS rather
+    than tuned to whatever made one demo pass.
 
     Handing over the searchable region is not handing over the answer: the cycle's edges arrive
     mixed in with every distractor within the same radius, and the model must find the path.
