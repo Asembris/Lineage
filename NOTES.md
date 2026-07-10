@@ -1796,3 +1796,161 @@ resolves each to a real row), `boundary_account` when inconclusive, `retrieval_m
 ### guard — this is its citation half only), Item 7 (headline eval), the regulatory corpus (still gated on
 ### the data/raw/ drop), the decisions.aml_transaction_id grounding FK, any change to the five tables,
 ### aml_* schema, or typology_corpus. Do NOT start Item 5 / E / 7 without approval.
+
+## Roadmap Item 5 — click-to-interrogate a transaction, with conflict-surfacing (2026-07-10)
+
+Item 5 delivered: a DETERMINISTIC interrogation surface over the AML money-flow graph
+(`app/services/aml_interrogate.py`), competing-witness provenance on every verdict branch, and
+a read-only `GET /aml/transactions/{id}/interrogate`. No migration, no new table, no OpenAI
+call, no change to the five-table moat / `aml_*` / `typology_corpus`. 12 new tests; the 14
+Item-4 brake tests pass unchanged.
+
+### The wrong-graph trap, caught a second time
+The roadmap's Item-5 wording ("real inherited beliefs, ancestor rows... on belief conflict")
+predates the Items 1-4 pivot onto the AML evidence layer and, taken literally, would have wired
+this against `belief_inheritance` — the same terminology collision Item 4 caught. It does not
+mean that graph. There is no ROADMAP.md in this repo (the wording lives outside it), so intent
+was resolved against three in-repo anchors the Item-4 session left, none written to be
+convenient here: `aml_agent.evaluate_transaction`'s docstring says verbatim "The Item-5 entry
+point"; `describe_transaction` is annotated "(for demos / Item 5)"; `aml_models.hop_index`'s
+comment warns that "narration (e.g. Item 5) must derive order from ts/edges". Plus NOTES Item 4:
+"witness_txn_ids (real aml_transactions ids — click-to-interrogate resolves each to a real row)".
+**"A node" is an AML transaction.**
+
+### PRECISION: a transaction is an EDGE. Accounts are the nodes.
+`aml_graph.Edge` IS the transaction; accounts are the graph's vertices. So interrogation resolves
+BOTH object kinds — the subject and each witness member as transaction rows, and the accounts they
+run between, including the `boundary_account` an INCONCLUSIVE search names (previously a bare uuid
+with no resolver anywhere). The old `describe_transaction()` had ZERO callers and returned only
+id + bank/account (no ts/amount/currency/format); it is superseded.
+
+### FINDING — the witness id list carries NO traversal order. It must be re-derived.
+Three measured facts, each of which would have produced a plausible, silently-wrong UI:
+- `verify_witness_path` is ORDER-INSENSITIVE by construction (it rebuilds the chain from a
+  `{src: edge}` map). Verified: feeding it a cycle citation with its tail reversed still returns
+  `None` (valid).
+- On a FLAG, `VerdictOutcome.witness_txn_ids` is `claim.evidence_txn_ids` — **the MODEL's list**,
+  not the graph's. The graph's canonical ordered path is on a different field entirely,
+  `structural_check.witness_txn_ids`. NOTES Item 4 advertised the former to Item 5.
+- The model's cited cycle and the graph's found cycle can be two DIFFERENT real cycles (the
+  graph's BFS returns the shortest return path; the model may cite a longer valid one). Both
+  verify. Both are real.
+So order is re-derived from the rows (`ring_order`, `scatter_gather_legs`), never read off a list.
+
+### Only CYCLE has a linear order — and it is a CLOSED RING, so `predecessor_of` is total
+Measured over all 1,500 edges: **57/57 CYCLE witnesses are contiguous AND closed**
+(`last.dst == first.src`). Consequence: every hop has exactly one predecessor and the SUBJECT's
+predecessor is the closing hop. There is therefore **no "first hop, no predecessor" case**, and
+`PredecessorStatus` deliberately has no `FIRST_HOP` member;
+`test_cycle_witness_is_a_closed_ring_so_predecessor_is_total` is what keeps that true.
+SCATTER-GATHER's witness is NOT a path: two scatter legs leaving one source + two gather legs
+entering one destination (verified non-contiguous) — two parallel 2-hop routes. `TraversalKind` is
+`RING` / `LEGS` / `BUNDLE` (GATHER-SCATTER, STACK) / `NONE`, and `predecessor_of` returns a
+`PredecessorStatus` enum (`RESOLVED` / `NO_LINEAR_ORDER` / `NOT_IN_WITNESS`) so a caller never
+parses a reason string to tell "not a path" from "not a member".
+
+### Conflict: it HALF-existed. The half that was missing is where the real conflicts live.
+`_competing_match` already ran other typologies' witnesses, and the `contradicted` downgrade was
+already implemented AND tested. But it was reachable from exactly one of four branches
+(`CONCLUSIVE_NO`), considered only `FLAG_CAPABLE` competitors, and short-circuited on first hit.
+Measured over all 1,500 edges (all four witnesses vs every edge):
+
+| typology       | MATCH edges | flag-capable |
+|----------------|-------------|--------------|
+| CYCLE          | 57          | yes          |
+| GATHER-SCATTER | 107         | no           |
+| SCATTER-GATHER | 42          | yes          |
+| STACK          | 35          | no           |
+
+- **CYCLE ∩ SCATTER-GATHER = 0.** The two FLAG-capable typologies NEVER co-witness the same edge.
+  So "the detector is torn between two flags" is UNREACHABLE in this extract and must not be
+  demoed. Stated plainly rather than discovered later.
+- 26 edges carry >=2 competing witnesses (24 with exactly 2, 2 with 3). Pairwise:
+  C∩GS 3, C∩STACK 9, GS∩STACK 14, SG∩STACK 4, C∩SG 0, GS∩SG 0.
+- **10 edges would FLAG on CYCLE while another typology also witnesses.** Reported today; gated
+  by nothing.
+- On **all 42 SG-MATCH edges, CYCLE is INCONCLUSIVE** (never CONCLUSIVE_NO) — a branch
+  `_competing_match` never ran on, so a live competing witness sat on the subject unmentioned.
+  Symmetrically, on the 57 CYCLE-MATCH edges SG is CONCLUSIVE_NO on 40 (today's `contradicted`
+  set) and INCONCLUSIVE on 17.
+- ORACLE, after the fact only: the 40 contradicted edges = 28 real CYCLE-labeled + 12 benign.
+
+`competing_witnesses()` now runs all four typologies, no short-circuit, and rides EVERY
+`VerdictOutcome` as `competing_typologies`.
+
+### SURFACING IS NOT GATING (the rule that keeps this from becoming MARGIN_FLOOR again)
+The widened result feeds exactly ONE decision — the pre-existing `CONCLUSIVE_NO` downgrade, which
+still requires a FLAG_CAPABLE contradictor, so `test_no_flag_downgrade_...` passes byte-unchanged.
+A non-flag-capable witness NEVER withholds a corroborated FLAG. Allowing it would repeat Item 4's
+`MARGIN_FLOOR` mistake exactly: evidence that gates nothing must not start gating.
+
+### The demo exhibit that is real: `3cda6d1d-f765-5001-9342-0478b1a92232`
+**BENIGN** by the oracle (`is_laundering=false`), yet CYCLE **and** GATHER-SCATTER **and** STACK
+all produce real structural witnesses on it, and it would FLAG. This single row is the honest,
+citable face of CYCLE's measured 75.4% precision (14 of the 57 edges it fires on are benign) —
+far better than a demo of a conflict that does not exist. Other locked subjects:
+`045adfd2-...` (clean 10-hop CYCLE, oracle laundering) and `1384b7bc-...` (CYCLE + STACK).
+
+### The CYCLE ∩ SCATTER-GATHER == 0 test is a LIVING INVARIANT, not a fact
+Same framing as Item 4's FLAG_CAPABLE soundness test. It is a property of what Item 1 ingested (20
+account-disjoint instances), not of money-flow graphs. Its failure message says so: a reachable
+flag-capable conflict is a **decision point** — the brake could then FLAG one story while an
+equally sound witness supports another, and someone must decide how the brake and the
+interrogation surface present that (tie-break rule? both?). Do not simply update the assertion.
+
+### Narration DEFERRED to Item E — the overlap flagged before it was built
+Item 4 shipped the citation-and-structure half of Item E and deferred prose entailment ("timing and
+shell-company claims are assertions beyond the evidence"). "The agent narrates the traversal" IS
+that deferred half: an LLM narration is a prose claim, and shipping it now means shipping an
+unfaithfulness surface with no guard for it. Strict-schema + temperature-0 constrain the SHAPE of
+output, not its entailment. What ships instead is the ordered, resolved, real-row traversal — a
+client can render it as text by formatting column values, which asserts nothing beyond what the
+rows literally contain and needs no faithfulness check. The word "narration" is deliberately absent
+from the API so Item E's real narration does not arrive to find the name taken.
+
+### Backend-only — and there was no HTTP surface at all
+`app/routers/` was agents/beliefs/decisions/demo: the whole evidence layer was unreachable over
+HTTP, so a frontend session had nothing to call. FRONTEND.md's endpoint table predates AML entirely
+and its ladder ends at Phase 6 (done), so an AML console is a NEW surface needing its own
+plan-gated session — the same way Items 0-4 were each backend-only. `GET /aml/transactions/{id}`
+and `GET /aml/transactions/{id}/interrogate?as_of=` are read-only; `as_of` pins graph load AND row
+resolution to ONE MVCC snapshot (the replay.py discipline), out-of-window/malformed -> 400.
+**No POST, and deliberately NO route for `evaluate_transaction()`**: it makes a paid OpenAI call,
+and a paid non-deterministic call behind a GET is a separate decision. It stays a callable.
+
+### Still NO new table — and the argument is STRONGER than Item 4's
+Item 4 deferred a `verdicts` table because a verdict is a pure function of (subject, corpus@T,
+graph@T), all AOST-reproducible. That had one soft spot: the MODEL's claim is not reproducible
+across model versions, temperature-0 notwithstanding. `interrogate_transaction()` sidesteps it
+entirely by being **claim-free** — no model call at all — so it is a pure function of the graph,
+free, and replayable offline. Nothing to persist.
+**The precise trigger for a `verdicts` table, named so a later session recognises it: when Item F
+must replay an identical MODEL CLAIM.** That is the one artifact this design cannot re-derive. Not
+today.
+
+### What a frontend session / Item F can call once this ships
+- `GET /aml/transactions/{id}/interrogate` — real subject row, both accounts, all four structural
+  verdicts with `flag_capable`, `competing_typologies` + `has_competing_structure` for a conflict
+  badge, resolved `transactions`/`accounts` maps (no per-id round-trip), and an ordered CYCLE
+  traversal whose shape maps straight onto the existing Trace animation idiom.
+- `aml_interrogate.predecessor_of(witness, txn_id)` — the "trace ancestor" primitive.
+- `aml_interrogate.interrogate_transaction()` — deterministic, zero API cost, offline-replayable
+  click-through; pair it with `aml_agent.evaluate_transaction()` for the ONE LLM verdict in a demo.
+
+### Mechanics / gotchas
+- `_snapshot()` runs graph load AND row resolution inside ONE explicit txn after a single
+  `SET TRANSACTION AS OF SYSTEM TIME`, so an interrogation can never mix a graph from one instant
+  with rows from another. Reuses `time_travel.normalize_as_of` + `_AOST_RANGE_ERRORS`.
+- `_build_witness` falls back to `BUNDLE` if `ring_order` returns None, so a hypothetical future
+  witness constructor emitting an open path is mis-presented as nothing rather than as a path.
+- `tests/test_aml_interrogate.py` is CI-SAFE: no OpenAI (retrieval uses a document's OWN stored
+  embedding, the test_corpus trick), read-only, never calls `run_seed` — it cannot wipe the moat
+  backfill.
+- Response DTOs carry NO label field; `aml_interrogate` selects neither `is_laundering` nor
+  pattern membership. Both remain test-only oracles.
+
+### Explicitly NOT done (still gated): Item 6, Item E (explanation-faithfulness / LLM narration),
+### Item 7 (headline eval), Item F (hero attack demo), the regulatory corpus (still gated on the
+### data/raw/ drop), any frontend wiring, the decisions.aml_transaction_id grounding FK, a
+### `verdicts` table, any change to the five tables / aml_* / typology_corpus.
+### Do NOT start Item 6 / E / 7 / F without approval.
