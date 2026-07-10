@@ -16,7 +16,9 @@ on:
       - 'frontend/**'
 
 # Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
-# both TRUNCATE ... CASCADE the shared cluster and collide (see NOTES Phase 3, Step 7).
+# both reseed the shared cluster and race (now a row-level write-write conflict rather than the
+# old TRUNCATE "indexes being dropped" schema-change collision, NOTES Phase 3 Step 7 — but a
+# race either way), so keep exactly one live.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,14 +26,14 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # The full suite runs SEQUENTIALLY against the real Frankfurt cluster + S3, and each test
-    # reseeds (TRUNCATE CASCADE + reseed). Across Items 1-7 it grew from ~36 tests (~13 min) to
-    # 89, ~36 of them cluster-bound AML load_graph round-trips plus atomic-invalidation (~132s),
-    # consistency/SSE fan-out, replay and resilience suites. At 30 min it was CANCELLED mid-run
-    # (not failed) at the timeout; CI-runner→Frankfurt latency makes real duration ~30-40 min.
-    # 60 gives genuine headroom, not a squeak-by. If the suite ever nears this, consolidate the
-    # 16 independent per-file reseeds (risky — see NOTES reseed-timing flakes) before raising more.
-    timeout-minutes: 60
+    # The full suite runs SEQUENTIALLY against the real Frankfurt cluster + S3. Each reseeding
+    # test resets via ordered DELETEs (seed.seed(), ~1s), NOT TRUNCATE — that swap cut the suite
+    # from ~36 min to 2m39s locally (measured 2026-07-10, 89 passed). The slowest tests are now
+    # the inherently-timed ones (demo/SSE fan-out ~10s, real S3 round-trip ~9s, eventual
+    # per-holder delay ~7s), not reseeds, so there is no bulk reseed cost left to cut. CI adds
+    # runner->Frankfurt latency + the pip-install step on top of the pytest wall time; 15 min is
+    # honest headroom (~2-3x the expected job time), not the old 40-min-over-runtime cushion.
+    timeout-minutes: 15
     env:
       # Real secrets (add these in GitHub → Settings → Secrets and variables → Actions):
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
