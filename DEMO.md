@@ -154,8 +154,8 @@ the roadmap's premise does not survive contact with the data.
 
 - **◐ HISTORICAL-REFERENCED** *(Item 8 full run + Item E live gemma demo, 2026-07-11;
   not re-run this session — needs Ollama + the scoped-TLS workaround Item E flagged)*:
-  the agent's prose rationale is scored for faithfulness. On Item E's real 6-hop CYCLE anchor
-  (`185f748d…`, a different real ring from the hero above), a faithful
+  the agent's prose rationale is scored for faithfulness. On a real CYCLE anchor
+  (`185f748d…` — Item E's own anchor, an unrelated ring not shown in this demo), a faithful
   rationale scored **1.00 (SUPPORTED, prose shown)**; an authored "within a 24-hour window"
   fabrication scored **0.40 (UNSUPPORTED, prose withheld, deterministic reconstruction shown)**; an
   unreachable judge → **UNAVAILABLE, fail-closed**. Source: `scripts/demo_faithfulness_guard.py`.
