@@ -22,11 +22,28 @@ plausible `inherited_at`, a real revocation state) so it passes every existing
 structural and referential check, and its illegitimacy is only visible by walking the
 provenance chain and testing the invariants. This audit is that walk.
 
-Framing note: this maps onto the recognised threat of *agent memory-store poisoning*
-(the belief/inheritance graph is the fleet's inherited long-term memory). Specific
-security-taxonomy identifiers (OWASP GenAI / MITRE ATLAS) are deliberately NOT cited in
-this file pending explicit approval of the exact verified IDs — cite correctly or not
-at all.
+SECURITY-TAXONOMY FRAMING (verified before citing; honesty labels kept inline)
+------------------------------------------------------------------------------
+The belief/inheritance graph is the agent fleet's inherited long-term memory, so an
+out-of-band edge is a *memory-store poisoning* attack, and this audit is a provenance-
+based defense against it.
+
+  * OWASP Top 10 for Agentic Applications 2026 — ASI06: Memory & Context Poisoning
+    (genai.owasp.org, released 2025-12-09). ASI06's own governance guidance prescribes
+    "provenance metadata on every memory write" and "periodic evaluation against ground
+    truth" — which is precisely what A1..A4 verify per edge. (ASI06 supersedes the
+    earlier "Agentic AI Threats & Mitigations" T1: Memory Poisoning, now doc v1.1
+    synchronised with the Top 10; T1 is the legacy detailed cross-reference.)
+  * MITRE ATLAS — AML.T0080 "AI Agent Context Poisoning", sub-technique AML.T0080.000
+    "Memory". SECONDARY-SOURCED, not primary-verified: atlas.mitre.org is a JS SPA that
+    could not be rendered this session, so this ID/title is corroborated across multiple
+    independent secondary sources (incl. a Cloud Security Alliance Labs research note)
+    rather than confirmed on the authoritative page. Same transparency standard as this
+    project's other unverifiable-source disclosures — labeled, not asserted as primary.
+
+Both citations describe the runtime analog of data poisoning (consequences at inference
+time, not training time), which is exactly this system's failure mode: an inherited
+belief, not a trained weight.
 
 THE LEGITIMACY INVARIANTS (every real edge satisfies all four)
 --------------------------------------------------------------
