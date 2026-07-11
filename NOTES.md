@@ -2664,3 +2664,71 @@ against exactly this, the versioned-deps cousin of "test against the cluster CI 
 ### Item E's prose-entailment guard as a runtime brake (this is an offline eval, not a guard); the
 ### regulatory corpus; Item 9/A/B/F/10. Do NOT wire a faithfulness check into the live verdict path
 ### without approval — that is Item E, not Item 8.
+
+## Roadmap Item 10 (pulled forward) — README.md + ARCHITECTURE.md (2026-07-11)
+
+Item 10 ("built-vs-roadmap + sponsor-mapping docs") delivered AHEAD OF SCHEDULE, as a documentation
+session, so it is NOT redone later from scratch. Two files: `README.md` (judge-facing front door) +
+`ARCHITECTURE.md` (deep technical dive with mermaid diagrams). NO code changed; no migration; no DB
+write. The discipline was the same as every prior item: every number, file path, and tool-usage claim
+was independently verified against the live code + live cluster before it was written, not taken from
+memory or from older NOTES prose.
+
+### Verified fresh this session (not trusted from prior entries)
+- **Live cluster (queried, CRDB v25.4.10):** agents 24 / beliefs 1 / belief_inheritance 8 /
+  aml_accounts 648 / aml_transactions 1500 / aml_pattern_instances 20 / aml_pattern_members 300 /
+  typology_corpus 4. **decisions / belief_performance / audit_log are EMPTY** — the 4000-row backfill
+  was deliberately NOT restored after the CI-speed session (per that session's "restore once, after
+  push is approved"). The docs cite the STATIC persistent counts + label decisions/perf as
+  "reproducible via `seed.backfill_decisions`", so they don't depend on transient cluster state.
+  Approver chose to leave the cluster as-is (option a), NOT run the backfill for the docs.
+- **Tests: 89 collected** (`pytest --collect-only`; 86 `def test_` + 3 parametrized). Suite ~2m39s
+  local (post DELETE-reseed fix). Both match the CI-speed session's numbers.
+- **Endpoints: 12 routes** confirmed by reading every `@router` decorator — 1 meta (/health), 2
+  agents, 4 beliefs, 1 decisions, 1 demo, 2 aml. /aml is read-only (no route to evaluate_transaction).
+
+### THE MCP-SERVER / ccloud-CLI HONESTY CALL (the one that could have been overclaimed)
+The judging criteria explicitly evaluates MCP Server + ccloud CLI usage, so this was checked hard and
+stated plainly rather than stretched. **Finding:** `.mcp.json` DOES configure a `cockroachdb-cloud`
+MCP Server (http, cluster-id 54fbef0c-…), and the session exposes MCP tools — BUT `grep` for
+`mcp`/`ccloud` across every `.py` file returns ZERO hits. All the cluster-capability verification NOTES
+attributes to "confirm via MCP" was actually done by DIRECT psycopg probe scripts
+(`scripts/probe_crdb.py` et al.); Phase 1's own note shows the MCP TODO superseded by "CONFIRMED via
+scripts/probe_crdb.py (direct psycopg connection)". ccloud CLI: no reference anywhere. So BOTH the
+README's "Technical Implementation" answer AND the honesty ledger say: **MCP Server configured, not
+exercised for the engineering; ccloud CLI not used.** Do NOT let a later edit upgrade this to a usage
+claim — it would be disprovable in one question, and the whole project's credibility is the opposite.
+
+### What the two docs contain (so a later session knows what Item 10 already covers)
+- **README.md:** typing-SVG header (headline number is REAL — CYCLE hold-out recall + the 90.8% Wilson
+  floor, per approver's explicit instruction that the restraint be VISIBLE on the page next to the
+  100%, not just reasoned about); real badges (CI linked to Asembris/Lineage actions, 89 tests, MIT,
+  stack); ASCII problem-framing (renders without mermaid); 3 core-innovation snippets (witness brake
+  MATCH/CONCLUSIVE_NO/INCONCLUSIVE counts, the cross-machine sha256 agreement with the real
+  1e40b7a7… value, structural precision); a five-dimension Judging-Criteria-Alignment section
+  answering each with cited facts INCLUDING the weak MCP/ccloud corner; sponsor-tech→file table;
+  Item-7 dev+hold-out table keeping SCATTER-GATHER's disclosed weak recall (40.6/50%) next to CYCLE's
+  strong numbers + the baseline-is-competitive ACH-artifact finding; Item-8 two-denominator
+  faithfulness numbers (8/10 labeled; 0.771-vs-0.287 delta on the 8 negatives; 40-tuple means are
+  descriptive-only); production-readiness table; honesty ledger; VERIFIED Getting Started (venv +
+  `alembic upgrade head` + real .env keys + `uvicorn app.main:app` + frontend `npm install`/`npm run
+  dev`, VITE_API_BASE→:8000, CORS 5173); tech-stack table; structure tree; roadmap 0-8; MIT.
+  Explicitly EXCLUDED per instruction: no "What Judges Can Verify In N Minutes" section; a marked
+  `<!-- TODO: demo video link once deployed -->` placeholder, NO fabricated URL / deployment claim.
+- **ARCHITECTURE.md:** 5 mermaid diagrams over real code — three-schema separation (moat/AmlBase/
+  CorpusBase) with the per-boundary WHY from NOTES Items 0/1/3 (demo-db create_all can't reach off-Base
+  tables; zero cross-FKs; corpus shares the AOST timeline = the anti-Pinecone thesis); the atomic
+  invalidation sequence (snapshot-HLC-before-write, set-based closure UPDATE, FOR UPDATE idempotency,
+  post-commit best-effort cert); AOST + deterministic-replay flow (validated-inlined literal,
+  txn-scoped SET, cluster_logical_timestamp==t0, GC-bounded→400, falsifiable byte-identical hash); the
+  certificate/certifier cross-machine hash agreement (shared canonicalizer, tri-state, re-derive-don't-
+  trust); the witness-construction brake (Gate 0/1a/1b, three outcomes because of sink boundaries,
+  distance-gates-nothing, superset-rejection, FLAG_CAPABLE replicates on hold-out).
+
+### Commits (Conventional Commits, each its own commit; held for review before push)
+- `docs(readme): judge-facing front door (fulfills Roadmap Item 10, part 1)`
+- `docs(architecture): deep technical dive with mermaid diagrams`
+- `docs(notes): record Item 10 pulled forward` (this entry)
+Do NOT push without explicit approval. Item 10's remaining scope (if any built-vs-roadmap detail is
+wanted beyond these two docs) is now effectively covered — a later session should treat Item 10 as
+DONE unless the approver asks for more.
