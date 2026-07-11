@@ -3102,3 +3102,112 @@ production gemma judge (needs a scoped-TLS solution for in-server use — see ab
 ### headline eval, Item 9 / F / 10; the regulatory corpus; the decisions.aml_transaction_id seam;
 ### a second belief; any change to the five tables / aml_* / typology_corpus. Do NOT push without
 ### explicit approval — held for review of the result.
+
+## Roadmap Item F — hero demo storyboard + verification (2026-07-11)
+
+Item F delivered: `DEMO.md` — the hero-demo SPINE as a storyboard document (the substance a 90s
+video is built from; the video itself stays a human task, README placeholder). NOT the video, NOT
+new code. No migration, no new table, no frontend surface, no touch to the five tables / aml_* /
+typology_corpus. The deliverable is a document + a build-time verification pass that re-ran every
+LIVE beat FRESH this session (same discipline as re-running eval_detection.py, not trusting older
+NOTES prose).
+
+### THE CENTRAL QUESTION — one causal chain vs two acts — resolved BEFORE drafting (same posture as Items 4/5/6/A/B/E)
+The roadmap's F wording ("one crafted fraud ring caught → interrogated → invalidated → propagated →
+counterfactually reversed") splices two graphs the data keeps apart. Verified from source, not
+assumed:
+- **Detection (Items 4/7) + interrogate (Item 5) live on the AML money-flow graph** (`aml_transactions`,
+  accounts = nodes, transactions = edges).
+- **Invalidate (Item 6) + its atomic propagation + provenance audit (A) + counterfactual (B) live on
+  the belief/agent genealogy** (`beliefs`/`belief_inheritance`/`decisions`).
+- The two meet NOWHERE: `decisions.aml_transaction_id` does not exist; the one belief is a card-auth
+  heuristic (MCC 5411); no decision has ever cited an AML transaction (Item 6 established this).
+RESOLUTION: **TWO ACTS unified by THEME + SUBSTRATE, not one causal chain.** Forcing "a six-hop cycle
+among bank accounts justifies killing an MCC-5411 rule" is exactly the "every field true, juxtaposition
+fabricated" move Item 6 already refused. The honest single-chain bridge IS buildable but is the
+five-step data-model job under Item 6's "THE HONEST PATH TO A REAL (b)" (add the aml_transaction_id
+FK = a moat change + a second laundering belief + agent runs on real aml_transactions + recompute
+belief_performance) — all out of F's stated scope. Flagged as a strong future addition, deliberately
+not forced. Theme = "a claim is only as good as the evidence you can re-derive; correct without
+overclaiming" (Act 1 = witness-required brake + INSUFFICIENT_COVERAGE; Act 2 = measured-not-hardcoded
+staleness + reproducible cert + honest counterfactual). Substrate = one cluster / one MVCC timeline
+(AOST + vector search + atomic cross-key txn). The closing script NAMES "no shared causal thread" so
+the honesty is a feature, not a hidden seam. Transition language holds the same line — no "and because
+of that…" between the graphs (approver's discipline #4).
+
+### Q2 — "the naive baseline misses this ring" is FALSE; verified fresh, reframed
+Re-ran `scripts/eval_detection.py` this session (read-only, deterministic, ~20s, no OpenAI, no reseed);
+Item 7's numbers reproduced byte-for-byte on current data. The roadmap's premise does not survive:
+- **The naive single-feature baseline (`payment_format==ACH`) has 100% recall on BOTH sets — it misses
+  NOTHING.** So no transaction exists that "the naive baseline misses."
+- **The oracle-fit logreg OUT-recalls and OUT-F1s structure on the hold-out** (logreg R 80.6% / F1 78.7%
+  vs structural R 65.3% / F1 77.1%). Structure MISSES MORE rings than the strong baseline (SG gather
+  legs). Leading with "a ring the baseline missed" would cherry-pick against Item 7's own headline
+  finding — the exact overclaim Item 7 spent a session disproving.
+- **Structure's real edge = PRECISION + AUDITABILITY** (hold-out CYCLE R/P 100% 38/38, Wilson floor
+  90.8%, format-agnostic so no ACH-artifact ride). HONEST REFRAME (approver pre-authorized): lead with
+  a real laundering CYCLE hero + the benign-cost exhibit, not a fabricated "miss".
+
+### The two verified Act-1 exhibits (fresh, via the claim-free interrogate path)
+- **HERO — real laundering CYCLE `2f1c1d6c-7f73-56ea-ba8c-076758945e4a`** (instance 62, oracle
+  is_laundering=true): interrogates to `CYCLE MATCH · RING · flag_capable`, a re-derivable 6-hop ordered
+  ring `2f1c1d→df930d→185f74→84f27e→769b09→300c7b`, `has_competing_structure=false`. (Note: `185f74…` is
+  a member of this cycle and is also Item E's faithfulness-guard anchor `185f748d…` — a real cross-ref,
+  NOT asserted as a causal link.)
+- **COST EXHIBIT — benign `3cda6d1d-f765-5001-9342-0478b1a92232`** (oracle is_laundering=false): CYCLE
+  (10-hop) + GATHER-SCATTER + STACK all MATCH, `has_competing_structure=true` — the honest face of
+  CYCLE's 75.4% dev precision. SCATTER-GATHER returns INCONCLUSIVE with a NAMED boundary account
+  (honest-uncertainty at the extract edge).
+
+### Deliverable format (Q3/Q4) — option (a), AML console deferred
+Option (a) storyboard + verification, NOT (b) new UI. Act 2 is ALREADY a complete live console
+(Frontend Phases 1-6 + Item 9 ledger); Act 1's endpoints are "built, no UI yet" (README ledger),
+narrated via terminal / `/docs` / demo scripts. "Low code, high multiplier" is HONEST for (a) but
+NOT for (b): an AML console is Item 5's/Item 9's own "LARGE, multi-session" estimate — deferred
+entirely as a strong future addition, its own plan-gated frontend ladder, NOT folded into F
+(approver approved this deferral explicitly).
+
+### Live-vs-referenced, per beat (approver approved: live Invalidate climax + backfill cost; Lambda cert REFERENCED not re-invoked)
+- **LIVE (deterministic/read-only, verified fresh this session):** interrogate (Act 1 hero + cost),
+  lineage/Trace, performance/Time-travel, counterfactual, provenance-audit. All free, no OpenAI, no
+  reseed.
+- **LIVE ON CAMERA (destructive, once):** the Invalidate climax — POST /beliefs/{id}/invalidate. Contract
+  + preconditions verified fresh (belief active, 8-edge closure, 2 living holders); the destructive fire
+  is the on-camera action (covered by 4 test_atomic_invalidation tests + Item 6's recorded end-to-end).
+  Requires re-backfill between takes — production reset note baked into DEMO.md (approver's discipline #3).
+- **HISTORICAL-REFERENCED (cited, not re-run this session):** Item 6 cross-machine sha256
+  `1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` (real Lambda 2026-07-10; NOT
+  re-invoked per plan); Item 8/E faithfulness scores (Ollama + scoped-TLS); the LLM FLAG
+  (paid/non-deterministic); consistency 1-vs-9 (live-safe in the isolated `demo` db, not re-run).
+
+### Build-time verification log (all fresh 2026-07-11)
+- `eval_detection.py`: naive ACH R 100%; hold-out logreg F1 78.7 > structural 77.1; structural P 94.2 >
+  76.9; CYCLE hold-out R/P 100% (38/38) Wilson floor 90.8%; all positives 100% ACH.
+- Deterministic ids match: belief 898ad0e5 / crimson-0 108cf7 / crimson-7 3fb55c / crimson-5b cd75b3.
+- `seed.backfill_decisions` (~273s): 4000 decisions, 8 windows, conf 0.924→0.528, gen-6 dip intact,
+  frauds_approved 19→118. Restored the console state (was empty since the CI-speed/Item-10 sessions).
+- HTTP (live server on :8000): lineage 9 nodes (fork at depth 5, 2 living holders); performance 8
+  windows 0.924→0.528; counterfactual@2025-05-27 N=1000 M=392 5 holders; provenance-audit CLEAN 8 edges;
+  interrogate hero CYCLE MATCH RING.
+- Frontend: `tsc -b` / `oxlint` / `vite build` all exit 0 (the >500KB three chunk is the accepted
+  Phase-5 bundle).
+- Invalidate contract read fresh from source (routers/beliefs.py + schemas.py): POST {actor_id non-nil}
+  → InvalidateResponse (pre_invalidation_state + cert outcome + content_hash + snapshot_hlc); actor
+  constant `5e5e0000-0000-4000-8000-000000000001` (frontend supervisor.ts).
+
+### Cluster state after this session
+The backfill RESTORED defaultdb (belief active + 4000 decisions + 8 perf windows) for the console. The
+verification pass was READ-ONLY after the backfill (no Invalidate fired, no reseed), so the cluster is
+left demo-ready. A stale uvicorn on :8000 from a prior session is serving current code (my own launch
+failed to bind — no orphan created). aml_* / typology_corpus untouched throughout.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(demo): two-act hero storyboard + build-time verification (Item F)`
+- `docs(notes): record Item F` (this entry)
+
+### Explicitly NOT done (still gated): the recorded VIDEO (human task, README placeholder); the AML
+### console (deferred entirely, a strong future addition — its own plan-gated frontend ladder); the
+### honest single-causal-chain bridge (decisions.aml_transaction_id FK = a moat change + a second
+### laundering belief + agent runs + backfill — Item 6's five-step path, gated); Item C/D; the
+### regulatory corpus; a `verdicts` table; any change to the five tables / aml_* / typology_corpus.
+### Do NOT push without explicit approval — held for review of the result.
