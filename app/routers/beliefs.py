@@ -10,6 +10,7 @@ from app.schemas import (
     BeliefOut,
     BeliefPerformanceResponse,
     BeliefPerformanceWindow,
+    CounterfactualResponse,
     InvalidateRequest,
     InvalidateResponse,
     LineageResponse,
@@ -21,6 +22,7 @@ from app.resilience import TransientRetryExhausted, run_with_retry
 from app.services import (
     catalog,
     certificate,
+    counterfactual,
     invalidation,
     lineage,
     provenance_audit,
@@ -105,6 +107,37 @@ async def audit_belief_provenance(belief_id: uuid.UUID) -> ProvenanceAuditRespon
     if result is None:
         raise HTTPException(status_code=404, detail="belief not found")
     return ProvenanceAuditResponse(**result)
+
+
+@router.get(
+    "/beliefs/{belief_id}/counterfactual-invalidation",
+    response_model=CounterfactualResponse,
+)
+async def counterfactual_invalidation(
+    belief_id: uuid.UUID,
+    at: str = Query(
+        ...,
+        description="The counterfactual instant T as an ISO-8601 date or datetime "
+        "(BUSINESS-TIME, a decided_at instant — NOT the MVCC `as_of` clock). Naive => UTC.",
+    ),
+) -> CounterfactualResponse:
+    """"If this belief had been invalidated at `at`, which downstream verdicts change?"
+
+    Read-only forensic query over the moat's `decisions`. The belief only ever approves, so the
+    answer is the belief-driven approvals after T (`withdrawn_approvals`) and their real-fraud
+    subset (`frauds_auto_approved`) — the data-backed "how much fraud an earlier kill would have
+    stripped the belief's justification from". Deliberately a plain query (T is business-time,
+    not an MVCC timestamp), no AOST/replay, no content-hash. Malformed `at` -> 400; unknown
+    belief -> 404.
+    """
+    try:
+        parsed = counterfactual.parse_at(at)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    result = await counterfactual.what_if_invalidated_at(belief_id, parsed)
+    if result is None:
+        raise HTTPException(status_code=404, detail="belief not found")
+    return CounterfactualResponse(**result)
 
 
 @router.post("/beliefs/{belief_id}/invalidate", response_model=InvalidateResponse)
