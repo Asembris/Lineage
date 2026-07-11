@@ -2637,6 +2637,29 @@ run is ~40-80 nemotron calls — affordable, but not to be re-run repeatedly on 
 NO new DB table (golden set is a flat committed JSON), NO write to aml_*/typology_corpus/the five
 tables, NO modification to Item 1/7 data. `.deepeval/` gitignored (no secret in it).
 
+### Dependency-resolution CI break — same class as the CI-vs-LOCAL cluster collisions (2026-07-11)
+Adding `deepeval==4.0.9` turned CI red on a resolution conflict that NEVER surfaced locally.
+deepeval needs `pydantic>=2.11.7` and `pydantic-settings>=2.10.1`, but requirements.txt still carried
+the scaffold-freeze pins `pydantic==2.10.4` / `pydantic-settings==2.7.0` (set in the first commit
+a24aaed, never a deliberate compatibility fix — confirmed by blame). Root cause is the SAME SHAPE as
+this project's CI-vs-local cluster contention: the environment I tested in diverged from the one CI
+builds. Specifically, `pip install deepeval` onto the EXISTING .venv silently UPGRADED pydantic
+2.10.4->2.13.4 and pydantic-settings 2.7.0->2.14.2 to satisfy deepeval's floor, but left the pins
+untouched — so my whole Item 8 session ran on 2.13.4 while the file said 2.10.4. CI's clean
+`pip install -r requirements.txt` then tried to honor `pydantic==2.10.4` AND deepeval together ->
+`ResolutionImpossible`. Local `pip install <dep>` does not run the same all-constraints resolution a
+clean install does; it hides the conflict.
+FIX: pin the exact versions the venv resolved to and the full suite is verified against —
+`pydantic==2.13.4`, `pydantic-settings==2.14.2` — both inside every declared range (fastapi <3,
+openai <3, deepeval >=2.11.7/>=2.10.1). NOT a blind "latest 2.x" and NOT the bare floor 2.11.7
+(pinning the floor while testing on 2.13.4 would re-create the same test-vs-CI gap). Full suite
+re-run on the new pins: **89 passed, 0 failed, ~2m33s** — including the pydantic-sensitive surfaces
+(certificate sha256 hashing, schemas.py DTO validation, FastAPI request/response models).
+STANDING PRACTICE (worth adopting, not a one-off): after adding a dependency, run a clean
+`pip install -r requirements.txt` (or `--dry-run`) in a THROWAWAY venv before committing — never
+trust that `pip install <newdep>` onto the working venv proved the pins resolve. Cheap insurance
+against exactly this, the versioned-deps cousin of "test against the cluster CI actually uses".
+
 ### NOT done this session (still gated): the full GEval run pending approval of the metric switch;
 ### Item E's prose-entailment guard as a runtime brake (this is an offline eval, not a guard); the
 ### regulatory corpus; Item 9/A/B/F/10. Do NOT wire a faithfulness check into the live verdict path
