@@ -16,8 +16,11 @@ certifi==2026.6.17
 alembic==1.14.0
 
 # Config / validation
-pydantic==2.10.4
-pydantic-settings==2.7.0
+# Floor raised from the scaffold freeze (2.10.4 / 2.7.0) to satisfy deepeval 4.0.9, which requires
+# pydantic>=2.11.7 and pydantic-settings>=2.10.1. These exact versions are what the venv resolved to
+# when deepeval was added and what the full suite is verified against; inside fastapi/openai ranges.
+pydantic==2.13.4
+pydantic-settings==2.14.2
 
 # Deterministic placeholder embedding vectors (real embeddings arrive in Phase 2)
 numpy==2.2.1
