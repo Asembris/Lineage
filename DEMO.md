@@ -124,13 +124,15 @@ the roadmap's premise does not survive contact with the data.
 
   **⬤ LIVE — re-confirmed this session** *(Log #2)*:
   ```bash
-  curl -s "http://localhost:8000/aml/transactions/2f1c1d6c-7f73-56ea-ba8c-076758945e4a/interrogate"
+  curl -s "http://localhost:8000/aml/transactions/045adfd2-a822-566f-9cd2-6a17fc150539/interrogate"
   ```
-  Returns `CYCLE MATCH`, `kind: RING`, `flag_capable: true`, and a **re-derivable 6-hop ordered
-  ring**: `2f1c1d → df930d → 185f74 → 84f27e → 769b09 → 300c7b` (this subject is a real
-  `is_laundering=true` CYCLE member — instance 62). Deterministic, no LLM, free, replayable.
+  Returns `CYCLE MATCH`, `kind: RING`, `flag_capable: true`, and a **re-derivable 10-hop closed
+  ring**: `045adf → 148a71 → d3b7bc → 1579aa → d76933 → 07ffb8 → 609cd1 → 291bb1 → c793d7 → 13f812`
+  (→ back to `045adf`). This subject is a real `is_laundering=true` CYCLE member — instance 6, a
+  clean 10-account single-component cycle (`num_components=1`); `has_competing_structure=false` and
+  all three other typologies return `CONCLUSIVE_NO`. Deterministic, no LLM, free, replayable.
 - **Narration:** *"Here's a real laundering ring. Click any hop and the graph re-derives the whole
-  cycle — six real transactions, closing back on themselves. That path is the witness. No path, no
+  cycle — ten real transactions, closing back on themselves. That path is the witness. No path, no
   flag."*
 
 ### Beat 3 — The honest cost, and honest uncertainty (~7s)
@@ -152,7 +154,8 @@ the roadmap's premise does not survive contact with the data.
 
 - **◐ HISTORICAL-REFERENCED** *(Item 8 full run + Item E live gemma demo, 2026-07-11;
   not re-run this session — needs Ollama + the scoped-TLS workaround Item E flagged)*:
-  the agent's prose rationale is scored for faithfulness. On the same 6-hop cycle anchor, a faithful
+  the agent's prose rationale is scored for faithfulness. On Item E's real 6-hop CYCLE anchor
+  (`185f748d…`, a different real ring from the hero above), a faithful
   rationale scored **1.00 (SUPPORTED, prose shown)**; an authored "within a 24-hour window"
   fabrication scored **0.40 (UNSUPPORTED, prose withheld, deterministic reconstruction shown)**; an
   unreachable judge → **UNAVAILABLE, fail-closed**. Source: `scripts/demo_faithfulness_guard.py`.
@@ -307,7 +310,7 @@ Every ⬤ LIVE beat above was run this session; the captured results:
 |---|---|---|---|
 | 1 | Detection numbers | `scripts/eval_detection.py` | Reproduced byte-for-byte: naive ACH rule **R 100%** (misses nothing); hold-out logreg **F1 78.7 > structural 77.1**, structural **P 94.2 > 76.9**; CYCLE hold-out **R/P 100% (38/38), Wilson floor 90.8%**; all positives 100% ACH, benign spans 6 formats |
 | — | Deterministic ids | `uuid5` probe | belief `898ad0e5…`, crimson-0 `108cf7…`, crimson-7 `3fb55c…`, crimson-5b `cd75b3…` — all match |
-| 2 | Interrogate hero | `GET /aml/transactions/2f1c1d6c…/interrogate` | `CYCLE MATCH · RING · flag_capable · 6 hops`: `2f1c1d→df930d→185f74→84f27e→769b09→300c7b`; `has_competing_structure=false`; oracle `is_laundering=true` |
+| 2 | Interrogate hero | `GET /aml/transactions/045adfd2…/interrogate` | `CYCLE MATCH · RING · flag_capable · 10 hops (closed)`: `045adf→148a71→d3b7bc→1579aa→d76933→07ffb8→609cd1→291bb1→c793d7→13f812`; `has_competing_structure=false`; instance 6, `num_components=1`; oracle `is_laundering=true`. (The 6-hop `2f1c1d6c…` is an equally-real but weaker alternate: fewer hops, and its SCATTER-GATHER returns `INCONCLUSIVE` rather than `CONCLUSIVE_NO`.) |
 | 3 | Benign-cost exhibit | `GET /aml/transactions/3cda6d1d…/interrogate` | oracle `is_laundering=false`; CYCLE(10-hop)+GATHER-SCATTER+STACK all `MATCH`; `has_competing_structure=true`; SCATTER-GATHER `INCONCLUSIVE` w/ named boundary |
 | — | Backfill (prep) | `python -m seed.backfill_decisions` | 4,000 decisions, 8 windows, conf **0.924→0.528**, gen-6 dip (0.556→0.624→0.528) intact, frauds_approved 19→118 |
 | 4 | Investigate data | `GET /beliefs` (active) | 1 active belief `898ad0e5…` |

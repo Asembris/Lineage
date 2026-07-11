@@ -3149,15 +3149,29 @@ Item 7's numbers reproduced byte-for-byte on current data. The roadmap's premise
   a real laundering CYCLE hero + the benign-cost exhibit, not a fabricated "miss".
 
 ### The two verified Act-1 exhibits (fresh, via the claim-free interrogate path)
-- **HERO — real laundering CYCLE `2f1c1d6c-7f73-56ea-ba8c-076758945e4a`** (instance 62, oracle
-  is_laundering=true): interrogates to `CYCLE MATCH · RING · flag_capable`, a re-derivable 6-hop ordered
-  ring `2f1c1d→df930d→185f74→84f27e→769b09→300c7b`, `has_competing_structure=false`. (Note: `185f74…` is
-  a member of this cycle and is also Item E's faithfulness-guard anchor `185f748d…` — a real cross-ref,
-  NOT asserted as a causal link.)
+- **HERO — real laundering CYCLE `045adfd2-a822-566f-9cd2-6a17fc150539`** (instance 6, oracle
+  is_laundering=true, `num_rows=10 num_accounts=10 num_components=1` — a clean, non-degenerate,
+  single-component ring): interrogates to `CYCLE MATCH · RING · flag_capable`, a re-derivable 10-hop
+  CLOSED ring `045adf→148a71→d3b7bc→1579aa→d76933→07ffb8→609cd1→291bb1→c793d7→13f812` (→ back to
+  045adf), `has_competing_structure=false`, all three other typologies `CONCLUSIVE_NO`. This is the
+  exhibit the investigation locked (also-locked alternates: `1384b7bc…` CYCLE 10-hop, `3cda6d1d…` cost).
 - **COST EXHIBIT — benign `3cda6d1d-f765-5001-9342-0478b1a92232`** (oracle is_laundering=false): CYCLE
   (10-hop) + GATHER-SCATTER + STACK all MATCH, `has_competing_structure=true` — the honest face of
   CYCLE's 75.4% dev precision. SCATTER-GATHER returns INCONCLUSIVE with a NAMED boundary account
   (honest-uncertainty at the extract edge).
+
+### HERO-EXHIBIT RECONCILIATION (recorded so the swap is not a silent discrepancy)
+The first draft of DEMO.md used `2f1c1d6c-7f73-56ea-ba8c-076758945e4a` (instance 62) as the hero, NOT
+the `045adfd2…` the investigation locked. This was an UNFLAGGED PROBE-SELECTION DRIFT, not a reasoned
+substitution: `scratchpad/verify_act1.py` picked "the smallest CYCLE instance" (further distorted by a
+`LIMIT 40` that truncated instance 62's rows), which surfaced the shorter 6-hop cycle, and it went into
+the storyboard without being reconciled against the locked exhibit. Caught on review. Both are REAL
+oracle-confirmed laundering CYCLEs with clean re-derivable RING witnesses (`2f1c1d6c` = 6-hop /
+6-account / 1-component, verified fresh), so `2f1c1d6c` met the bar too — but `045adfd2` is STRONGER
+(10 hops vs 6; and all three non-CYCLE typologies return `CONCLUSIVE_NO`, whereas `2f1c1d6c`'s
+SCATTER-GATHER returns `INCONCLUSIVE` with a boundary). Reverted to the locked `045adfd2`; `2f1c1d6c`
+retained in DEMO.md's log as a valid weaker alternate. Lesson banked: a locked exhibit id must be
+carried through verification EXPLICITLY, not re-derived by a convenience heuristic that can drift.
 
 ### Deliverable format (Q3/Q4) — option (a), AML console deferred
 Option (a) storyboard + verification, NOT (b) new UI. Act 2 is ALREADY a complete live console
