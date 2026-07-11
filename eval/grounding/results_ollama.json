@@ -1,0 +1,682 @@
+[
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is fully faithful to the retrieval context. It correctly identifies the 'CYCLE' typology based on the structural facts stating funds return to the source after 10 transfers. The account ID 496d39 is explicitly identified as the source of transaction 045adfd2-a822-566f-9cd2-6a17fc150539, and the claim regarding not revisiting accounts aligns with the provided typology definition."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts, with numerous factual alignments and no contradictions."
+    }
+  },
+  {
+    "subject_id": "07ffb837-8e96-582b-bdbc-f39238bbef2c",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains several hallucinations not supported by the retrieval context. Specifically, it claims funds return to ec3968 from 639182, which is not in the edge list; it claims a cycle returns to the original source account dda0ba, whereas the context only states that funds 'can reach' the source after 10 transfers, not that they do so via the specific path described. Additionally, the path described is incomplete and does not match the edge list provided."
+    },
+    "faithfulness": {
+      "score": 0.8,
+      "reason": "The score is 0.80 because the actual output incorrectly states that funds were transferred from 639182 back to ec3968 or dda0ba, whereas the context only shows 639182 sending funds to 79564c and 72fc35."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided transaction details and typology definitions, with no contradictions identified."
+    }
+  },
+  {
+    "subject_id": "1384b7bc-5a0b-5cc3-9fcb-773d254c7498",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.7,
+      "reason": "The output correctly identifies the typology as a CYCLE and traces a sequence of accounts. However, the trace is partially unsupported: the transition from '045f3a, which returns to ba8447, and then back to aca4ca' is not supported by the retrieval context. While the context shows 045f3a sending to ba8447, there is no transaction edge showing ba8447 sending funds back to aca4ca; instead, ba8447 sends funds to 6fdbee and 2aeee6."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the output incorrectly claims a cycle returns to aca4ca and that e0795b transfers to e56936, whereas the context shows the sequence ends with ba8447 and that 8a204c sent funds to both addresses separately."
+    },
+    "hallucination": {
+      "score": 0.06060606060606061,
+      "reason": "The score is 0.06 because the actual output aligns with the majority of transaction flows and the typology definition, with only two minor contradictions regarding the specific sender in one transfer and the complete closure of the cycle."
+    }
+  },
+  {
+    "subject_id": "13f81205-d310-5f8f-90e4-f54b2e23dae8",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.7,
+      "reason": "The output correctly identifies the 'CYCLE' typology based on the structural fact that funds return to the source after 10 transfers. However, it hallucinates a specific path involving accounts 496d39 and c3a6ca as the exclusive cycle participants; while these accounts are in the context, the context does not provide the full 10-step path to verify that the funds return specifically via those accounts or that no accounts are repeated in a way that violates the typology definition."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided context and contains no contradictions."
+    }
+  },
+  {
+    "subject_id": "148a71ad-3367-50d9-8d09-16c2a275f5a6",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output contains hallucinated account IDs (35c55f) and an incorrect transaction path. While the context supports a cycle returning to the source after 10 transfers, the actual sequence of accounts provided in the output is not supported by the retrieval context's edge list."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the output incorrectly claims there is a sequence of 10 transfers forming a cycle returning funds to account c3a6ca, whereas the context only shows transfers from c3a6ca to 52c6f9 and 52c6f9 to 35c55f with no returning funds."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts, containing no contradictions and accurately identifying the transaction typology as a cycle."
+    }
+  },
+  {
+    "subject_id": "1579aa59-7c74-5709-b0ab-397476351067",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the CYCLE typology and uses the provided structural facts regarding the return to the original source after 10 transfers. It also correctly identifies specific accounts and transaction IDs from the edge list (e.g., 148859 to fa9fa7 via 1579aa59-7c74-5709-b0ab-397476351067). Every claim is explicitly supported by the retrieval context."
+    },
+    "faithfulness": {
+      "score": 0.8333333333333334,
+      "reason": "The score is 0.83 because the actual output incorrectly states that account dda0ba sent funds to account ec3968, whereas the retrieval context specifies that funds were sent to account 605576."
+    },
+    "hallucination": {
+      "score": 0.02564102564102564,
+      "reason": "The score is 0.03 because the output is almost entirely aligned with the facts, correctly identifying the typology and several transactions, with only one minor contradiction regarding the sender of transaction 781d8b2b-dbdb-5292-b99d-8a2ddf58edbe."
+    }
+  },
+  {
+    "subject_id": "17035dce-7281-576e-bfd1-64dc6529ed1a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output correctly identifies the typology as a CYCLE based on the structural fact that funds return to the source account. However, it hallucinates a specific sequence of account transfers (e.g., 9835b6 to 8a204c, 8a204c to aca4ca) that are not supported by the retrieval context. The provided edge list does not show these specific links; for example, the context shows 8a204c sending to e56936, not aca4ca sending to 8a204c. The output creates a linear path that is not explicitly present in the evidence."
+    },
+    "faithfulness": {
+      "score": 0.4,
+      "reason": "The score is 0.40 because the actual output incorrectly describes the flow of funds, claiming transactions occurred between 9835b6 to 8a204c and aca4ca to e25373 that are not in the context, falsely stating that funds returned to e56936 from 045f3a, and inaccurately claiming sender accounts did not repeat."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided factual data and there are no contradictions."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is fully faithful to the provided context. It correctly identifies the 'CYCLE' typology based on the structural facts and the provided definition. Every factual claim\u2014including the specific sequence of accounts (41ce7e -> dc9cc4 -> 6e804f -> ca932b -> d30dab -> e25aba -> 41ce7e) and their corresponding transaction IDs\u2014is explicitly supported by the edge list in the retrieval context."
+    },
+    "faithfulness": {
+      "score": 0.6666666666666666,
+      "reason": "The score is 0.67 because the output incorrectly claims that account d30dab sent funds back to account 41ce7e, whereas the context shows d30dab actually sent funds to e25aba, c8f5d1, 5a6edb, 8af705, and c614ee."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts, correctly referencing all mentioned transactions and structural facts without any contradictions."
+    }
+  },
+  {
+    "subject_id": "291bb10c-8e34-5768-b577-55aaeb898535",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains numerous hallucinations not supported by the context. It claims a sequence of transactions and accounts that do not exist in the edge list (e.g., account 968306 receiving funds back from c3a6ca via transaction 9965452e-8090-57be-bc0d-f0e41dee9a7a, which actually shows 72fc35 sending to 496d39). Furthermore, it claims the funds return to the original source account via transaction 148a71ad-3367-50d9-8d09-16c2a275f5a6, but the context shows that transaction sends funds to account 52c6f9, not the source account 968306."
+    },
+    "faithfulness": {
+      "score": 0.16666666666666666,
+      "reason": "The score is 0.17 because the actual output incorrectly identified the direction and participants of multiple transactions (b1e47421, c793d7ae, 4ac06883, 9965452e, and 148a71ad) and falsely claimed a cycle structure that is not supported by the context."
+    },
+    "hallucination": {
+      "score": 0.1282051282051282,
+      "reason": "The score is 0.13 because while the output correctly identifies several transactions and the overall cycle typology, it contains specific contradictions regarding the flow of funds and the account mappings for five transactions."
+    }
+  },
+  {
+    "subject_id": "2de125f7-297c-5c03-ade2-b9baad3a5311",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is faithful to the retrieval context. It correctly identifies the CYCLE typology based on the structural fact that funds can reach the source account again after 10 transfers. It accurately traces the path using account IDs provided in the edge list (b3f864 -> 4dee45 -> 4f77eb/109c01), and the claim that funds return to b3f864 is explicitly supported by the structural facts and the provided transaction chain ending back at the source."
+    },
+    "faithfulness": {
+      "score": 0.75,
+      "reason": "The score is 0.75 because the output incorrectly claims that funds moved from 4f77eb to 109c01 and returned to b3f864 from 109c01, neither of which is supported by the context."
+    },
+    "hallucination": {
+      "score": 0.022727272727272728,
+      "reason": "The score is 0.02 because the actual output is almost entirely aligned with the provided contexts and definitions, with only one minor factual contradiction regarding the specific sender in a transaction sequence."
+    }
+  },
+  {
+    "subject_id": "2f1c1d6c-7f73-56ea-ba8c-076758945e4a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output contains a significant factual error (hallucination). It claims a cycle exists returning to account d30dab via transaction 4956641a, but the retrieval context shows transaction 4956641a is from account 22bb29 to 6e804f, not from 6e804f to d30dab. The actual context does not provide any transaction that returns funds to d30dab to complete the cycle described."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the output incorrectly claims that funds were sent back to account d30dab, whereas the context shows that account 6e804f actually sent funds to account ca932b, meaning no valid cycle was formed."
+    },
+    "hallucination": {
+      "score": 0.04,
+      "reason": "The score is 0.04 because the output is almost entirely accurate, with only one contradiction where a transaction ID was incorrectly attributed to a transfer from 6e804f to d30dab instead of from 22bb29 to 6e804f."
+    }
+  },
+  {
+    "subject_id": "2f3bb27c-ba08-5835-b371-566f6eb2bb42",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output makes several factual claims not supported by the retrieval context. It describes a specific path (1bc80a -> 2ac86d -> 78cb9e -> c3c413 -> 1bc80a) that does not exist in the edge list; specifically, there is no transaction from 78cb9e to c3c413, nor is there any transaction from c3c413 back to 1bc80a. While a cycle is mentioned in the structural facts (reach original source after 10 transfers), the actual output invents a short 4-step path and specific transaction IDs to support it that are contradicted by the provided data."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the actual output hallucinates a transaction ID (2f3bb27c-ba08-5835-b371-566f6eb2bb42) and claims a cyclic flow of funds involving accounts 78cb9e, c3c413, and 1bc80a that is not supported by the retrieval context."
+    },
+    "hallucination": {
+      "score": 0.022727272727272728,
+      "reason": "The score is 0.02 because the actual output correctly identifies a large number of factual transactions and aligns with the provided definitions, with only one minor contradiction regarding the specific number of steps in the identified cycle."
+    }
+  },
+  {
+    "subject_id": "08a8a98e-37f0-5d53-ae3b-fae547f5de79",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output accurately identifies the SCATTER-GATHER typology and correctly names the source account (8e0723) and the destination account (73d8ae) from the retrieval context. It correctly identifies specific intermediary accounts (ca350c, 4d2c8d) that link the source to the destination. All factual claims are supported by the provided edge list and structural facts."
+    },
+    "faithfulness": {
+      "score": 0.75,
+      "reason": "The score is 0.75 because the output incorrectly identifies account 4d2c8d as an intermediary receiving funds from 8e0723, whereas the context states that 4d2c8d actually sends funds to account ca350c."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided context, accurately identifying the scatter-gather pattern with account 8e0723 as the source and 73d8ae as the destination, all of which are supported by the transaction data with no contradictions."
+    }
+  },
+  {
+    "subject_id": "096ee0ac-051d-549e-bb02-a570092ce47f",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output hallucinates a 'SCATTER-GATHER' typology, claiming funds are 'gathered back into these distinct accounts,' which contradicts the definition provided in the context (gathering back into a single destination). Furthermore, it mischaracterizes the flow as scattering from source 511b1d across intermediaries, whereas the context shows the source sends to f52965, and f52965 is the one scattering to a6948f, 17c341, and bce378, which actually matches the provided definition for 'GATHER-SCATTER'."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.07407407407407407,
+      "reason": "The score is 0.07 because the actual output correctly identifies all specific transaction flows and account participants, but it incorrectly labels the identified GATHER-SCATTER pattern as a SCATTER-GATHER pattern."
+    }
+  },
+  {
+    "subject_id": "099ae54b-70a3-556e-aec0-9a2784e32c83",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is fully faithful to the retrieval context. It correctly identifies the source account (8e0723) and destination account (6de8cc) for the subject transaction. It accurately lists several intermediary accounts (ca350c, 86a0e0, etc.) that are shown in the edge list as receiving funds from 8e0723 and subsequently sending funds to account 73d8ae. This matches the SCATTER-GATHER typology definition provided in the context."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": null,
+      "error": "ValidationError: 2 validation errors for Verdicts\nverdicts.45.verdict\n  Field required [type=missing, input_value={'reason': 'The actual ou....', ' laverdict': 'yes'}, input_typ"
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.4,
+      "reason": "The output correctly identifies the source account (0de6aa), destination account (f83b0a), and the typology. However, it contains several hallucinations not supported by the retrieval context: it lists specific transaction IDs (e.g., 3d73daac, 5808e78d) as movements from intermediaries to a 'common destination account (be7a48)', but the context shows be7a48 is a separate account from the primary destination account (f83b0a). This inaccurately describes the fund flow for the specific subject transaction provided."
+    },
+    "faithfulness": {
+      "score": 0.6,
+      "reason": "The score is 0.60 because the actual output lists incorrect account IDs for both the funds sent by the source account (0de6aa) and the accounts sending funds to be7a48."
+    },
+    "hallucination": {
+      "score": null,
+      "error": "ValidationError: 1 validation error for Verdicts\nverdicts.15.verdict\n  Field required [type=missing, input_value={'reason': 'The actual ou...ransfer.', ' la': 'yes'}, input_type"
+    }
+  },
+  {
+    "subject_id": "0e227181-3407-5df5-9216-b38da3e84c1e",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is faithful to the retrieval context. It correctly identifies the transaction ID, source account (8e0723), and destination account (86a0e0). It accurately notes that the source account sends to 15 distinct accounts and identifies the common gather account (73d8ae) by referencing the edge list where multiple intermediaries (e.g., 86a0e0, ca350c, 6de8cc) all send funds to that specific account, justifying the SCATTER-GATHER typology."
+    },
+    "faithfulness": {
+      "score": 0.8,
+      "reason": "The score is 0.80 because the output incorrectly claims that all 15 accounts receiving funds from 8e0723 send funds to 73d8ae, whereas accounts ca350c and e2e5a9 actually send funds to other addresses."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output fully aligns with all provided structural facts, transaction details, and typology definitions, with no contradictions identified."
+    }
+  },
+  {
+    "subject_id": "16ddbae7-800b-51f8-bf1b-7ab848a96e4e",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is highly faithful to the provided retrieval context. It correctly identifies the source account (8e0723) and destination account (21d9c4) for the subject transaction, accurately counts the 15 distinct accounts the source sends to, and correctly identifies the common destination account (73d8ae) that receives funds from those intermediaries. All claims regarding account IDs, flow patterns, and the resulting SCATTER-GATHER typology are explicitly supported by the edge list and typology definitions."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output aligns perfectly with the provided contexts, correctly identifying the SCATTER-GATHER pattern, the source and destination accounts, and specific transaction details without any contradictions."
+    }
+  },
+  {
+    "subject_id": "1b6a80fd-98d9-5a1f-8ba2-d70fc2722339",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains several hallucinated factual claims that are not supported by the retrieval context. It claims that account 44afe0 receives funds from accounts 0bc572e6, 22f0b8a3, 36c2bed5, and 37ebc195; however, the context shows these are actually transaction IDs, not account IDs, and those transactions are transfers from account 0de6aa to other distinct accounts, not to 44afe0. Furthermore, it claims a SCATTER-GATHER typology, but the context states the destination account 44afe0 receives from only 1 distinct account, failing the fan-in requirement (at least two different vertices) for that typology."
+    },
+    "faithfulness": {
+      "score": 0.6,
+      "reason": "The score is 0.60 because the actual output incorrectly claims that account 44afe0 receives funds from multiple accounts (0bc572e6, 22f0b8a3, 36c2bed5, and 37ebc195) when the context only mentions 0de6aa, and it erroneously describes 44afe0 as a gathering point rather than a destination account that forwards funds to others."
+    },
+    "hallucination": {
+      "score": 0.056451612903225805,
+      "reason": "The score is 0.06 because while the actual output correctly identifies many individual transactions and account relationships, it hallucinates a scatter-gather pattern and incorrectly claims several transactions (0bc572e6, 22f0b8a3, 36c2bed5, and 37ebc195) send funds to account 44afe0 when they actually send funds to other accounts."
+    }
+  },
+  {
+    "subject_id": "208e13a9-0d52-5175-8f88-82eb7e028319",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is highly faithful to the retrieval context. It correctly identifies the transaction (208e13a9-0d52-5175-8f88-82eb7e028319) and accounts (d14282 and dae40e). It accurately traces the flow from the source account (d14282) to intermediaries (such as 4cbbbc and d72c4d) and finally to the common destination account (579a2c), all of which are explicitly listed in the edge list. The typology classification of SCATTER-GATHER is correctly supported by the identified fan-out and fan-in patterns."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided context and transaction data, with no contradictions identified."
+    }
+  },
+  {
+    "subject_id": "22f0b8a3-e7cf-50ee-8f3f-b000d879c8df",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains significant hallucinations and factual errors. It claims the subject transaction (22f0b8a3-e7cf-50ee-8f3f-b000d879c8df) sends funds to multiple accounts, but the context explicitly states it is a single transfer from 0de6aa to c0b0da. Furthermore, it lists accounts (f83b0a, 44afe0, 993210, ee0980, add5c6) as being sent to by the subject transaction, which is contradicted by the edge list. Finally, it claims these accounts then send funds to a common destination be7a48; while some do, others (like 993210) do not, meaning the scatter-gather structure is not fully supported for the specific set of accounts cited."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the output incorrectly claims transaction 22f0b8a3-e7cf-50ee-8f3f-b000d879c8df involved multiple accounts instead of just two, and it falsely states that account 993210 sent funds to account be7a48."
+    },
+    "hallucination": {
+      "score": null,
+      "error": "ValidationError: 1 validation error for Verdicts\nverdicts.25.verdict\n  Field required [type=missing, input_value={'reason': 'The actual ou...saction.', ' la': 'yes'}, input_type"
+    }
+  },
+  {
+    "subject_id": "273b690f-cb47-541b-9edf-9d4f3f42dde9",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output is fully faithful to the retrieval context. It correctly identifies the source (8e0723), the immediate destination (b6ec9d), and the final gather account (73d8ae) based on the provided edge list. The claim that 15 intermediaries are used is supported by both the structural facts and the list of transactions originating from 8e0723 and terminating at 73d8ae. The typology classification aligns with the provided definition of SCATTER-GATHER."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts and contains no contradictions."
+    }
+  },
+  {
+    "subject_id": "072dcfb9-4352-5de9-80dc-f405a59ed44c",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output hallucinates the typology as SCATTER-GATHER, but the actual flow described (one source to one destination, which then distributes to others) matches the provided GATHER-SCATTER definition or a simple fan-out, not a scatter-gather. Furthermore, it falsely claims a 'fan-in to a common destination' when the destination account in the context is actually the one scattering funds outward."
+    },
+    "faithfulness": {
+      "score": 0.75,
+      "reason": "The score is 0.75 because the output incorrectly describes a fan-out to intermediaries leading to a common destination, whereas the transactions actually show a fan-in to account 027827 followed by a fan-out to accounts 010dc9 and ffe831."
+    },
+    "hallucination": {
+      "score": 0.09523809523809523,
+      "reason": "The score is 0.10 because while the actual output correctly identifies the flow of funds between accounts, it mislabels the pattern as 'SCATTER-GATHER' when the described flow actually represents a 'GATHER-SCATTER' pattern."
+    }
+  },
+  {
+    "subject_id": "09b1d610-1f4f-5b29-b999-0dd02a663263",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.0,
+      "reason": "The output claims a CYCLE typology, but the retrieval context explicitly states that funds from the destination account do not reach the original source account. Furthermore, the output hallucinates a transaction (b89c2d61... returning funds to 1c023f) that actually flows from account 04f759 to 1c023f, and invents a return path to the source account 16b2d6 which is not present in the edge list."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the actual output falsely claims funds returned to account 16b2d6 despite only outgoing transactions and misidentifies transaction b89c2d61-add4-531d-a416-96f01cce49d4 as a self-transfer for 1c023f instead of 04f759 -> 1c023f."
+    },
+    "hallucination": {
+      "score": 0.010869565217391304,
+      "reason": "The score is 0.01 because the output is highly aligned with the majority of transaction details, with only one specific contradiction regarding the claim of a cycle returning to the original source account."
+    }
+  },
+  {
+    "subject_id": "0aad49a1-c7e2-5a14-a21c-e22ad76d1434",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.0,
+      "reason": "The output is completely hallucinated and contradicts the retrieval context. It claims a CYCLE typology and describes a specific flow of funds returning to account 86afa0, whereas the retrieval context explicitly states that 'funds do not reach the original source account within the search budget'. Furthermore, the specific transaction sequence described (86afa0 -> 3776ff -> 242618 -> 6af4c1 -> 3776ff -> 86afa0) is not supported by the provided edge list; there are no transactions from 6af4c1 or 3776ff back to 86afa0."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the output incorrectly claims that funds return to account 86afa0 and that a cycle completes, whereas the context explicitly states that funds transferred onward do not reach the original source account."
+    },
+    "hallucination": {
+      "score": 0.008064516129032258,
+      "reason": "The score is 0.01 because the actual output is almost entirely aligned with the provided facts, with only one contradiction regarding whether a cycle returned funds to account 86afa0."
+    }
+  },
+  {
+    "subject_id": "0c247eef-6aa4-536c-b8bb-27261347e557",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.0,
+      "reason": "The output is entirely unfaithful to the retrieval context. It claims a 'CYCLE' typology exists, but the structural facts explicitly state that funds 'do not reach the original source account within the search budget.' Furthermore, the output fabricates a sequence of transactions (e.g., 10bf9bfb -> 125b0390) that do not exist in the edge list; for instance, transaction 10bf9bfb actually moves funds from account 1c023f to a37634, not as a link in a linear chain."
+    },
+    "faithfulness": {
+      "score": 0.6666666666666666,
+      "reason": "The score is 0.67 because the actual output incorrectly suggests that funds transferred from the destination account (1c023f) reach the original source account (208d78), contradicting the context which explicitly states they do not do so within the search budget."
+    },
+    "hallucination": {
+      "score": 0.011494252873563218,
+      "reason": "The score is 0.01 because the actual output is overwhelmingly aligned with the provided transaction details and definitions, with only one minor contradiction regarding a CYCLE pattern return to a specific account."
+    }
+  },
+  {
+    "subject_id": "0c8fed02-5a7f-5ab0-b8bf-24f5df2b4d58",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.1,
+      "reason": "The output is almost entirely hallucinatory. It claims a CYCLE typology exists, but the structural facts explicitly state that funds 'do not reach the original source account.' Furthermore, it claims transaction 36ae9c88-00f8-5ee0-9413-4e25d3ec96f6 sends funds back to account 514a9f, whereas the retrieval context shows that transaction actually sends funds from 514a9f to cb956e."
+    },
+    "faithfulness": {
+      "score": 0.4,
+      "reason": "The score is 0.40 because the output incorrectly claims a cycle exists returning to account 514a9f and references a specific transaction ID (36ae9c88-00f8-5ee0-9413-4e25d3ec96f6), whereas the context explicitly states that funds from account bbe7f9 do not reach account 514a9f and provides no transaction IDs."
+    },
+    "hallucination": {
+      "score": 0.0392156862745098,
+      "reason": "The score is 0.04 because while the actual output aligns with the vast majority of transaction data, it contains a specific hallucination regarding transaction 36ae9c88-00f8-5ee0-9413-4e25d3ec96f6 and incorrectly identifies a CYCLE typology despite the facts stating funds did not return to the source."
+    }
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The response fails significantly on faithfulness. It claims a 'SCATTER-GATHER' typology, but the provided context describes a 'GATHER-SCATTER' pattern (multiple sources into one account, which then sends to multiple destinations). Furthermore, it hallucinates a 'scatter-gather' structure where the source account (b08bcb) sends to the destination account (7ff480) via multiple transactions, whereas the typology definition requires the source and destination to connect via a set of intermediate accounts. The output incorrectly identifies the relationship between the accounts based on the provided typology definitions."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.034482758620689655,
+      "reason": "The score is 0.03 because the actual output is almost entirely aligned with the provided context, with the only discrepancy being a conceptual contradiction regarding the definition and application of a scatter-gather laundering pattern."
+    }
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The response contains significant hallucinations. While it correctly identifies the source account (5f99c2) and destination account (a3262f) for the subject transaction, it claims account a3262f is an intermediary that sends funds to 3827ed and 166cba to create a fan-out. However, it then falsely claims these intermediaries (3827ed and 166cba) gather funds back into account 3827ed. The retrieval context shows a3262f sending funds to 3827ed, but there is no transaction from 166cba to 3827ed. Furthermore, it incorrectly identifies account 3827ed as the final 'common destination' for the scatter-gather pattern when the subject transaction's destination was a3262f."
+    },
+    "faithfulness": {
+      "score": 0.8,
+      "reason": "The score is 0.80 because the output incorrectly claims that funds from account 166cba were gathered back into account 3827ed, whereas the context only shows funds moving from account a3262f to those accounts."
+    },
+    "hallucination": {
+      "score": null,
+      "error": "ValidationError: 1 validation error for Verdicts\nverdicts.11.verdict\n  Field required [type=missing, input_value={'reason': 'The actual ou...nstance.', ' la': 'yes'}, input_type"
+    }
+  },
+  {
+    "subject_id": "00d7b6c3-feb0-5eb7-8565-56c6f0bfd4dd",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains significant hallucinations. It claims funds are 'gathered back into a single destination account (e25aba)' from intermediaries (c8f5d1, 5a6edb), but the retrieval context shows no transactions from those intermediaries to e25aba. Furthermore, it claims the destination account (e25aba) receives from these intermediaries, whereas the context explicitly states the destination account 'receives from 1 distinct account(s)' (which is d30dab)."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the output incorrectly claims that accounts c8f5d1 and 5a6edb sent funds to e25aba and falsely describes a SCATTER-GATHER pattern, whereas the context shows d30dab sent funds directly to e25aba without intermediaries."
+    },
+    "hallucination": {
+      "score": null,
+      "error": "ValidationError: 1 validation error for Verdicts\nverdicts.20.verdict\n  Field required [type=missing, input_value={'reason': 'The actual ou....', ' laverdict': 'yes'}, input_type"
+    }
+  },
+  {
+    "subject_id": "01238194-515c-5fe5-bc06-49c92216aea6",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains several factual hallucinations and errors. It describes a 'scatter-gather' pattern where funds are 'gathered back' into a destination account, but the provided context explicitly states that the source account only sends to one distinct account and that the destination account sends funds to 0 distinct accounts. Furthermore, it claims the source account 'scatters' to multiple intermediaries, but the structural facts state the source sends to only 1 distinct account. This directly contradicts the provided data and the definition of a fan-out required for the SCATTER-GATHER typology."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the actual output incorrectly describes a scatter-gather pattern; while the context confirms a gather structure (funds from cbff11, 9e39fc, and ead5a3 to account 38e324), it explicitly states there are no onward transfers from 38e324, meaning no fan-out occurred to complete the typology."
+    },
+    "hallucination": {
+      "score": 0.13333333333333333,
+      "reason": "The score is 0.13 because the output accurately identifies the transaction flows and accounts, but incorrectly labels the pattern as 'scatter-gather' instead of 'gather', contradicting the specific definition provided in the context."
+    }
+  },
+  {
+    "subject_id": "0126e764-53b5-531c-b034-046962599925",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains severe hallucinations. It claims the source account 4cbbbc sends funds to intermediaries 579a2c and d72c4d; however, the retrieval context shows 4cbbbc sends funds to 579a2c and 4cd42b, not d72c4d. Furthermore, it claims d72c4d sends funds to destination account f12c5a, but there is no such transaction in the edge list. The output also incorrectly asserts a SCATTER-GATHER typology, which is contradicted by the structural fact that 'at most 1' of the accounts the source sends to send funds onward to the same further account."
+    },
+    "faithfulness": {
+      "score": 0.3333333333333333,
+      "reason": "The score is 0.33 because the output incorrectly claims that account 4cbbbc sends funds to account d72c4d and that account d72c4d sends funds to f12c5a, whereas the context states 4cbbbc sends to 579a2c and 4cd42b, and only 579a2c sends to f12c5a."
+    },
+    "hallucination": {
+      "score": 0.08108108108108109,
+      "reason": "The score is 0.08 because the output is largely consistent with the transaction data, though it contains minor hallucinations regarding the exact path and typology definition, specifically incorrectly claiming 4cbbbc sends to d72c4d and misapplying the SCATTER-GATHER pattern requirements."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-timing",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output correctly identifies the CYCLE typology and account 41ce7e based on the context. However, it hallucinates significant timing details, claiming the transfers occurred 'within a single 24-hour window' and 'overnight', which are not mentioned in the retrieval context. Per the evaluation steps, adding information not provided in the context is a failure."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly aligned with the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the structural facts and correctly identifies the CYCLE typology without any contradictions."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-corporate-form",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output correctly identifies the typology as CYCLE based on the structural facts (funds return to source after 6 transfers). However, it suffers from severe hallucinations: it claims a 'shell company incorporated in a well-known offshore secrecy jurisdiction' and a 'deliberate layering scheme,' neither of which are mentioned or entailed by the retrieval context."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because all claims in the actual output, including the identification of a 'CYCLE' typology starting at account 41ce7e, are fully supported by the factual alignments and there are no contradictions."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-intent-mens-rea",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains multiple unsupported claims. First, it claims the source account 'deliberately' split funds to 'evade detection' and keep transfers under a '$10,000 CTR reporting threshold', none of which is mentioned in the retrieval context. Second, while it identifies the typology as SCATTER-GATHER, the structural facts explicitly state that 'at most 7' of the intermediaries send funds to the same further account, which contradicts the SCATTER-GATHER definition requiring the source and destination to connect to the 'same set of intermediate accounts' (which would require all 10 to gather into the destination)."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the output incorrectly claimed that transfers from account 0de6aa did not exceed $10,000, whereas the context shows multiple transfers well above that threshold, such as 19361.27 and 18570.25."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the context, correctly identifying the SCATTER-GATHER pattern where account 0de6aa sends funds to 10 distinct accounts which then gather into a single destination (account be7a48), with no contradictions found."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-fabricated-aggregate",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains massive hallucinations. It claims a total of 'over $2.4 million' which is not in the context, describes a 'single burst of activity' (timing information) not present in the context, and asserts a SCATTER-GATHER typology. While account 0de6aa is a source, the context explicitly states that only 'at most 7' of its recipients send funds to the same further account, and the provided edge list shows funds scattering to many accounts that do not gather into one single destination, contradicting the SCATTER-GATHER definition."
+    },
+    "faithfulness": {
+      "score": 0.6666666666666666,
+      "reason": "The score is 0.67 because the actual output incorrectly claims a transaction sum of $2.4 million for account 0de6aa, whereas the retrieval context shows the total is significantly less at approximately $85,000."
+    },
+    "hallucination": {
+      "score": 0.008064516129032258,
+      "reason": "The score is 0.01 because the actual output is overwhelmingly aligned with the provided contexts, correctly identifying the scatter-gather pattern, the originating account (0de6aa), and the destination account (be7a48), with only one minor contradiction regarding the total amount laundered."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-fabricated-hop",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output hallucinates an account ID '9f3a11' which is not present anywhere in the retrieval context. While the typology identification (CYCLE) and the number of transfers (6) are supported by the structural facts and typology definitions, the inclusion of an unsupported account ID violates the requirement to penalize claims that add information the context never provides."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the actual output references account 9f3a11 and a sequence of six transfers returning funds to account 41ce7e, neither of which are mentioned in the retrieval context."
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts, with no contradictions found, accurately describing the cycle and the typology."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-reversed-direction",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output identifies the typology as SCATTER-GATHER, but the descriptive logic provided ('funds are first gathered... and then scattered') actually describes the GATHER-SCATTER typology. Furthermore, it claims funds are gathered from 'ten distinct source accounts' into account 0de6aa, which is contradicted by the retrieval context stating the source account (0de6aa) sends to 10 accounts and receives from only 2."
+    },
+    "faithfulness": {
+      "score": 0.5,
+      "reason": "The score is 0.50 because the actual output incorrectly describes a gather-then-scatter pattern by stating the source account (0de6aa) received funds from ten accounts, whereas the context specifies it received funds from only 2 and sent funds to 10."
+    },
+    "hallucination": {
+      "score": null,
+      "error": "RetryError: RetryError[<Future at 0x2006ba8dd30 state=finished raised TimeoutError>]"
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-external-reference",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.4,
+      "reason": "The output contains significant hallucinations not supported by the retrieval context. Specifically, it references 'FinCEN Advisory FIN-2019-A003' and 'trade-based laundering', neither of which appear in the provided context. While the 'CYCLE' typology and the return-to-origin structure are supported, the addition of external advisory references is a direct violation of the evaluation steps."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.0,
+      "reason": "The score is 0.00 because the actual output is fully aligned with the provided contexts, correctly identifying the 'CYCLE' typology and the six-hop return-to-origin structure without any contradictions."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-fabricated-recurrence",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output contains significant hallucinations not present in the retrieval context. Specifically, it claims the activity 'recurs on a monthly cadence' and is an 'established, routinized laundering pipeline,' neither of which is mentioned or entailed by the provided structural facts or edge list. While it correctly identifies account 0de6aa as a source, the timing and nature of the pipeline are entirely unsupported."
+    },
+    "faithfulness": {
+      "score": 1.0,
+      "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!"
+    },
+    "hallucination": {
+      "score": 0.006993006993006993,
+      "reason": "The score is 0.01 because while there is a contradiction regarding the SCATTER-GATHER pattern and the 'monthly cadence' for account 0de6aa, the vast majority of the provided factual alignments show the output did not incorrectly reference the majority of the specific transactions in the context."
+    }
+  }
+]
