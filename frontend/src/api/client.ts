@@ -13,6 +13,7 @@ import type {
   DecisionListResponse,
   InvalidateResponse,
   LineageResponse,
+  ProvenanceAuditResponse,
   UUID,
 } from "./types";
 
@@ -115,6 +116,15 @@ export function getBeliefPerformance(
   beliefId: UUID,
 ): Promise<BeliefPerformanceResponse> {
   return request<BeliefPerformanceResponse>(`/beliefs/${beliefId}/performance`);
+}
+
+/** GET /beliefs/{id}/provenance-audit — top-line provenance-integrity verdict (Item A).
+ *  A zero-argument data-point call (belief id only): CLEAN / ANOMALOUS / INCONCLUSIVE +
+ *  edge/anomaly counts. Consumed by the honesty ledger as a live fact, NOT a per-edge feature. */
+export function getProvenanceAudit(
+  beliefId: UUID,
+): Promise<ProvenanceAuditResponse> {
+  return request<ProvenanceAuditResponse>(`/beliefs/${beliefId}/provenance-audit`);
 }
 
 /* --- The governed write --------------------------------------------------- */

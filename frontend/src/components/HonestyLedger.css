@@ -1,0 +1,227 @@
+/*
+ * HonestyLedger — a credibility surface, so it reads CLINICAL, not decorative.
+ * Cold by default (--void ground, --surface rows, --line hairlines). The LIVE/STATIC
+ * provenance marker is a cold tag (--bone / --ash) — deliberately NOT the --alive/--alert
+ * vocabulary the decision feed and closure state use, so the ledger never reads as a
+ * second alert system. --alert appears on exactly one value, and only when earned:
+ * a genuinely ANOMALOUS provenance verdict (a real tamper signal). No amber/orange
+ * (that stays Trace's). Motion is a single opacity reveal, disabled under reduced-motion.
+ */
+
+.ledger {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--void);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ledger {
+    animation: ledger-reveal 0.2s ease both;
+  }
+}
+
+@keyframes ledger-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- Intro + legend (fixed above the scrolling record) -------------------- */
+
+.ledger__intro {
+  flex: 0 0 auto;
+  max-width: 78rem;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 1rem;
+}
+
+.ledger__title {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+  color: var(--bone);
+}
+
+.ledger__lead {
+  margin: 0 0 1rem;
+  max-width: 60rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ghost);
+}
+
+.ledger__lead b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.ledger__legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ledger__legend-txt {
+  font-size: 0.72rem;
+  color: var(--ash);
+  margin-right: 0.75rem;
+}
+
+/* --- The scrolling record ------------------------------------------------- */
+
+.ledger__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ledger__scroll:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
+}
+
+.ledger__list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem;
+  max-width: 78rem;
+}
+
+/* Every row shares one column template so head + data rows align.
+   Item (name + live value) | Label | Note | Provenance marker. */
+.ledger-row {
+  display: grid;
+  grid-template-columns:
+    minmax(11rem, 1.3fr)
+    minmax(7rem, 0.7fr)
+    minmax(18rem, 2.5fr)
+    minmax(5.5rem, auto);
+  gap: 0 1.25rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.5rem 0;
+  background: var(--void);
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger-row--head > * {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ash);
+}
+
+/* Item cell — name over the live reading (live rows only). */
+.ledger-row__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.ledger-row__name {
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--bone);
+  line-height: 1.35;
+}
+
+.ledger-row__value {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--bone);
+  line-height: 1.4;
+}
+
+/* The one earned alert on the surface: a genuinely ANOMALOUS provenance verdict. */
+.ledger-row__value--alert {
+  color: var(--alert);
+}
+
+/* Label — a UNIFORM cold tag for every row, no per-label colour coding (colour
+   coding would reintroduce a traffic-light/alert reading this surface must avoid). */
+.ledger-row__label-col {
+  min-width: 0;
+}
+
+.ledger-row__label {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ghost);
+  line-height: 1.4;
+}
+
+.ledger-row__note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--ghost);
+  min-width: 0;
+}
+
+.ledger-row__note code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--bone);
+  word-break: break-word;
+}
+
+.ledger-row__note b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.ledger-row__note em {
+  font-style: italic;
+  color: var(--bone);
+}
+
+.ledger-row__mode-col {
+  justify-self: start;
+}
+
+/* The provenance marker — cold, quiet, never the --alive/--alert vocabulary. */
+.ledger__mode {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+/* LIVE — read from the cluster now: bright cold, a thin outline pill. */
+.ledger__mode--live {
+  color: var(--bone);
+  border: 1px solid var(--ash);
+}
+
+/* STATIC — permanent fact: dim cold, no outline. */
+.ledger__mode--static {
+  color: var(--ash);
+  border: 1px solid transparent;
+}
