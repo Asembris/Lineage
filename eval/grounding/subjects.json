@@ -1,0 +1,322 @@
+[
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "07ffb837-8e96-582b-bdbc-f39238bbef2c",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "1384b7bc-5a0b-5cc3-9fcb-773d254c7498",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "13f81205-d310-5f8f-90e4-f54b2e23dae8",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "148a71ad-3367-50d9-8d09-16c2a275f5a6",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "1579aa59-7c74-5709-b0ab-397476351067",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "17035dce-7281-576e-bfd1-64dc6529ed1a",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "291bb10c-8e34-5768-b577-55aaeb898535",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "2de125f7-297c-5c03-ade2-b9baad3a5311",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "MATCH",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "2f1c1d6c-7f73-56ea-ba8c-076758945e4a",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "2f3bb27c-ba08-5835-b371-566f6eb2bb42",
+    "category": "CYCLE_WITNESS",
+    "witness_profile": {
+      "CYCLE": "MATCH",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "08a8a98e-37f0-5d53-ae3b-fae547f5de79",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "096ee0ac-051d-549e-bb02-a570092ce47f",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "099ae54b-70a3-556e-aec0-9a2784e32c83",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "0e227181-3407-5df5-9216-b38da3e84c1e",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "16ddbae7-800b-51f8-bf1b-7ab848a96e4e",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "1b6a80fd-98d9-5a1f-8ba2-d70fc2722339",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "208e13a9-0d52-5175-8f88-82eb7e028319",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "22f0b8a3-e7cf-50ee-8f3f-b000d879c8df",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "273b690f-cb47-541b-9edf-9d4f3f42dde9",
+    "category": "SG_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "MATCH",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "072dcfb9-4352-5de9-80dc-f405a59ed44c",
+    "category": "GS_OR_STACK_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "MATCH",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "09b1d610-1f4f-5b29-b999-0dd02a663263",
+    "category": "GS_OR_STACK_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "MATCH",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "0aad49a1-c7e2-5a14-a21c-e22ad76d1434",
+    "category": "GS_OR_STACK_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "MATCH",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "0c247eef-6aa4-536c-b8bb-27261347e557",
+    "category": "GS_OR_STACK_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "MATCH",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "0c8fed02-5a7f-5ab0-b8bf-24f5df2b4d58",
+    "category": "GS_OR_STACK_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "MATCH"
+    }
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "category": "NO_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "category": "NO_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  },
+  {
+    "subject_id": "00d7b6c3-feb0-5eb7-8565-56c6f0bfd4dd",
+    "category": "NO_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "INCONCLUSIVE",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "INCONCLUSIVE"
+    }
+  },
+  {
+    "subject_id": "01238194-515c-5fe5-bc06-49c92216aea6",
+    "category": "NO_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "INCONCLUSIVE",
+      "SCATTER-GATHER": "CONCLUSIVE_NO",
+      "STACK": "INCONCLUSIVE"
+    }
+  },
+  {
+    "subject_id": "0126e764-53b5-531c-b034-046962599925",
+    "category": "NO_WITNESS",
+    "witness_profile": {
+      "CYCLE": "INCONCLUSIVE",
+      "GATHER-SCATTER": "CONCLUSIVE_NO",
+      "SCATTER-GATHER": "INCONCLUSIVE",
+      "STACK": "CONCLUSIVE_NO"
+    }
+  }
+]
