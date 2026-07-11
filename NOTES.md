@@ -2732,3 +2732,103 @@ claim — it would be disprovable in one question, and the whole project's credi
 Do NOT push without explicit approval. Item 10's remaining scope (if any built-vs-roadmap detail is
 wanted beyond these two docs) is now effectively covered — a later session should treat Item 10 as
 DONE unless the approver asks for more.
+
+## Roadmap Item A — adversarial / poisoned-lineage detection (2026-07-11)
+
+Item A delivered: a read-only, deterministic provenance-integrity verifier over a belief's
+`belief_inheritance` closure (`app/services/provenance_audit.py`), a thin `GET
+/beliefs/{id}/provenance-audit` route, and an isolated done-test that constructs three real
+poisoned edges and proves the verifier flags each while leaving every legitimate edge alone. No
+migration, no new table, no persisted state, no AML read, no LLM call, no change to the five-table
+moat / `aml_*` / `typology_corpus`.
+
+### The roadmap wording is ML-security vocabulary; resolved against THIS system first (same posture as Items 4/5/6)
+"A node whose provenance traces to a later-invalidated source" and the mandate to make invalidation
+(6) "bite" both name columns that exist ONLY in `agents` / `beliefs` / `belief_inheritance` — the
+belief/agent genealogy, NOT the `aml_*` money-flow graph. "Provenance" is the inheritance edge set
+the lineage CTE and `replay.closure_snapshot()` already walk; "invalidated source" is
+`beliefs.status` / `belief_inheritance.invalidated_at`, which only `invalidate_belief` writes. The
+AML side has no such column, and (Item 6 already established) the one belief has never touched an
+AML transaction and `decisions.aml_transaction_id` does not exist. So this is squarely Item 2/6
+territory — the same collision Item 4 caught and ruled the opposite way for its own brake.
+
+### THE LOAD-BEARING FINDING: no live vuln exists — this is VERIFICATION + tamper detection, stated honestly
+Investigated the real write surface from code, not assumption. **The ONLY two paths that INSERT a
+`belief_inheritance` row are `seed.seed()` and `lifecycle.spawn_child()`** (grep-confirmed; the other
+`s.add(` hits are `Decision` / `BeliefPerformance`). `spawn_child()` is **not exposed by any HTTP
+route** (only caller is `tests/test_lifecycle.py`); `invalidate_belief` only ever UPDATEs edges. Both
+writers maintain the legitimacy invariants below by construction, so **the application cannot produce
+an anomalous edge.** This was NOT dressed up as a live vulnerability — exactly the way Item 6 called
+"not-a-hardcoded-secret-HMAC" a stale concern rather than a gap. The honest scope is verification that
+no anomalous edge exists, PLUS detection of OUT-OF-BAND tampering: a direct-SQL write by an actor with
+cluster credentials, a future write path that doesn't preserve the invariants, a buggy migration, or a
+future multi-belief / multi-writer world. That is the "clean-label" analog made concrete — an edge
+with real FKs and a plausible timestamp that passes every structural/referential check, refutable only
+by walking the provenance chain.
+
+### The four invariants every legitimate edge satisfies (derived from the two writers)
+- **A1 genealogy-consistency:** `from_agent_id == to_agent.parent_id`. Both writers set the child's
+  parent to exactly the edge's from_agent (seed spine + branch; spawn_child `from=parent_id`,
+  `child.parent_id=parent_id`). Violation = phantom ancestor.
+- **A2 spawn-time consistency:** `inherited_at == to_agent.spawned_at`. seed sets
+  `inherited_at = child.spawned_at`; spawn_child sets both to the same `now`. Violation = out-of-band
+  edge inserted "after the fact".
+- **A3 source-was-a-holder:** at `inherited_at`, from_agent is the originator or holds an earlier
+  inbound edge (`inherited_at <= this`). Revocation-agnostic ON PURPOSE so A3/A4 stay orthogonal.
+- **A4 not-post-invalidation:** `inherited_at` precedes any invalidation it depends on (the belief's
+  own `invalidated_at`, or the source edge's revocation). This is the literal "traces to a
+  later-invalidated source". A legitimately-invalidated closure is NOT flagged: every real edge's
+  old spawn-time `inherited_at` precedes the single invalidation commit.
+
+Outcome vocabulary mirrors the AML brake: **CLEAN / ANOMALOUS / INCONCLUSIVE**, the last for an edge
+whose backing data is missing — surfaced, never a silent pass.
+
+### `replay.closure_snapshot()` gave the shape but not everything — small ADDITIVE gap, no new state
+Item 2's closure walk covers A4's timeline (per-edge `invalidated_at` + belief `invalidated_at`) but
+its projection does NOT carry `to_agent.parent_id` / `spawned_at`, which A1/A2 need. So the verifier
+reuses the closure-walk concept and adds exactly those two columns in its own read; the A1..A4
+classifier is new pure code. Achievable as a read-only service over existing tables — the same "no new
+table without a stated reason" discipline every prior item held. AOST is NOT required for the core
+structural check (current-state read); an AOST/certifiable variant is a possible future add, left out.
+
+### The constructed attacks — real, isolated to `demo`, never touching defaultdb (evidentiary bar of Item 4)
+`tests/test_provenance_audit.py` seeds the real 9-node / **8-edge** closure into Item 0's dedicated
+`demo` database (origin has no inbound edge — the "8 vs 9" was a genuine node-vs-edge trap caught in
+test), asserts CLEAN, then injects three edges by DIRECT SQL that bypasses `spawn_child` (the exact
+out-of-band vector) and asserts each flags EXACTLY its invariant with every legitimate edge left OK:
+- **A1 phantom ancestor:** new heir descends from crimson-2 but the edge claims `from=crimson-5`.
+  inherited_at == spawn (A2 ok), crimson-5 was a holder (A3 ok) → ONLY A1.
+- **A2 out-of-band time:** heir genuinely descends from crimson-6 (A1 ok) but `inherited_at=days(120)`
+  ≠ `spawned_at=days(150)` → ONLY A2.
+- **A4 later-invalidated source:** invalidate the whole closure at days(50), then graft a fresh edge
+  (heir of the still-living crimson-7) with `inherited_at=days(10)` — after the kill. A1/A2/A3 hold →
+  ONLY A4; the 8 legitimately-invalidated edges stay CLEAN.
+The test snapshots defaultdb before/after and asserts byte-identity, so constructing poison never
+touches the console's real closure. A separate PURE test covers the INCONCLUSIVE branch (unreachable
+live under FK constraints, so proven at the classifier level). **2 passed, ~11s.** Endpoint
+smoke-verified against the real belief (200 CLEAN, 8 edges) + unknown id (404).
+
+### Security-taxonomy framing — VERIFIED before citing, honesty labels kept (the MCP/ccloud standard)
+- **OWASP Top 10 for Agentic Applications 2026 — ASI06: Memory & Context Poisoning** (genai.owasp.org,
+  released 2025-12-09). PRIMARY citation. ASI06 supersedes the legacy "Agentic AI Threats &
+  Mitigations" **T1: Memory Poisoning** (that doc now v1.1, synchronised); T1 kept only as the legacy
+  detailed cross-reference. ASI06's own governance guidance — "provenance metadata on every memory
+  write", "periodic evaluation against ground truth" — is exactly what A1..A4 verify per edge.
+- **MITRE ATLAS — AML.T0080 "AI Agent Context Poisoning" / sub-technique AML.T0080.000 "Memory".**
+  Labeled **SECONDARY-SOURCED**, not primary-verified: `atlas.mitre.org` is a JS SPA that could not be
+  rendered this session, so the ID/title is corroborated across multiple independent secondary sources
+  (incl. a Cloud Security Alliance Labs research note) rather than confirmed on the authoritative page.
+  Same transparency standard as this project's MCP/ccloud disclosure — do NOT let a later edit upgrade
+  it to "primary-verified" without actually rendering the ATLAS page.
+
+### Commits (Conventional Commits, each its own; held for review before push)
+- `feat(provenance): A1-A4 inheritance-provenance audit service (Item A)`
+- `test(provenance): isolated A1/A2/A4 constructed-attack done-tests (Item A)`
+- `docs(provenance): cite verified OWASP ASI06 + MITRE ATLAS AML.T0080 (Item A)`
+- `feat(api): GET /beliefs/{id}/provenance-audit read-only verifier (Item A)`
+- `docs(notes): record Item A` (this entry)
+
+### Explicitly NOT done (deferred): FRONTEND wiring for the audit surface (its own plan-gated session,
+### same as Item 5 deferred its UI); an AOST/certifiable audit variant; any change to the five tables /
+### aml_* / typology_corpus; the decisions.aml_transaction_id seam; a second belief. Do NOT push without
+### explicit approval — held for review of the result.
