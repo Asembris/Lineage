@@ -85,6 +85,46 @@ class ReplaySnapshotResponse(BaseModel):
     content_hash: str  # 'sha256:...' over the canonical reconstructed world
 
 
+# --- Roadmap Item A: inheritance-provenance audit -----------------------------
+
+
+class ProvenanceEdgeReport(BaseModel):
+    """One belief_inheritance edge's provenance verdict.
+
+    `verdict` is 'ok' | 'anomalous' | 'inconclusive'. `violated` lists the invariant codes
+    an anomalous edge broke (A1 genealogy-consistency, A2 spawn-time, A3 source-was-a-holder,
+    A4 not-post-invalidation). `evidence` carries the per-invariant specifics (expected vs
+    actual values) for a forensic reader.
+    """
+
+    edge_id: uuid.UUID
+    from_agent_id: uuid.UUID
+    to_agent_id: uuid.UUID
+    verdict: str
+    violated: list[str]
+    evidence: dict
+
+
+class ProvenanceAuditResponse(BaseModel):
+    """A read-only provenance-integrity verdict over a belief's inheritance closure.
+
+    `status` is CLEAN (every edge legitimate) | ANOMALOUS (>=1 edge violates an invariant) |
+    INCONCLUSIVE (an edge's backing data is missing — surfaced, never a silent pass). This is
+    verification + out-of-band tamper detection: the legitimate write paths preserve A1..A4 by
+    construction, so an anomaly means an edge was inserted by something other than the spawn
+    lifecycle. See app/services/provenance_audit.py for the invariants and taxonomy framing.
+    """
+
+    belief_id: uuid.UUID
+    belief_status: str
+    origin_agent_id: uuid.UUID
+    status: str
+    edge_count: int
+    anomaly_count: int
+    edges: list[ProvenanceEdgeReport]
+    anomalies: list[ProvenanceEdgeReport]
+
+
 # --- Phase 3: atomic invalidation ---------------------------------------------
 
 

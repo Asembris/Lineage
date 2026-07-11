@@ -14,10 +14,19 @@ from app.schemas import (
     InvalidateResponse,
     LineageResponse,
     PreInvalidationState,
+    ProvenanceAuditResponse,
     ReplaySnapshotResponse,
 )
 from app.resilience import TransientRetryExhausted, run_with_retry
-from app.services import catalog, certificate, invalidation, lineage, replay, s3_audit
+from app.services import (
+    catalog,
+    certificate,
+    invalidation,
+    lineage,
+    provenance_audit,
+    replay,
+    s3_audit,
+)
 
 router = APIRouter(tags=["beliefs"])
 
@@ -79,6 +88,23 @@ async def replay_belief_closure(
     if result is None:
         raise HTTPException(status_code=404, detail="belief not found")
     return ReplaySnapshotResponse(**result)
+
+
+@router.get("/beliefs/{belief_id}/provenance-audit", response_model=ProvenanceAuditResponse)
+async def audit_belief_provenance(belief_id: uuid.UUID) -> ProvenanceAuditResponse:
+    """Verify this belief's inheritance closure for provenance anomalies (A1..A4).
+
+    Read-only, deterministic, no cost. Walks every belief_inheritance edge and confirms each
+    was created by a legitimate spawn: from the heir's real parent (A1), at the heir's spawn
+    instant (A2), by an ancestor that actually held the belief (A3), before any invalidation it
+    depends on (A4). Returns CLEAN / ANOMALOUS / INCONCLUSIVE. This is verification + out-of-
+    band tamper detection (the legitimate writers preserve A1..A4 by construction), maps to
+    OWASP ASI06 Memory & Context Poisoning. Unknown belief → 404.
+    """
+    result = await provenance_audit.audit_inheritance(belief_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="belief not found")
+    return ProvenanceAuditResponse(**result)
 
 
 @router.post("/beliefs/{belief_id}/invalidate", response_model=InvalidateResponse)
