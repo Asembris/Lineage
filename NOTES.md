@@ -3049,6 +3049,15 @@ score) / empty-rationale / the verdict-field-identical invariant on every branch
 path is exercised ONLY by the demo, matching Item 8's demo-vs-test split.
 
 ### Mechanics / gotchas
+- **The app-wide tripwire caught a real cross-module violation the full suite surfaced (NOT
+  import-graph inference).** `app/services/faithfulness.py` first imported `_frag`/`neighbourhood`/
+  `structure_text` from `aml_agent`, tripping `test_aml_routes.py`'s Item-6 static guard that
+  forbids ANY application module from importing `aml_agent` at all (it carries the paid
+  `evaluate_transaction`). The guard is right: pure code must not depend on the paid-path module.
+  Fix: the pure evidence-rendering helpers moved to a new pure `app/services/aml_evidence.py`
+  (`_frag`, `_return_path_hops`, `structure_text`, `neighbourhood`, `NEIGHBOURHOOD_HOPS/LIMIT`);
+  `aml_agent` re-imports them so its importers/scripts are unchanged, and `faithfulness` imports
+  from `aml_evidence`. Re-verified: golden set still byte-identical; full suite 99/99.
 - **NOT wired into the server this session (deferred, deliberate).** DeepEval's `LocalModel` builds
   its own OpenAI-compatible client internally, so it cannot be handed a scoped `http_client` the
   way `openai_client.py` / `aws_client.py` configure the clients THEY build. `eval_grounding.py`
@@ -3084,6 +3093,8 @@ production gemma judge (needs a scoped-TLS solution for in-server use — see ab
 - `test(faithfulness): hermetic guard tests + verdict-identical invariant (Item E)`
 - `feat(faithfulness): live gemma demo of the explanation-faithfulness guard (Item E)`
 - `docs(notes): record Item E` (this entry)
+- `refactor(faithfulness): extract pure evidence helpers to aml_evidence so no app module imports aml_agent (Item E)`
+  (fix for the tripwire the full-suite run surfaced; docs follow-up folded into the NOTES update)
 
 ### Explicitly NOT done (still gated): the in-server HTTP route (needs a scoped-TLS solution for
 ### DeepEval's LocalModel first); FRONTEND wiring (its own plan-gated session, per Item 5/A/B); a
