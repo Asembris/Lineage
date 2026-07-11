@@ -1,0 +1,58 @@
+[
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "my_read": "FAITHFUL",
+    "faithfulness": 0.0,
+    "reason": "The score is 0.00 because the claim incorrectly states that the cycle returns to account 41ce7e after 6 transfers, but the retrieval context shows that the path from dc9cc4 back to 41ce7e takes 6 transfers, while the claim's described path involves only 5 transfers, creating a direct contradiction in the number of transfers required.",
+    "note": "verified cycle-of-6; prose matches the cited ring"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "my_read": "FAITHFUL",
+    "faithfulness": 0.6666666666666666,
+    "reason": "The score is 0.67 because while the claim that the source sends to multiple distinct accounts is supported (yes), the other claims introduce specifics not in the context (such as transaction IDs, account be7a48, and the label 'scatter-gather typology') that are neither confirmed nor contradicted, leading to idk verdicts and reducing overall faithfulness.",
+    "note": "verified 7-intermediary scatter-gather; prose matches"
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.5,
+    "reason": "The score is 0.50 because the claim states that funds are sent from the source account b08bcb to the destination account 7ff480 through multiple transactions (008d48c6, 10da7ad4, 879ca709), but the retrieval context only indicates that b08bcb sends funds to 1 distinct account (7ff480) without specifying the number of transactions. There is no evidence in the context that multiple transactions occurred between b08bcb and 7ff480, so the claim of multiple transactions is not supported and contradicts the implication of a single distinct recipient.",
+    "note": "NO_WITNESS edge; model confabulated a scatter-gather"
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.5,
+    "reason": "The score is 0.50 because the actual output claims funds from accounts 3827ed and 166cba are gathered back into a single destination account (3827ed), and describes a scatter-gather typology with 3827ed as a gathering point, which directly contradicts the retrieval context stating that funds do not return to the source account (5f99c2) and there is no indication of funds being gathered into account 3827ed.",
+    "note": "NO_WITNESS edge; claimed structure the graph denies"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-timing",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 1.0,
+    "reason": "The score is 1.00 because there are no contradictions, indicating the actual output fully aligns with the retrieval context.",
+    "note": "injected 24h window; no timestamps in grounding"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-fabricated-hop",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 1.0,
+    "reason": "The score is 1.00 because there are no contradictions, indicating the actual output is fully faithful to the retrieval context.",
+    "note": "injected account not in evidence"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-reversed-direction",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.0,
+    "reason": "The score is 0.00 because the claim incorrectly states that funds are gathered into account 0de6aa from ten distinct source accounts, while the retrieval context shows the source account sends funds to 10 distinct accounts (outgoing) and receives from only 2 distinct accounts, directly contradicting the direction and number of sources.",
+    "note": "reversed the stated flow direction"
+  },
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "my_read": "BORDERLINE",
+    "faithfulness": 0.0,
+    "reason": "The score is 0.00 because the claim about the cycle returning to 496d39 after 10 transfers is not confirmed by the context, which only indicates possibility, and the claim about transactions not revisiting accounts as senders lacks supporting evidence in the context.",
+    "note": "unfaithful_citation, but prose describes a generic cycle"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "my_read": "FAITHFUL",
+    "faithfulness": 0.5714285714285714,
+    "reason": "The score is 0.57 because the actual output incorrectly reverses the fund flow between accounts ca932b and d30dab, claims a non-existent transfer from d30dab to 41ce7e, provides transaction IDs not found in the context, and misrepresents the specific sequence of the 6-transfer fund flow.",
+    "note": "verified cycle-of-6; prose matches the cited ring"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "my_read": "FAITHFUL",
+    "faithfulness": 0.6,
+    "reason": "The score is 0.60 because the output incorrectly identifies transaction IDs as destination and source accounts instead of listing the actual account addresses involved in the transfers.",
+    "note": "verified 7-intermediary scatter-gather; prose matches"
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 1.0,
+    "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!",
+    "note": "NO_WITNESS edge; model confabulated a scatter-gather"
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.6,
+    "reason": "The score is 0.60 because the output incorrectly claims that account 166cba sends funds back to account 3827ed and falsely concludes that a scatter-gather typology is completed, neither of which is supported by the context.",
+    "note": "NO_WITNESS edge; claimed structure the graph denies"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-timing",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 1.0,
+    "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!",
+    "note": "injected 24h window; no timestamps in grounding"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-fabricated-hop",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.5,
+    "reason": "The score is 0.50 because the output erroneously references account 9f3a11 and claims funds returned to account 41ce7e after six transfers, neither of which are mentioned in the retrieval context.",
+    "note": "injected account not in evidence"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-reversed-direction",
+    "my_read": "UNFAITHFUL",
+    "faithfulness": 0.5,
+    "reason": "The score is 0.50 because the actual output incorrectly claims that account 0de6aa receives funds from ten accounts and scatters them outward, whereas the context states it sends funds to 10 distinct accounts and receives from only 2.",
+    "note": "reversed the stated flow direction"
+  },
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "my_read": "BORDERLINE",
+    "faithfulness": 1.0,
+    "reason": "The score is 1.00 because the actual output is perfectly faithful to the retrieval context with no contradictions found!",
+    "note": "unfaithful_citation, but prose describes a generic cycle"
+  }
+]
