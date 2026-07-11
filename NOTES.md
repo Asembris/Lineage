@@ -2832,3 +2832,104 @@ smoke-verified against the real belief (200 CLEAN, 8 edges) + unknown id (404).
 ### same as Item 5 deferred its UI); an AOST/certifiable audit variant; any change to the five tables /
 ### aml_* / typology_corpus; the decisions.aml_transaction_id seam; a second belief. Do NOT push without
 ### explicit approval — held for review of the result.
+
+## Roadmap Item B — counterfactual "what-if invalidation" (2026-07-11)
+
+Item B delivered: a read-only, deterministic service (`app/services/counterfactual.py`) + a thin
+`GET /beliefs/{id}/counterfactual-invalidation?at=T` route answering "if belief X had been
+invalidated at T, which downstream verdicts change?" against the moat's `decisions` table. No
+migration, no new table, no persisted state, no AML read, no LLM call, no AOST, no change to the
+five-table moat / `aml_*` / `typology_corpus`. Makes reversibility (Item 2/6) pay off as a forensic
+tool. 2 tests pass (~8s).
+
+### Two roadmap phrases resolved against real code BEFORE building (same posture as Items 4/5/6/A)
+- **"which downstream verdicts change" = the moat's `decisions` table, NOT the AML brake.** Two
+  independent verdict paths exist; only `decisions` carries a real `driving_belief_id -> beliefs.id`
+  link. The AML FLAG/NO_FLAG/INSUFFICIENT_COVERAGE brake (Items 4/5) has never driven a belief —
+  `decisions.aml_transaction_id` does not exist and the one belief is a card-auth heuristic the AML
+  money-flow graph never carried (Item 6 established this from source). So the counterfactual is
+  answerable ONLY against `decisions`. Same terminology-collision discipline, resolved in the moat's
+  favor (the opposite way Item 4 ruled for its own brake).
+- **The AOST/`replay.closure_snapshot()` reuse the Item-2 note anticipated is a CATEGORY ERROR here,
+  and was deliberately rejected (approved).** Item 2's note said "B calls closure_snapshot(X,
+  as_of=T)", but that predated resolving the verdicts to `decisions` and presumed T was an MVCC
+  instant. T is a `decided_at`/`belief_performance.window_start` BUSINESS-TIME instant (~400 days
+  ago) — the "two clocks" the project never conflates (`[[lineage-thesis-two-clocks]]`). `AS OF
+  SYSTEM TIME` time-travels DATABASE STATE and is bounded by the 75-min GC TTL; a T ~400 days ago is
+  both the wrong clock AND out-of-window (the backfilled rows were INSERTED at seed time 2026-07;
+  they never existed in MVCC history at T). And no closure reconstruction is even needed — every
+  belief-driven decision already carries `driving_belief_id` + `decided_at`. So it is a plain
+  deterministic WHERE over immutable columns, not a replay.
+
+### The substitution rule — sourced from `_decision_from`, not invented (the load-bearing finding)
+The belief's ENTIRE behaviour is one branch of the backfill policy (`seed/backfill_decisions.py`):
+an on-pattern txn (mcc 5411, <$180, age>6mo) → `verdict='approve'` AND is the SOLE driver
+(`driving_belief_id=origin`); everything else → generic path, `driving_belief_id=NULL`. Two
+consequences:
+- **The belief ONLY EVER APPROVES** (never declines/blocks). So invalidation can only WITHDRAW
+  approvals — it can never flip a NULL-driver row and never create a decline. The affected set is
+  exactly `{driving_belief_id=X AND decided_at>T}`, every row an approval. (Live-verified: `approvals
+  == withdrawn_approvals` in the real 4,000-row data AND asserted in the controlled test.)
+- **NO faithful per-row "generic fallback verdict" exists**, so we do NOT fabricate one. The generic
+  branch is stochastic AND its RNG draw-count is branch-dependent — re-deriving one row's fallback
+  would require re-running the whole seeded world with a restructured branch, shifting every
+  downstream draw. Each affected verdict is reported as `approve (belief-driven)` → **approval
+  withdrawn**, not a made-up replacement. The honest, fully-deterministic numbers are N (withdrawn
+  approvals) and M (their real is_fraud subset) — never "fraud we'd have caught" (the fallback is
+  stochastic; the belief only ever approved it, so the harm is the approval, and M measures exactly
+  that).
+
+### No content-hash — deliberately, and it's the more honest call (approved)
+Borrowing Item 6's content-addressing was considered and rejected: hash-coverage is load-bearing
+ONLY when a second party independently re-derives and COMPARES it (Item 6's certifier Lambda). There
+is no such counterparty here, and Item 6's own caveat applies verbatim ("hash-coverage proves a
+document hasn't changed, never that it was true"). The `decisions` inputs are already reproducible
+(deterministic backfill; a real `POST /invalidate` never touches `decisions` rows — it only UPDATEs
+`beliefs.status`/`belief_inheritance.invalidated_at`), so a hash would freeze a snapshot without
+making the answer more true. If Item F ever wants a *certifiable* counterfactual artifact,
+`certificate.canonical_digest` wraps `{belief_id, T, sorted affected ids, N, M}` as an additive step
+— NOT this session.
+
+### REAL numbers (live query, EXACT — not estimates), demonstration T = window-4 start
+Belief `898ad0e5-...`, 2,000 belief-driven decisions total (8 windows × 250). Confirmed against the
+live cluster (`scratchpad/probe_counterfactual.py`), all exact because each window is exactly 250
+contiguous non-overlapping rows:
+- **T = 2025-05-27 (window-4 start, where confidence first cracks .852→.724): N = 1000, M = 392**,
+  5 distinct holders (crimson-4/5/5b/6/7). Per-window M = 69/111/94/118 for w4–w7 = 392. The demo
+  story: "had we killed the belief when the data first showed staleness, 392 real fraud approvals
+  downstream would have lost their justification."
+- T = 2025-09-04 (window-5 start, steepest .724→.556): N = 750, M = 323, 4 holders.
+- Extremes behave sanely with NO special-case logic (asserted in the done-test AND live-probed):
+  T before formation (2024-01-01) → N = 2000 = the full driven set, M = 491 (the belief's whole-life
+  frauds_approved); T after the last window (2026-07-02) → N = 0, empty set. `decided_at > T` is
+  STRICT (a row exactly at T is excluded — asserted).
+
+### Mechanics / API
+- `at` is a NORMAL bind parameter (parsed datetime passed parameterized) — unlike the AOST `as_of`
+  which must be inlined. `parse_at` accepts an ISO date or datetime, naive→UTC; malformed → ValueError
+  → 400. Named `at` (not `as_of`) precisely to signal it is NOT the MVCC clock. Missing `at` → 422
+  (required Query), unknown belief → 404.
+- Belief lookup + all aggregates run in ONE explicit txn (shared MVCC snapshot; no torn read between
+  the belief row and the decision aggregates). Response echoes N, M, `affected_holders`,
+  `total_belief_driven`, and a per-window breakdown bucketed via `generation_windows()` — IDENTICAL
+  bucketing to belief_performance, so the counterfactual lines up against the staleness curve.
+- Response carries `approvals` out of the service dict for the test's belief-only-approves assertion;
+  the DTO omits it (redundant with N). Pydantic ignores the extra key.
+
+### What Item F (hero attack demo) can call once this ships
+Given `(belief_id, T)`: "N verdicts lose their driver; M of them approved real fraud" — a data-backed
+answer to *how much fraud earlier action would have prevented*, turning the reversible-invalidation
+infrastructure into a forensic instrument. The demo instant (2025-05-27 → 392) is a real
+belief_performance window boundary, not an invented date.
+
+### Commits (Conventional Commits, each its own; held for review before push)
+- `feat(counterfactual): what-if invalidation query over decisions (Item B)`
+- `feat(api): GET /beliefs/{id}/counterfactual-invalidation (Item B)`
+- `test(counterfactual): deterministic affected-set + extremes done-test (Item B)`
+- `docs(notes): record Item B` (this entry)
+
+### Explicitly NOT done (deferred): FRONTEND wiring (its own plan-gated session, per Item 5/A
+### precedent); the certifiable/hashed counterfactual variant (additive, gated on Item F actually
+### needing it); Item D (confidence propagation); any change to the five tables / aml_* /
+### typology_corpus; the decisions.aml_transaction_id seam; a second belief; the live OpenAI path.
+### Do NOT push without explicit approval — held for review of the result.
