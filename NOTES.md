@@ -2557,11 +2557,31 @@ Headline judge gemma+GEval; cross-check nemotron+GEval; built-in Faithfulness/Ha
 alongside as the un-tuned control (per approval, the Item-7 way — the weak baseline's real numbers
 are reported, not dropped).
 
+**TWO DENOMINATORS, KEPT APART (the Item-4 two-populations discipline — do not blur).** There are
+two distinct number sets below and they are computed over different tuples: (a) the **8/10 headline
+accuracy** is over the 10 tuples that have INDEPENDENTLY VERIFIED per-tuple ground truth — the 2
+manually-confirmed faithful FLAG anchors plus the 8 hand-authored negatives (label_faithful=False
+by construction); the GEval-vs-built-in **DELTA (0.771 vs 0.287)** is likewise a mean over the 8
+labeled negatives only. (b) The **"full 40" category means** are metric-comparison aggregates over
+the entire golden set (32 real + 8 authored), and the 32 real tuples carry NO manually-verified
+per-tuple faithful/unfaithful label — they are descriptive distribution, not scored accuracy. A
+reader must not read "8/10" as computed over 40, nor the 40-tuple means as an accuracy: the only
+scored-against-ground-truth figures are the 10-tuple accuracy and the 8-negative delta.
+
 **JSON-parse / call failures, from the ACTUAL full run (not "it worked"):**
 - gemma:    GEval 0/40, Faithfulness 0/40, Hallucination **6/40** (gemma emits a malformed verdict
   key, e.g. `laverdict`, breaking DeepEval's Verdicts schema).
 - nemotron: GEval **0/40** — `response_format=json_object` is wired into the full-run harness
   (JUDGES['nvidia'].generation_kwargs, read by build_judge in run_full), and it held over all 40.
+
+**Why nemotron ran GEval ONLY (not Faithfulness/Hallucination) — a deliberate cost choice, stated
+so the asymmetry isn't a mystery.** nemotron is NVIDIA-credit-metered; gemma is free via Ollama
+cloud. The built-in Faithfulness/Hallucination metrics were ALREADY shown on gemma (for free, over
+all 40) to be the wrong instrument — contradiction-only, scoring additive hallucinations as
+faithful. Re-running them on nemotron would only re-confirm that at credit cost for no new
+information. nemotron's single job was to be an INDEPENDENT cross-check of the HEADLINE metric
+(GEval), so it ran GEval alone. The built-in-vs-GEval delta is therefore a same-judge (gemma)
+comparison — the fair way to isolate the metric effect — not a cross-judge artifact.
 
 **THE DELTA — GEval vs built-in Faithfulness on the 8 authored hallucinations (mean geval-faithful
 score, higher = judged more faithful):**
