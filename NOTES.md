@@ -2933,3 +2933,161 @@ belief_performance window boundary, not an invented date.
 ### needing it); Item D (confidence propagation); any change to the five tables / aml_* /
 ### typology_corpus; the decisions.aml_transaction_id seam; a second belief; the live OpenAI path.
 ### Do NOT push without explicit approval — held for review of the result.
+
+## Roadmap Item E — live explanation-faithfulness guard (2026-07-11)
+
+Item E delivered: a LIVE guard that scores the grounded agent's narrated explanation
+(`Claim.rationale`) for faithfulness to the exact evidence it was shown, WITHHOLDING any prose
+that asserts more than the retrieved rows support and showing a faithful deterministic
+reconstruction in its place. It operationalizes Item 8's offline GEval rubric as a runtime check.
+Shipped as a callable + a live demo, NOT an HTTP route. No migration, no new table, no OpenAI on
+the guard path, no change to the five-table moat / `aml_*` / `typology_corpus`. 6 hermetic tests
+pass (<1s); all three branches verified LIVE against gemma. `app/services/faithfulness.py`
+(shared instrument) + `app/services/faithfulness_guard.py` (the guard) + `scripts/
+demo_faithfulness_guard.py`.
+
+### THE TWO DECISIONS A WRONG CALL WOULD CORRUPT — resolved before building, approved
+- **The guard governs the RATIONALE, never the VERDICT.** `verdict_guard.evaluate_claim` decides
+  FLAG/NO_FLAG/INSUFFICIENT_COVERAGE from DETERMINISTIC structural evidence and never reads the
+  rationale prose (confirmed in source: the field is carried on `Claim`, read by no gate). An
+  unfaithful rationale means the EXPLANATION is untrustworthy — a different fact from the verdict
+  being wrong (Item 4's invariant: "FLAG is unreachable without a witness"; the witness is real
+  whether or not the model narrated it faithfully). Downgrading a structurally-proven FLAG because
+  a probabilistic prose judge distrusted the prose would let an LLM judge override a deterministic
+  proof — inverting the brake's whole reason to exist. So `check_rationale` consumes a
+  `VerdictOutcome` and returns a `FaithfulnessResult` ALONGSIDE it; it MUST NOT mutate it.
+  `test_faithfulness_guard.py` asserts FIELD equality of verdict/reason/witness_txn_ids/corpus_doc
+  before vs after, on every status (approver's addition #1 — a real equality assertion, not code
+  inspection). NOTE the orthogonality: `verdict_guard`'s own `unfaithful_citation` path IS a
+  deterministic STRUCTURAL check (cited edges don't form the structure) and legitimately moves the
+  verdict; Item E governs PROSE entailment only and never does.
+- **FAIL CLOSED.** Judge unreachable / timeout / no-parseable-score → `UNAVAILABLE`, prose
+  withheld, never shown unguarded. Consistent with every "can't determine" in this project (Item
+  5's INSUFFICIENT_COVERAGE-on-uncertainty, Item 6's "a missing counterparty never reads as a
+  pass", the brake's "uncertainty never resolves to fraud"). Cheap here because the deterministic
+  `VerdictOutcome` + the deterministic reconstruction are ALWAYS available regardless of judge
+  state, so a withheld rationale still leaves a fully-usable finding — the supervisor loses only
+  the LLM's prose gloss, degraded to the deterministic truth (a strictly better artifact).
+
+### The status is three-state: SUPPORTED / UNSUPPORTED / UNAVAILABLE (house style, Item 4/5/6)
+A caller decides display on the enum ALONE. `SUPPORTED` shows the model's prose; `UNSUPPORTED` and
+`UNAVAILABLE` both withhold it and show the deterministic reconstruction (approver's addition #2 —
+one specific behavior, NOT an either/or "withheld marker"). `SUPPORTED` means "PASSED the
+faithfulness check", NOT "verified faithful": the judge has a documented nonzero false-negative
+rate on dense structural prose (Item 8's two disclosed misses), so this is a probabilistic guard
+on top of the deterministic verdict, never a proof. That caveat is in the module docstring and
+printed by the demo.
+
+### The instrument is SHARED, not duplicated (Item 6's canonicalizer lesson, applied — approved)
+Item 8's rubric (`GEVAL_STEPS`), threshold, grounding renderer, and judge-input formatters
+(`build_grounding` / `build_input` / `build_actual_output`) moved into `app/services/
+faithfulness.py`, and BOTH the offline eval (`scripts/eval_grounding.py`) and the live guard
+import them. Two independent copies that agree today silently diverge the first time one is
+edited, and the live guard would stop measuring what the eval validated — the exact false
+guarantee Item 6 forced the certificate canonicalizer to be shared to avoid. **Verified
+byte-identical:** `build_grounding_goldenset.py rebuild` reconstructs `goldenset.json` through the
+shared functions with ZERO `git diff`, so the extraction changed nothing the eval was validated
+against. The module is PURE (no DeepEval, no judge, no DB); the DeepEval GEval wiring stays in the
+two judge-owning places, each importing the shared rubric constant.
+
+### The withheld-prose fallback REUSES Item 5, and is faithful by construction
+`deterministic_rationale` / `render_witness_text` pick the witness for the verdict's OWN claimed
+typology (via Item 5's pure `interrogate()` / `Witness` / `ring_order` / `scatter_gather_legs`)
+and render it naming ONLY row contents — 6-char account frags, amounts, payment formats — never
+timing, entity form, or intent. This is Item 5's discipline verbatim ("a client can render the
+traversal as text by formatting column values, which asserts nothing beyond what the rows
+literally contain"), so the fallback is the one narration that can never itself be unfaithful. A
+NO_FLAG / INSUFFICIENT verdict whose claimed typology has no matching witness (the naturally-
+occurring confabulations Item 8 found on NO_WITNESS edges) falls back to stating the deterministic
+verdict and asserting NOTHING structural.
+
+### Judge: gemma ONLY, not gemma+nemotron — Item 8's finding does not transfer to a live context
+Item 8 measured gemma as decisively the better single judge (8/10 labeled vs nemotron 4/10) and
+found nemotron's value is ONLY as an independent cross-check for CALIBRATION on a fixed offline
+set. A live guard emits ONE decision, so it uses the better single judge. Running nemotron live
+would add NVIDIA-credit cost + latency + its systematic anti-CYCLE bias (category mean 0.27, which
+would false-flag faithful cycle rationales) for no ensemble benefit that exists only offline.
+nemotron stays the offline cross-check instrument in `eval_grounding.py`. Chosen deliberately
+rather than defaulting to "both because Item 8 did".
+
+### Threat taxonomy — verified against the primary OWASP PDF, honesty correction included (approved)
+- **PRIMARY — OWASP Top 10 for LLM Applications 2025, `LLM09:2025 Misinformation`** (absorbed the
+  former "Overreliance"): "the model states false things with confidence, and other systems [here
+  a human supervisor] act on them." Additive citation-spoofing caught before display is exactly
+  this. Verified by the approver directly against the primary OWASP PDF, not just secondary sources.
+- **SECONDARY (weaker fit) — `LLM05:2025 Improper Output Handling`:** the supervisor is the
+  downstream consumer; the guard is the validation gate on model output.
+- **EXPLICITLY NOT CLAIMED — retrieval/memory poisoning** (`LLM08:2025 Vector and Embedding
+  Weaknesses`; OWASP `ASI06:2026 Memory & Context Poisoning`, which is Item A's citation). The
+  roadmap's own phrase "retrieval poisoning" OVERCLAIMS what Item E does: the guard compares prose
+  against the RETRIEVED rows, so if those rows were themselves poisoned it would PASS a claim
+  faithful to the poison. It defends against the model fabricating BEYOND its evidence, not against
+  the evidence being poisoned — a different control. Same "every field true, juxtaposition
+  fabricated" refusal Item 6 made. Do not upgrade this to a poisoning defense without building one.
+
+### VERIFIED LIVE end to end against gemma4:31b-cloud (the Phase-3 "real invocation" standard)
+`scripts/demo_faithfulness_guard.py` (no OpenAI — cached Item-8 rationales; only the free gemma
+judge is live), all three branches, on the real 6-hop CYCLE anchor `185f748d-...`:
+- **SUPPORTED** — verified-faithful anchor scored **1.00**; the model's prose is shown; judge
+  reason confirms it mapped the real transaction/account ids.
+- **UNSUPPORTED** — the authored `::adv-timing` negative (a "within a single 24-hour window /
+  overnight" fabrication over the SAME real cycle) scored **0.40** (< 0.5); prose WITHHELD; the
+  faithful deterministic reconstruction shown instead. The judge's reason explicitly names the
+  timing fabrication. **0.40 reproduces Item 8's full-run number for the timing negative exactly —
+  the shared instrument is faithful, not a re-implementation that drifted.**
+- **UNAVAILABLE** — an unreachable endpoint (`127.0.0.1:9`) → real `APIConnectionError` → guard
+  fails closed, prose withheld, deterministic reconstruction shown.
+The VERDICT printed FLAG and was identical across all three. (First demo run this session ALSO
+fail-closed all three when the Ollama daemon was down — a real, if accidental, extra proof of the
+UNAVAILABLE path before the daemon was started.)
+
+### Tests — hermetic, purer than the brake tests
+`tests/test_faithfulness_guard.py`: an in-memory 3-account cycle, a directly-constructed claim, a
+STUB judge — ZERO cluster, ZERO OpenAI, ZERO live judge, never `run_seed` (6 passed <1s, like
+`test_certificate.py`). Covers SUPPORTED / UNSUPPORTED / UNAVAILABLE(raise) / UNAVAILABLE(None
+score) / empty-rationale / the verdict-field-identical invariant on every branch. The live judge
+path is exercised ONLY by the demo, matching Item 8's demo-vs-test split.
+
+### Mechanics / gotchas
+- **NOT wired into the server this session (deferred, deliberate).** DeepEval's `LocalModel` builds
+  its own OpenAI-compatible client internally, so it cannot be handed a scoped `http_client` the
+  way `openai_client.py` / `aws_client.py` configure the clients THEY build. `eval_grounding.py`
+  works around this machine's AVG-antivirus TLS interception with a PROCESS-GLOBAL
+  `truststore.inject_into_ssl()`, safe only because that process is a short-lived script. A guard
+  inside long-lived uvicorn cannot use a global TLS patch; it needs a scoped solution FIRST. So
+  Item E is a callable + demo (the demo does the global inject), and any HTTP route is a separate
+  later decision — same posture as `evaluate_transaction()` shipping as a callable, never a paid
+  GET. This finding, on top of the paid-call-behind-GET precedent, was the approved justification.
+- **No new table, and Item E is NOT the `verdicts`-table trigger** (Item 4/5 named that as "Item F
+  must replay an identical MODEL CLAIM"). The guard consumes a claim live and judges it; it does
+  not persist it. An LLM judge's verdict is not bit-reproducible (temp 0 mitigates, doesn't
+  guarantee) — the same soft spot Item 5 flagged for the model claim — which argues AGAINST
+  persisting the result as a certifiable artifact this session, not for a table.
+- `evaluate_claim` in the demo is fed reconstructed `retrieved` dicts with placeholder distances;
+  the brake uses distance only as ungating provenance (`retrieval_margin`), so the verdict is
+  unaffected. The cached golden set carries no distances, hence the reconstruction.
+- Empty rationale → `SUPPORTED` with the deterministic reconstruction and the judge NOT called
+  (nothing asserted can be unfaithful). A test asserts the judge is never invoked on it.
+
+### What Item F (hero attack demo) can call once this ships
+`faithfulness_guard.check_rationale(outcome, rationale, grounding, input_text, subject, graph,
+judge)` → `FaithfulnessResult{status, score, display_rationale, ...}`. Given a claim's rationale +
+its grounding: "SUPPORTED / UNSUPPORTED / UNAVAILABLE, here is the display-safe explanation." The
+demo can present an LLM narration GUARANTEED either faithful-per-the-instrument or withheld,
+closing the loop `evaluate_transaction()` (verdict) → `interrogate_transaction()` (deterministic
+traversal) → `check_rationale()` (guarded prose). `GEvalFaithfulnessJudge(LocalModel(...))` is the
+production gemma judge (needs a scoped-TLS solution for in-server use — see above).
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `refactor(faithfulness): share the GEval rubric, grounding renderer + deterministic witness renderer (Item E)`
+- `feat(faithfulness): live explanation-faithfulness guard, verdict-preserving + fail-closed (Item E)`
+- `test(faithfulness): hermetic guard tests + verdict-identical invariant (Item E)`
+- `feat(faithfulness): live gemma demo of the explanation-faithfulness guard (Item E)`
+- `docs(notes): record Item E` (this entry)
+
+### Explicitly NOT done (still gated): the in-server HTTP route (needs a scoped-TLS solution for
+### DeepEval's LocalModel first); FRONTEND wiring (its own plan-gated session, per Item 5/A/B); a
+### `verdicts` table / any persistence of the judge result; nemotron in the live path; Item 7's
+### headline eval, Item 9 / F / 10; the regulatory corpus; the decisions.aml_transaction_id seam;
+### a second belief; any change to the five tables / aml_* / typology_corpus. Do NOT push without
+### explicit approval — held for review of the result.
