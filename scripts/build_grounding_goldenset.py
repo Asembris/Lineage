@@ -37,14 +37,16 @@ from dataclasses import asdict
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from app.services.aml_agent import (  # noqa: E402
-    _frag,
-    claim_for_transaction,
-    neighbourhood,
-    structure_text,
-)
+from app.services.aml_agent import claim_for_transaction, structure_text  # noqa: E402
 from app.services.aml_graph import WITNESS, Edge, Graph, Outcome, check, load_graph  # noqa: E402
 from app.services.corpus import TYPOLOGY_DOCS  # noqa: E402
+# The grounding renderer + judge-input formatters are SHARED with the live guard (Item E), so the
+# cached golden set is built with byte-identical evidence to what the guard feeds the live judge.
+from app.services.faithfulness import (  # noqa: E402
+    build_actual_output,
+    build_grounding,
+    build_input,
+)
 from app.services.verdict_guard import Claim, evaluate_claim  # noqa: E402
 
 # Static typology -> definition body, so grounding can be rebuilt offline (no OpenAI) for the
@@ -128,46 +130,20 @@ async def cmd_select() -> None:
         print(f"  {cat:22s} {counts.get(cat, 0):2d}/{QUOTA[cat]}")
 
 
-def _grounding(g: Graph, subject: Edge, summary: str, defs: list[tuple[str, str]]) -> list[str]:
-    """The evidence the rationale must follow from, rendered EXACTLY as the agent saw it.
-
-    CRITICAL: accounts use the SAME 6-char `_frag` the agent's prompt and rationale use. An
-    earlier version rendered 8-char account prefixes here; the judge then read the rationale's
-    `41ce7e` and the context's `41ce7e96` as a contradiction and scored every faithful rationale
-    0.00. The grounding must be the agent's own evidence representation, not a re-rendering — else
-    the eval measures a truncation mismatch, not prose faithfulness.
-    """
-    edge_facts = [
-        f"transaction {x.id}: account {_frag(x.src)} sends {x.amount} ({x.payment_format}) "
-        f"to account {_frag(x.dst)}"
-        for x in neighbourhood(g, subject)
-    ]
-    definitions = [f"{typ}: {body}" for typ, body in defs]
-    return [f"Structural facts: {summary}"] + edge_facts + definitions
-
-
 def _tuple_from(subject: Edge, g: Graph, retrieved: list[dict], claim: Claim, summary: str,
                 plan: dict) -> dict:
     """Assemble one DeepEval-ready tuple. evaluate_claim() is PURE — no OpenAI here."""
     outcome = evaluate_claim(subject=subject, graph=g, retrieved=retrieved, claim=claim)
-    grounding = _grounding(g, subject, summary, [(r["typology"], r["body"]) for r in retrieved])
+    grounding = build_grounding(g, subject, summary, [(r["typology"], r["body"]) for r in retrieved])
 
     return {
         "subject_id": str(subject.id),
         "category": plan["category"],
         "witness_profile": plan["witness_profile"],
         "provenance": "gpt-4o-mini@real",  # vs a Claude-Code-authored adversarial negative
-        # --- the DeepEval fields ---
-        "input": (
-            f"Given these neutral structural facts about transaction {subject.id}'s neighbourhood "
-            f"in a money-flow graph, which laundering typology (if any) does the structure match, "
-            f"and why?\n\n{summary}"
-        ),
-        "actual_output": (
-            f"Claimed typology: {claim.typology}.\n{claim.rationale}"
-            if claim.rationale
-            else f"Claimed typology: {claim.typology}."
-        ),
+        # --- the DeepEval fields (built by the SHARED formatters, identical to the live guard) ---
+        "input": build_input(subject, summary),
+        "actual_output": build_actual_output(claim.typology, claim.rationale),
         "retrieval_context": grounding,
         "context": grounding,
         # --- provenance / cross-checks (not fed to the judge; for the human review + report) ---
@@ -225,12 +201,8 @@ async def cmd_rebuild() -> None:
         subject = g.by_id[uuid.UUID(t["subject_id"])]
         summary = structure_text(g, subject)
         defs = [(typ, _BODY[typ]) for typ in t["retrieved_typologies"]]
-        t["retrieval_context"] = t["context"] = _grounding(g, subject, summary, defs)
-        t["input"] = (
-            f"Given these neutral structural facts about transaction {subject.id}'s neighbourhood "
-            f"in a money-flow graph, which laundering typology (if any) does the structure match, "
-            f"and why?\n\n{summary}"
-        )
+        t["retrieval_context"] = t["context"] = build_grounding(g, subject, summary, defs)
+        t["input"] = build_input(subject, summary)
     GOLDENSET_PATH.write_text(json.dumps(tuples, indent=2), encoding="utf-8")
     print(f"rebuilt grounding for {len(tuples)} tuples (no OpenAI) -> {GOLDENSET_PATH}")
 

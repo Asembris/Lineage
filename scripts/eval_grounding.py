@@ -63,26 +63,11 @@ from deepeval.metrics import (  # noqa: E402
 from deepeval.models import LocalModel  # noqa: E402
 from deepeval.test_case import LLMTestCase, LLMTestCaseParams  # noqa: E402
 
-# A GEval faithfulness rubric that — unlike the built-in FaithfulnessMetric — penalizes claims
-# that are merely UNSUPPORTED, not only claims that directly contradict. Calibration showed the
-# built-in metric scores injected-but-non-contradicting hallucinations (a 24h window, a fabricated
-# account, an external advisory) as 1.00 faithful, because "no info" is not a contradiction. The
-# prose-entailment gap Item 8 targets is exactly those unsupported additions, so the rubric makes
-# "every claim must be explicitly supported by the context" the bar.
-_GEVAL_STEPS = [
-    "Identify every factual claim in the actual output: accounts, transaction ids, amounts, the "
-    "structure/typology, flow direction, timing, entities, counts, and any external references.",
-    "For each claim, check whether it is explicitly stated in, or directly entailed by, the "
-    "retrieval context (the structural facts, the neighbourhood edge list, the typology "
-    "definitions).",
-    "Penalize any claim that is not supported by the context — including claims that merely ADD "
-    "information the context never provides (e.g. timing like 'within 24 hours', entity form like "
-    "'shell company', a specific total, an account id absent from the edge list, an external "
-    "advisory reference, or a claimed recurrence). Absence of support is a failure, not only "
-    "direct contradiction.",
-    "A fully faithful output makes only claims the context supports. Score down in proportion to "
-    "how many claims are unsupported or contradicted, weighting outright contradictions most.",
-]
+# THE RUBRIC IS SHARED, NOT LOCAL. Item E turns this offline eval into a live guard, and both must
+# score against the identical rubric text and threshold — a divergent copy would make the live
+# guard stop measuring what this eval validated (the Item-6 shared-canonicalizer discipline). So
+# GEVAL_STEPS + FAITHFULNESS_THRESHOLD live in app.services.faithfulness and are imported here.
+from app.services.faithfulness import FAITHFULNESS_THRESHOLD, GEVAL_STEPS  # noqa: E402
 
 EVAL_DIR = pathlib.Path(__file__).resolve().parents[1] / "eval" / "grounding"
 GOLDENSET_PATH = EVAL_DIR / "goldenset.json"
@@ -156,14 +141,14 @@ def to_testcase(t: dict) -> LLMTestCase:
 def _geval_faithfulness(judge: LocalModel) -> GEval:
     return GEval(
         name="Grounded Faithfulness",
-        evaluation_steps=_GEVAL_STEPS,
+        evaluation_steps=GEVAL_STEPS,
         evaluation_params=[
             LLMTestCaseParams.INPUT,
             LLMTestCaseParams.ACTUAL_OUTPUT,
             LLMTestCaseParams.RETRIEVAL_CONTEXT,
         ],
         model=judge,
-        threshold=0.5,
+        threshold=FAITHFULNESS_THRESHOLD,
         async_mode=False,
     )
 
