@@ -62,10 +62,12 @@ structural witness — a real, re-derivable path. A negative is **conclusive** o
 closed without hitting the boundary of the ingested extract; otherwise it is honest uncertainty.
 
 ```
-CYCLE witness search over all 1,500 evidence edges:
-   MATCH ............ 14 benign  +  43 real CYCLE members   →  FLAG (witness required)
-   CONCLUSIVE_NO .... 458 edges  (search closed, no sink)   →  NO_FLAG
-   INCONCLUSIVE ..... 728 edges  (hit extract boundary)     →  INSUFFICIENT_COVERAGE
+CYCLE witness search over all 1,500 evidence edges (live re-run):
+   MATCH ............ 57   (43 real CYCLE members + 14 benign)    →  FLAG (witness required)
+   CONCLUSIVE_NO .... 463  (search closed inside the extract)     →  NO_FLAG
+   INCONCLUSIVE ..... 980  (hit a sink — the extract boundary)    →  INSUFFICIENT_COVERAGE
+                    ─────
+                    1,500   →  precision 43/57 = 75.4% (14 benign FPs is CYCLE's honest cost)
 ```
 
 The model's *own* cited path is re-derived from the rows; real evidence plus an unfaithful citation
