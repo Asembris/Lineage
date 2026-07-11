@@ -1,0 +1,58 @@
+[
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "my_read": "FAITHFUL",
+    "score": 1.0,
+    "reason": "The output is fully faithful to the retrieval context. It correctly identifies the CYCLE typology based on the provided definition and structural facts. Every account (41ce7e, dc9cc4, 6e804f, ca932b, d30dab, e25aba) and transaction ID cited in the sequence is explicitly present in the edge list and correctly maps the flow of funds returning to the origin after 6 transfers.",
+    "note": "verified cycle-of-6; prose matches the cited ring"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "my_read": "FAITHFUL",
+    "score": 0.3,
+    "reason": "The response contains significant hallucinations. It claims specific transaction IDs (e.g., 3d73daac..., 5808e78d...) and accounts (e.g., be7a48) are part of a gather pattern, but the context shows that while be7a48 is a destination for some accounts, the specific set of intermediaries linked to the source 0de6aa does not exclusively map to be7a48 as described. Furthermore, it claims that the specific transaction IDs it lists as 'gathering' funds into be7a48 are the ones sending funds, but several of those IDs in the context actually represent transfers from the destination account or unrelated parties. It adds specific account IDs and transaction mappings not supported by the retrieval context to force a match with the SCATTER-GATHER typology.",
+    "note": "verified 7-intermediary scatter-gather; prose matches"
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "my_read": "UNFAITHFUL",
+    "score": 0.2,
+    "reason": "The output fundamentally misidentifies the typology. It claims a SCATTER-GATHER pattern, but the context describes funds moving from a source to a destination and then onward, which matches the provided definition of GATHER-SCATTER (fan-in followed by fan-out at account 7ff480). Additionally, the output incorrectly describes the flow as 'sent from the source account to the destination account through multiple transactions', while the retrieval context shows the destination account 7ff480 sending funds to others, not the source sending to intermediaries who then gather into the destination.",
+    "note": "NO_WITNESS edge; model confabulated a scatter-gather"
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "my_read": "UNFAITHFUL",
+    "score": 0.2,
+    "reason": "The output contains significant hallucinations not supported by the retrieval context. Specifically, it claims that funds from intermediaries (3827ed and 166cba) are gathered back into a single destination account (3827ed), which is logically impossible as 3827ed cannot be both the intermediary and the final destination for itself. Furthermore, the output identifies 166cba as an intermediary that sends funds to 3827ed, but the retrieval context contains no transaction where 166cba is a source account.",
+    "note": "NO_WITNESS edge; claimed structure the graph denies"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-timing",
+    "my_read": "UNFAITHFUL",
+    "score": 0.4,
+    "reason": "The output contains significant hallucinations not supported by the retrieval context. Specifically, it claims all six transfers were completed 'within a single 24-hour window' and 'overnight', but the context provides no timing or timestamp data. While the identification of the CYCLE typology and the account ID 41ce7e are supported by the structural facts and edge list, the addition of temporal details is a failure according to step 3 of the evaluation process.",
+    "note": "injected 24h window; no timestamps in grounding"
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-fabricated-hop",
+    "my_read": "UNFAITHFUL",
+    "score": 0.6,
+    "reason": "The output identifies a 'CYCLE' typology, which is supported by the structural facts stating funds return to the source after 6 transfers. However, it introduces an account '9f3a11' as an intermediary that does not appear anywhere in the retrieval context (edge list). While it correctly identifies the source account '41ce7e', the inclusion of an unsupported account ID violates the faithfulness requirement.",
+    "note": "injected account not in evidence"
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-reversed-direction",
+    "my_read": "UNFAITHFUL",
+    "score": 0.2,
+    "reason": "The output contains a critical factual error: it describes a GATHER-SCATTER pattern (funds gathered into 0de6aa and then scattered) but labels it as SCATTER-GATHER. Furthermore, it claims funds are gathered from 'ten distinct source accounts' into 0de6aa, whereas the retrieval context explicitly states the source account 0de6aa sends to 10 accounts and only receives from 2 distinct accounts.",
+    "note": "reversed the stated flow direction"
+  },
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "my_read": "BORDERLINE",
+    "score": 0.8,
+    "reason": "The output correctly identifies the 'CYCLE' typology based on the structural fact that funds reach the original source account after 10 transfers. It correctly maps account 496d39 as the source. However, it claims that 'each transaction follows the rule of not revisiting any account as a sender,' which is information not explicitly stated or derivable from the provided retrieval context.",
+    "note": "unfaithful_citation, but prose describes a generic cycle"
+  }
+]

@@ -2471,3 +2471,85 @@ The `--durations` measurement run + the timing probes reseeded and then emptied 
 and left the belief invalidated). Restore for the console/frontend with
 `python -m seed.backfill_decisions` (~4 min: 24 agents / active belief / 4000 decisions / 8 perf
 windows). Deferred to end-of-session per approval — restore once, after push is approved.
+
+## Roadmap Item 8 — RAG-grounding eval (2026-07-11, IN PROGRESS)
+
+Item 8 scores the ONLY LLM-generated prose in the AML pipeline — `Claim.rationale` from the
+grounded agent — for FAITHFULNESS to the evidence the agent actually saw. It is explicitly
+SECONDARY to Item 7's headline detection number. Judge is NVIDIA NIM (nemotron-3-super-120b-a12b)
+or Ollama (gemma4:31b-cloud), a PARAMETER, never OpenAI. The system under eval is unchanged:
+gpt-4o-mini verdicts + text-embedding-3-small retrieval, exactly as Items 3/4 built them.
+
+### The non-redundant gap, restated (why this isn't verdict_guard again)
+`verdict_guard.py` validates that citations RESOLVE to real rows that form the claimed structure.
+It is blind to whether the PROSE is accurate. A rationale can cite the correct 6 cycle edges (FLAG)
+yet assert "funds returned within 24 hours through a shell company" — timing/entity claims no edge
+supports. This eval is a first, narrower cut at Item E's deferred prose-entailment half. Confirmed
+by reading verdict_guard.py: the rationale field is passed in but read by no gate.
+
+### The object scored: claim_for_transaction(), NOT evaluate_transaction()
+`evaluate_transaction()` returns a `VerdictOutcome` that carries the DETERMINISTIC reason only —
+none of the model's prose. The rationale lives on `Claim.rationale`, reachable via
+`claim_for_transaction()`. It is a single free-text field, not "slots". The golden-set builder
+calls claim_for_transaction() once per subject then the PURE evaluate_claim() (records the branch),
+so each subject costs exactly one gpt-4o-mini + one embedding and no more.
+
+### The golden set (eval/grounding/, committed, reproducible without OpenAI)
+- 32 REAL tuples, cached from 64 approved one-time OpenAI calls (32 chat + 32 embed). Subjects
+  chosen deterministically to span the brake's branches: 12 CYCLE / 10 SG witnesses / 5 GS-or-STACK
+  / 5 NO_WITNESS. Verdict skew is real: 26 INSUFFICIENT_COVERAGE (20 unfaithful_citation), 4 NO_FLAG,
+  2 FLAG. The skew is verdict_guard's CITATION half working; it is NOT prose faithfulness.
+- The NO_WITNESS subjects produced NATURALLY-OCCURRING hallucinations — the model confabulated a
+  scatter-gather on benign edges. Real ground-truth negatives, not synthetic.
+- 8 CLAUDE-CODE-AUTHORED adversarial negatives (labeled loudly as such, NOT "synthetic", NOT
+  model-produced), each perturbing a verified-faithful FLAG anchor with one unsupported claim over
+  its REAL grounding: timing / corporate-form / intent / fabricated-aggregate / fabricated-hop /
+  reversed-direction / external-reference / fabricated-recurrence. They exist because gpt-4o-mini
+  writes mostly faithful prose, so a faithful-only set would measure only the judge's FP rate.
+
+### THE GROUNDING-REPRESENTATION BUG (found by calibration, fixed)
+First calibration scored the two VERIFIED-FAITHFUL anchors 0.00 — worst possible. Cause was mine,
+not the judge's: the grounding context rendered accounts with 8-char prefixes while the agent's
+prompt (and therefore its rationale) uses 6-char `_frag` fragments. The judge correctly read
+`41ce7e` vs `41ce7e96` as a contradiction. FIX: the grounding must mirror the agent's OWN evidence
+representation exactly (6-char frags, same edge-line format). Rebuilt offline (no OpenAI) via a
+`rebuild` subcommand. LESSON: a faithfulness eval must score prose against the identical evidence
+the model saw, not a re-rendering — else it measures a formatting mismatch.
+
+### THE CALIBRATION FINDING (the load-bearing Item-8 result so far)
+Calibrated BOTH judges on 8 hand-read tuples (faithful anchors + natural confabulations + authored
+negatives) BEFORE any full run, per discipline. Two independent problems surfaced:
+1. **DeepEval's built-in FaithfulnessMetric is contradiction-only.** It scores a claim unfaithful
+   only if it CONTRADICTS the context; unsupported ADDITIONS that merely aren't mentioned pass. So
+   the fabricated-hop negative (an account absent from the edge list) and the 24h-timing negative
+   both scored 1.00 "fully faithful" — "there are no contradictions." Structurally blind to exactly
+   the additive hallucinations Item 8 targets. Both judges, same blind spot.
+2. **Both judges misread dense id-laden structural prose.** nemotron scored a faithful cycle 0.00
+   by miscounting hops ("claim says 5 transfers, context implies 6"); gemma was lenient the other
+   way. Nemotron also needs `response_format=json_object` or it intermittently wraps output in
+   {analysis, final} and breaks DeepEval's schema.model_validate.
+FIX for (1): a GEval custom rubric that penalizes UNSUPPORTED claims, not only contradictions.
+Recovered discrimination — on gemma: faithful cycle 1.00, both confabulations 0.20, reversed 0.20,
+timing 0.40 (vs the built-in metric's 1.00s). At threshold 0.5, gemma+GEval agrees with my read
+6/8; nemotron+GEval 5/8. Both independently flag the clear hallucinations; both remain unreliable
+on the two hardest structural-reasoning edge cases (cycle-length counting; one fabricated account
+among many real ones) — disclosed, not smoothed. RECOMMENDATION: GEval rubric (not built-in
+Faithfulness) as the primary metric; gemma primary judge (free, better discriminator) with
+nemotron as the independent zero-shared-failure cross-check.
+
+### Retrieval metrics — the 4-doc caveat stands (as Item 3 flagged for the vector index)
+ContextualPrecision/Recall/Relevancy against a 4-document corpus at k=3 are near-guaranteed to look
+strong and will be reported with that caveat loudly attached, or held. The HEADLINE is the
+generation/prose-entailment metric above.
+
+### Credit + scope
+NVIDIA usage through calibration: ~55 small requests (Step-0 smoke + 3 nemotron calibration passes),
+negligible against the 1,000 allowance; gemma runs are free via Ollama cloud. A full 40-tuple GEval
+run is ~40-80 nemotron calls — affordable, but not to be re-run repeatedly on nemotron. NO migration,
+NO new DB table (golden set is a flat committed JSON), NO write to aml_*/typology_corpus/the five
+tables, NO modification to Item 1/7 data. `.deepeval/` gitignored (no secret in it).
+
+### NOT done this session (still gated): the full GEval run pending approval of the metric switch;
+### Item E's prose-entailment guard as a runtime brake (this is an offline eval, not a guard); the
+### regulatory corpus; Item 9/A/B/F/10. Do NOT wire a faithfulness check into the live verdict path
+### without approval — that is Item E, not Item 8.
