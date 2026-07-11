@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.services.aml_agent import _frag, neighbourhood, structure_text
+from app.services.aml_evidence import _frag, neighbourhood
 from app.services.aml_graph import Edge, Graph
 from app.services.aml_interrogate import TraversalKind, Witness, interrogate
 from app.services.verdict_guard import VerdictOutcome
