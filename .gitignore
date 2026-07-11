@@ -19,6 +19,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+# DeepEval CLI local-model config + telemetry (Item 8 judge points at NVIDIA NIM;
+# the key is NOT stored here — it lives in .env's NVIDIA_API_KEY, read at runtime).
+.deepeval/
+.deepeval_telemetry.txt
 
 # --- Local diagnostic output / logs ---
 *.log
