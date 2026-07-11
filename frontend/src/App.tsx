@@ -5,6 +5,7 @@ import { DecisionFeed } from "./components/DecisionFeed";
 import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
 import { ConsistencyDemo } from "./components/ConsistencyDemo";
+import { HonestyLedger } from "./components/HonestyLedger";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -86,11 +87,11 @@ function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["a
 }
 
 /** Which surface fills the console body. "consistency" is the standalone fleet-level demo
- *  (Frontend Phase 4) — it takes over the whole body rather than hanging off a selected row,
- *  because it is fleet-scoped, not per-decision/per-agent like the four supervisor interactions.
- *  A plain view flag (no router, no new dep); the demo's own destructive lifecycle lives inside
- *  ConsistencyDemo, and leaving the view unmounts it (which aborts any live stream). */
-type View = "console" | "consistency";
+ *  (Frontend Phase 4); "ledger" is the honesty ledger (Item 9). Both take over the whole body
+ *  rather than hanging off a selected row, because they are fleet-scoped, not per-decision/
+ *  per-agent like the four supervisor interactions — the same "fleet-scoped ⇒ header mode"
+ *  reasoning Phase 4 used. A plain view flag (no router, no new dep). */
+type View = "console" | "consistency" | "ledger";
 
 function App() {
   const { agents, decisions, beliefs } = useConsoleData();
@@ -248,12 +249,21 @@ function App() {
           >
             Consistency demo
           </button>
+          <button
+            className="console__view"
+            aria-pressed={view === "ledger"}
+            onClick={() => setView("ledger")}
+          >
+            Ledger
+          </button>
         </nav>
         <FleetSummary agents={agents} />
       </header>
 
       {view === "consistency" ? (
         <ConsistencyDemo />
+      ) : view === "ledger" ? (
+        <HonestyLedger agents={agents} decisions={decisions} beliefs={beliefs} />
       ) : (
         <div className="console__body">
           <div className="console__region">

@@ -67,6 +67,17 @@ export interface BeliefPerformanceResponse {
   count: number;
 }
 
+/** Top-line provenance-integrity verdict (ProvenanceAuditResponse, Item A). The full
+ *  backend DTO also carries a per-edge `edges[]` report; the honesty ledger consumes only
+ *  this top-line fact (a zero-argument data-point, not a per-edge UI), so `edges` is omitted. */
+export interface ProvenanceAuditResponse {
+  belief_id: UUID;
+  belief_status: string;
+  status: string; // 'CLEAN' | 'ANOMALOUS' | 'INCONCLUSIVE'
+  edge_count: number;
+  anomaly_count: number;
+}
+
 export interface LineageNode {
   depth: number;
   agent_id: UUID;
