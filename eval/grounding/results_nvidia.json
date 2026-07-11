@@ -1,0 +1,362 @@
+[
+  {
+    "subject_id": "045adfd2-a822-566f-9cd2-6a17fc150539",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a CYCLE typology and describes a cycle starting and ending at account 496d39 after 10 transfers, with no account revisited as a sender. While the structural facts mention that funds can reach the original source account again after 10 transfers from the destination account, they do not specify that the path forms a cycle, that it starts at 496d39, that no account is revisited as a sender, or that the typology is CYCLE. The retrieval context provides transaction edges but does not entail a closed loop or the specific path described. The claim about the cycle and its properties adds information not present in the context, making it unsupported."
+    }
+  },
+  {
+    "subject_id": "07ffb837-8e96-582b-bdbc-f39238bbef2c",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a cycle involving specific accounts and transaction IDs (dda0ba \u2192 ec3968 \u2192 968306 \u2192 639182 \u2192 ec3968 \u2192 dda0ba) and states the funds return to the original source after a sequence of transfers. While the structural facts mention that funds can reach the original source after 10 transfers from the destination, the output specifies a much shorter path (4 transfers) and names intermediate accounts (968306, 639182) and transaction IDs (609cd146-a3ca-5045-8eab-2bed2036ffe2, 291bb10c-8e34-5768-b577-55aaeb898535) that are present in the context. However, the context does not state that these specific transactions form a direct path from ec3968 to 968306 to 639182 and back to ec3968; it only lists individual transactions without confirming they connect in that sequence. The claim that funds go from ec3968 to 968306 (via 609cd146...) and then to 639182 (via 291bb10c...) and back to ec3968 is not explicitly stated or directly entailed by the context \u2014 the return leg from 639182 to ec3968 is not present in the context at all. Thus, the output adds unsupported details about the flow and structure, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "1384b7bc-5a0b-5cc3-9fcb-773d254c7498",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The actual output claims a specific cycle path (aca4ca \u2192 8a204c \u2192 e0795b \u2192 e56936 \u2192 9835b6 \u2192 e25373 \u2192 db3161 \u2192 045f3a \u2192 ba8447 \u2192 aca4ca) and identifies it as a CYCLE typology. While the retrieval context confirms the existence of a cycle (funds can reach the original source after 10 transfers) and includes the first two edges (aca4ca \u2192 8a204c and 8a204c \u2192 e0795b), it does not provide any transaction or structural fact supporting the subsequent edges in the claimed path (e.g., e0795b \u2192 e56936, e56936 \u2192 9835b6, etc.). The context contains no edge from e0795b to e56936, nor from e56936 to 9835b6, nor any of the other links in the proposed cycle. Therefore, the specific cycle path described is not entailed by the context and adds unsupported details. The claim of a CYCLE typology is weakly supported by the general statement about reachability after 10 transfers, but the detailed path is fabricated. This constitutes an unsupported claim that adds information not present in the context, warranting a reduced score."
+    }
+  },
+  {
+    "subject_id": "13f81205-d310-5f8f-90e4-f54b2e23dae8",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a cycle involving accounts 72fc35, 496d39, c3a6ca, and back to 72fc35 after 10 transfers, but the retrieval context does not contain a transaction from c3a6ca back to 72fc35; instead, it shows c3a6ca sending funds to 52c6f9, 71ae93 (twice), and receiving from 496d39 and 277ccd. The claim of a 10-transfer cycle returning to the source is not supported by the provided edge list, making it an unsupported addition."
+    }
+  },
+  {
+    "subject_id": "148a71ad-3367-50d9-8d09-16c2a275f5a6",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.4,
+      "reason": "The output claims a CYCLE typology and describes a specific path (c3a6ca \u2192 52c6f9 \u2192 35c55f \u2192 ... \u2192 c3a6ca) returning after 10 transfers. While the structural facts mention that funds can reach the original source after 10 transfers from the destination account, they do not specify the exact intermediate accounts (52c6f9, 35c55f) or confirm that the path forms a simple cycle visiting each account at most once. The retrieval context provides no edge from 35c55f back to c3a6ca or any account, nor does it confirm the sequence of accounts in the cycle. Thus, the specific account sequence and cycle closure are unsupported additions, making the claim not fully entailed by the context."
+    }
+  },
+  {
+    "subject_id": "1579aa59-7c74-5709-b0ab-397476351067",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a specific cycle path with named accounts and transaction IDs (e.g., account 148859 to fa9fa7 via transaction 1579aa59-7c74-5709-b0ab-397476351067, then to dda0ba via 781d8b2b-dbdb-5292-b99d-8a2ddf58edbe, etc.), but the retrieval context only provides the structural facts and a list of individual transactions without confirming that these specific accounts and transaction IDs form a connected cycle. While the context states that 'following transfers onward from the destination account, the funds can reach the original source account again after 10 transfers,' it does not specify the exact path, account sequence, or transaction IDs involved. Therefore, the detailed cycle description adds information not present in the context, making it unsupported."
+    }
+  },
+  {
+    "subject_id": "17035dce-7281-576e-bfd1-64dc6529ed1a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a specific cycle of accounts (e56936 \u2192 9835b6 \u2192 8a204c \u2192 aca4ca \u2192 e25373 \u2192 db3161 \u2192 045f3a \u2192 e56936) and states that each transaction follows the previous one without repeating any sender account, and that funds return to the original source account. However, the retrieval context only provides the structural facts and a list of individual transactions. It does not contain any transaction from 045f3a back to e56936, nor does it confirm the exact sequence of accounts as claimed. The context includes transaction 91795a5d-9402-5ab1-84eb-1cea52e16aed where db3161 sends to 045f3a, but there is no transaction from 045f3a to e56936 in the provided list. Therefore, the claim about the cycle closing back to e56936 is unsupported. Additionally, the output asserts that no sender account is repeated in the cycle, but this cannot be verified from the context alone without the full sequence being present. Since the cycle closure is a key factual claim and is not entailed by the context, the output contains unsupported information."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a specific cycle involving accounts 41ce7e, dc9cc4, 6e804f, ca932b, d30dab, and back to 41ce7e with explicit transaction IDs and amounts. While the structural facts support a cycle after 6 transfers from destination to source, the retrieval context does not contain the exact sequence of transactions or accounts claimed (e.g., transaction 84f27e1b-9134-5c67-af7c-e9e932f494f3 is listed but with dc9cc4 sending to 6e804f, which matches; however, the subsequent steps like 6e804f to ca932b via 769b0914-0975-5cad-9818-80ee86288641 is present, but ca932b to d30dab via 300c7b97-b5f1-578f-bc02-c62f08c27510 is present, and d30dab to e25aba via 2f1c1d6c-7f73-56ea-ba8c-076758945e4a is present, but the output claims d30dab sends to e25aba and then e25aba to 41ce7e via df930d1a-db83-543d-b2c2-1eb5af8b0640, which is in the context. However, the output states the cycle returns to account 41ce7e, but the context shows df930d1a-db83-543d-b2c2-1eb5af8b0640 is from e25aba to 41ce7e, meaning the account before 41ce7e is e25aba, not d30dab. The output incorrectly states d30dab sends directly to 41ce7e, but the context shows d30dab sends to e25aba, and e25aba sends to 41ce7e. Thus, the claimed cycle skips e25aba and misrepresents the path. Additionally, the output asserts the cycle 'fulfills the criteria for a cycle laundering pattern' and returns after 6 transfers, but the context only states that following transfers from the destination account can reach the original source after 6 transfers \u2014 it does not confirm the exact path or that it is a simple cycle visiting each account at most once. The typology definition supports the idea of a cycle, but the specific instance claimed is not fully entailed due to the incorrect path and unsupported claim of a 6-transfer return via that exact route. Therefore, the output adds unsupported details and misrepresents the flow."
+    }
+  },
+  {
+    "subject_id": "291bb10c-8e34-5768-b577-55aaeb898535",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a specific cycle involving accounts 968306, 639182, 79564c, 72fc35, 496d39, c3a6ca, and back to 968306 and 148a71ad-3367-50d9-8d09-16c2a275f5a6, with specific transaction IDs and directions. However, the retrieval context only provides the structural facts and a list of individual transactions, none of which confirm the exact sequence or closure of the claimed cycle. The context does not state that funds from the destination account (639182) go to 79564c, then to 72fc35, then to 496d39, then to c3a6ca, then back to 968306, and finally to the original source account. While some individual transactions in the claimed path exist in the context (e.g., 6ab98b5c-87c1-50de-a841-c3b7af68a5dd, b1e47421-9b21-5bf0-8fd4-09acaaf879be, c0b04ca9-5e94-5fce-9c0a-6c8596f5e73d, c793d7ae-df55-506c-bee7-5f9e7b9dce97, 13f81205-d310-5f8f-90e4-f54b2e23dae8, 4ac06883-c234-5028-a671-dd81a4fceacf, 9965452e-8090-57be-bc0d-f0e41dee9a7a, 148a71ad-3367-50d9-8d09-16c2a275f5a6), the specific chaining and directionality as described (e.g., funds moving from 79564c to 72fc35, then to 496d39, etc.) is not explicitly stated or directly entailed by the context. The context does not confirm that the transaction from 79564c to 72fc35 exists, nor that 72fc35 sends to 496d39 via the claimed transaction, nor that c3a6ca sends back to 968306, nor that the final step reaches the original source account via the claimed path. The structural fact mentions that funds can reach the original source after 10 transfers from the destination, but does not specify the path or confirm the exact cycle claimed. Therefore, the output adds unsupported details about the specific flow, timing, and account sequence, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "2de125f7-297c-5c03-ade2-b9baad3a5311",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a cycle involving specific account IDs (b3f864, 4dee45, 4f77eb, 109c01) and a return path, but the retrieval context only provides the structural facts and a list of individual transactions without confirming the existence of a directed path from 109c01 back to b3f864. While the structural fact states that funds can reach the original source after 10 transfers from the destination account, it does not specify the exact route or confirm the intermediate accounts used in the claimed cycle. The output adds unsupported details about the specific sequence and closure of the cycle, which are not entailed by the context."
+    }
+  },
+  {
+    "subject_id": "2f1c1d6c-7f73-56ea-ba8c-076758945e4a",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a specific cycle of accounts and transaction IDs (d30dab \u2192 e25aba \u2192 41ce7e \u2192 dc9cc4 \u2192 6e804f \u2192 d30dab) with explicit transaction IDs, but the retrieval context only provides the first edge (d30dab \u2192 e25aba via transaction 2f1c1d6c-7f73-56ea-ba8c-076758945e4a) and does not contain any of the subsequent transactions or accounts in the claimed cycle. The context does not support the existence of the other transactions (df930d1a-db83-543d-b2c2-1eb5af8b0640, 185f748d-f99e-58f4-bcab-e1b7114a8d3a, 84f27e1b-9134-5c67-af7c-e9e932f494f3, 4956641a-1326-5b9d-8aa8-ea90028c6cb3) or the intermediate accounts (e25aba, 41ce7e, dc9cc4, 6e804f) in the described sequence. Therefore, the output adds unsupported details about the cycle structure, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "2f3bb27c-ba08-5835-b371-566f6eb2bb42",
+    "category": "CYCLE_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a cycle involving specific accounts and transactions (e.g., 2ac86d to 78cb9e via 31c56706-4fb2-57c6-93ea-ad5e084f86b2, then to c3c413 via c2502661-1c57-5f4f-8c9a-cae8d0ccd1ae, and back to 1bc80a via cfe8d856-4733-58b3-a99b-65afae13c0a3). However, the retrieval context shows that cfe8d856-4733-58b3-a99b-65afae13c0a3 is from account 253a15 to 1bc80a, not from c3c413 to 1bc80a. There is no transaction in the context from c3c413 to 1bc80a, and the path described does not exist in the provided edge list. The claim that funds return to the original source account through that specific transaction is unsupported and contradicted by the context, which shows a different sender (253a15) for that transaction ID. This constitutes an outright contradiction and an unsupported addition of structure not present in the facts."
+    }
+  },
+  {
+    "subject_id": "08a8a98e-37f0-5d53-ae3b-fae547f5de79",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a scatter-gather structure with specific intermediary accounts (ca350c, 4d2c8d, etc.) and a destination account (73d8ae), but the structural facts only state that the source sends to 15 distinct accounts and the destination receives from 2 and sends to 3, without naming any accounts or confirming that intermediaries send to a common destination. The retrieval context lists many transactions but does not show that the intermediaries (e.g., ca350c, 4d2c8d) send funds to 73d8ae as part of the subject transaction's neighbourhood or that they converge on a single destination in a way that matches the scatter-gather typology definition. The output adds unsupported details about account roles and flow paths not entailed by the context."
+    }
+  },
+  {
+    "subject_id": "096ee0ac-051d-549e-bb02-a570092ce47f",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output correctly identifies the transaction and accounts from the context, and the scatter-gather claim is supported by the structural facts and edge list showing f52965 sending to three distinct accounts. However, the claim that funds are 'gathered back into these distinct accounts' is unsupported; the context shows no incoming edges to f52965 from those accounts, only outgoing, so the gather part is not entailed. This adds information not in the context, resulting in a partial failure."
+    }
+  },
+  {
+    "subject_id": "099ae54b-70a3-556e-aec0-9a2784e32c83",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the transaction details and structural facts from the context, including the ACH transfer amount, source and destination accounts, and the fan-out/fan-in pattern. It accurately maps the structure to the SCATTER-GATHER typology as defined in the retrieval context, with all claims being directly supported by the provided edge list and typology definition. No unsupported or contradictory claims are made."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output correctly identifies the transaction and accounts from the context, but introduces unsupported specifics: it names only four intermediary accounts (1b6a80fd..., 22f0b8a3..., 36c2bed5..., 37ebc195...) and five transaction IDs for scatter paths, while the context states the source sends to 10 distinct accounts and at most 7 of them send to one same further account. It also claims these specific intermediaries send to 'be7a48' as the common destination, but the context does not identify which accounts are the intermediaries or confirm that these exact accounts send to be7a48; it only states that at most 7 of the 10 recipients send funds to one and the same further account, without naming it. These additions go beyond what is entailed by the structural facts."
+    }
+  },
+  {
+    "subject_id": "0e227181-3407-5df5-9216-b38da3e84c1e",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the transaction ID, source and destination accounts, and the scatter-gather typology based on the source sending to 15 distinct accounts and those accounts sending to a common destination (73d8ae), which is supported by the structural facts and edge list. All claims are explicitly stated or directly entailed by the context, with no unsupported additions or contradictions."
+    }
+  },
+  {
+    "subject_id": "16ddbae7-800b-51f8-bf1b-7ab848a96e4e",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the transaction ID, accounts, amount, and transfer type from the context, and accurately describes the fan-out and fan-in structure supported by the edge list. The claim that the structure matches SCATTER-GATHER is directly entailed by the typology definition and the structural facts, which state the source sends to 15 accounts and at most 15 of them send to one same further account, satisfying the scatter-gather condition. No unsupported or contradictory claims are made."
+    }
+  },
+  {
+    "subject_id": "1b6a80fd-98d9-5a1f-8ba2-d70fc2722339",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.4,
+      "reason": "The output correctly identifies the transaction and accounts from the context, and the scatter-gather claim is supported by the structural facts and typology definition. However, it adds unsupported details: it claims the destination account receives funds from multiple other accounts (e.g., 0bc572e6, 22f0b8a3, 36c2bed5, 37ebc195) as distinct sources, but the context only shows these accounts receiving funds from the source account (0de6aa), not sending to the destination (44afe0). It also states funds are gathered into the destination account, which contradicts the structural fact that the destination receives from only 1 distinct account. These unsupported and contradictory claims reduce fidelity."
+    }
+  },
+  {
+    "subject_id": "208e13a9-0d52-5175-8f88-82eb7e028319",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the transaction details and the SCATTER-GATHER typology, which is supported by the structural facts and edge list showing the source account sending to multiple intermediaries that converge on a common destination account. All claims about accounts, transaction IDs, amounts, and flow direction are explicitly stated or directly entailed by the retrieval context. No unsupported or contradictory claims are made."
+    }
+  },
+  {
+    "subject_id": "22f0b8a3-e7cf-50ee-8f3f-b000d879c8df",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a scatter-gather pattern and lists specific accounts (0de6aa as source, f83b0a, 44afe0, 993210, ee0980, add5c6 as intermediaries, be7a48 as destination) that are not all supported by the context. While the context confirms the source account 0de6aa sends to those accounts via transactions, it does not state that all of those intermediary accounts send funds to the same destination account be7a48. Only f83b0a, 44afe0, ee0980, and add5c6 are shown sending to be7a48 in the context; there is no evidence that 993210 sends to be7a48. Thus, the claim that 'each of these accounts then sends funds to a common destination account (be7a48)' includes an unsupported claim about 993210, making the output not fully faithful."
+    }
+  },
+  {
+    "subject_id": "273b690f-cb47-541b-9edf-9d4f3f42dde9",
+    "category": "SG_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 1.0,
+      "reason": "The output correctly identifies the transaction ID, accounts, amount, and transfer type from the context, and accurately describes the source sending to 15 accounts and the destination receiving from one account. It then infers a SCATTER-GATHER typology based on the intermediaries sending to a common further account (73d8ae), which is supported by multiple transactions in the context showing those intermediaries sending funds to 73d8ae. The claim about gathering back into a single destination account is entailed by the structural fact that 'at most 15 of them send funds onward to one and the same further account' and the evidence of multiple intermediaries sending to 73d8ae. No unsupported or contradictory claims are made."
+    }
+  },
+  {
+    "subject_id": "072dcfb9-4352-5de9-80dc-f405a59ed44c",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a scatter-gather pattern and describes funds being sent from source account 759f57 to destination account 027827 through multiple transactions (Cheque and ACH), then to accounts 010dc9 and ffe831 as a fan-out and fan-in. However, the structural facts state the source account sends funds to only 1 distinct account and receives from 0, which contradicts the claim of a fan-out (requiring at least two outgoing edges). The destination account sends to 2 and receives from 2, but the scatter-gather typology requires the fan-out and fan-in to connect the same set of intermediate accounts, which is not supported \u2014 the source only connects to one account (the destination), not multiple intermediaries. The output adds unsupported details like multiple transactions (both Cheque and ACH) from source to destination (only one Cheque transaction is listed in the context for that specific transfer, though another ACH exists from same source to same destination, but this still doesn't create a fan-out from source), and misrepresents the direction and structure. These are unsupported or contradicted claims."
+    }
+  },
+  {
+    "subject_id": "09b1d610-1f4f-5b29-b999-0dd02a663263",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a CYCLE typology and describes a specific cycle starting and ending at account 16b2d6, including transaction b89c2d61-add4-531d-a416-96f01cce49d4 as 1c023f -> 1c023f (a self-loop). However, the retrieval context shows that transaction b89c2d61-add4-531d-a416-96f01cce49d4 is actually from account 04f759 to 1c023f, not a self-loop. Additionally, the structural facts state that the source account (16b2d6) sends to 1 distinct account and receives from 0, and the destination (1c023f) sends to 14 and receives from 9, with no return path from destination to source within the search budget \u2014 directly contradicting the claimed cycle. The output adds unsupported details about a cycle and misrepresents transaction direction, making multiple claims not entailed by the context."
+    }
+  },
+  {
+    "subject_id": "0aad49a1-c7e2-5a14-a21c-e22ad76d1434",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a CYCLE typology and describes a specific cycle of accounts (86afa0 \u2192 3776ff \u2192 242618 \u2192 6af4c1 \u2192 3776ff \u2192 86afa0). However, the retrieval context does not support the existence of a transaction from 6af4c1 back to 3776ff or from 3776ff back to 86afa0 to close the cycle. While the context includes transactions from 86afa0 to 3776ff and from 3776ff to 242618 and 6af4c1, it does not include any transaction from 6af4c1 to 3776ff or from 3776ff to 86afa0. The claim of a cycle therefore adds information not present in the context, violating faithfulness. The structural facts also state that funds from the destination account do not reach the original source within the search budget, which contradicts the implied cycle closure. Thus, the output makes unsupported claims."
+    }
+  },
+  {
+    "subject_id": "0c247eef-6aa4-536c-b8bb-27261347e557",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a CYCLE typology and describes a specific sequence of transactions forming a cycle that returns to the source account, but the retrieval context explicitly states that following transfers onward from the destination account, the funds do not reach the original source account within the search budget, directly contradicting the claimed cycle. Additionally, the output lists specific transaction IDs and account sequences (e.g., 0c247eef -> 10bf9bfb -> ...) that are not verified as forming a closed loop in the context; while some individual transactions exist, the context does not support the claim that they form a cycle returning to 208d78. Thus, the output makes unsupported and contradicted claims about structure and flow direction."
+    }
+  },
+  {
+    "subject_id": "0c8fed02-5a7f-5ab0-b8bf-24f5df2b4d58",
+    "category": "GS_OR_STACK_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a cycle typology and describes a specific transaction path (514a9f \u2192 bbe7f9 \u2192 3afdae \u2192 514a9f) as forming a cycle, but the retrieval context does not support that bbe7f9 sends funds to 3afdae and then that funds return to 514a9f via a transaction from 514a9f to cb956e; instead, the context shows bbe7f9 sends to 3afdae (transaction 31a93e0b-455d-5277-a9fc-20c8a05dcbb1) and de1bf4ef-2b99-5da4-94b8-c6041474b5f6, and 514a9f sends to cb956e (transaction 36ae9c88-00f8-5ee0-9413-4e25d3ec96f6), not to 3afdae or back from 3afdae to 514a9f. The claimed cycle path is not present in the context, making the claim unsupported. Additionally, the output adds details like transaction ids and amounts not tied to a cycle in the context, and asserts a return to origin that the structural facts explicitly deny (funds from destination do not reach original source within search budget). These are unsupported additions and contradictions."
+    }
+  },
+  {
+    "subject_id": "008d48c6-e003-5f93-93a5-6e96bcbfe4c3",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a scatter-gather typology and describes a pattern where funds are sent from source account b08bcb to destination account 7ff480 through multiple transactions (008d48c6, 10da7ad4, 879ca709), and that the destination sends to multiple accounts (327767 and 9bcbea) and receives from multiple accounts. The retrieval context confirms the existence of the three transactions from b08bcb to 7ff480, and that 7ff480 sends to 327767 and 9bcbea and receives from a5e446 and another account (inferred from the edge list showing two incoming edges to 7ff480: from a5e446 and one other). The structural facts state the source sends to 1 distinct account and receives from 0, and the destination sends to 2 and receives from 2, which matches. The typology definition provided in the context requires fan-out from source and fan-in to destination connecting to the same set of intermediate accounts. However, the context does not show that the intermediate accounts (the ones the source sends to and the destination receives from) are the same set. The source sends only to 7ff480 (one account), and the destination receives from a5e446 and one other (not b08bcb). Thus, the fan-out set is {7ff480} and the fan-in set does not include 7ff480 as an intermediary in the required way; the scatter-gather definition requires the fan-out and fan-in to connect via the same intermediate accounts, which is not supported. The output incorrectly assumes the pattern matches scatter-gather without verifying the intermediate account overlap, adding unsupported typological reasoning. Therefore, the claim of SCATTER typology is not entailed by the context."
+    }
+  },
+  {
+    "subject_id": "00ba6e26-aa25-57ed-9016-26e6576cf47d",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.4,
+      "reason": "The output claims the transaction sends funds from account 5f99c2 to a3262f, which is supported by the context. It also claims a3262f sends funds to 3827ed and 166cba, which is supported by transactions 10acd3a4 and 29f1cb31. However, it claims that funds from 3827ed and 166cba are gathered back into a single destination account 3827ed, implying 166cba sends to 3827ed, which is not present in the context. The output also states the structure matches scatter-gather due to scattering from 5f99c2 to multiple intermediaries and gathering into 3827ed, but the context only shows that 5f99c2 sends to 16 accounts, and of those, at most 16 send to one same further account \u2014 it does not confirm that the intermediaries (like 3827ed and 166cba) both send to 3827ed. The claim about gathering into 3827ed from 166cba is unsupported, making the typology claim unjustified."
+    }
+  },
+  {
+    "subject_id": "00d7b6c3-feb0-5eb7-8565-56c6f0bfd4dd",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a SCATTER-GATHER typology based on a specific pattern involving source account d30dab sending to intermediaries c8f5d1 and 5a6edb, then gathering into destination e25aba. However, the structural facts only state that the source sends to 5 distinct accounts and receives from 2, and the destination receives from 1 distinct account. The output specifies particular intermediary accounts and a gather-back mechanism, but the context does not confirm that the funds from the intermediaries reach the destination account e25aba, nor that the same set of intermediaries is involved in both scatter and gather. The claim about funds being gathered back into a single destination account is not entailed by the structural facts, which only confirm the destination receives from 1 account total \u2014 not that it receives from the intermediaries the source sent to. Thus, the output adds unsupported details about the flow path and intermediary roles."
+    }
+  },
+  {
+    "subject_id": "01238194-515c-5fe5-bc06-49c92216aea6",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.2,
+      "reason": "The actual output makes several unsupported claims: it asserts a scatter-gather pattern involving intermediaries and a fan-in/fan-out structure connecting the same source and destination via intermediate accounts, but the retrieval context shows no evidence that the accounts the source sends to (only 38e324) have any further connections, nor that there is a fan-in from multiple sources to an intermediary and then fan-out to multiple destinations. The context only shows multiple sources sending directly to 38e324, with no intermediary layer or shared intermediate accounts between source and destination. The claim that funds are scattered to multiple intermediaries and gathered back into the same destination account is not entailed by the structural facts, which state the source sends to 1 distinct account and the destination receives from 3 distinct accounts with no onward transfers recorded. The output adds structure (intermediaries, fan-out/fan-in via same set) not present in the context."
+    }
+  },
+  {
+    "subject_id": "0126e764-53b5-531c-b034-046962599925",
+    "category": "NO_WITNESS",
+    "label_faithful": null,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a scatter-gather typology and describes a specific structure involving accounts 4cbbbc, 579a2c, d72c4d, and f12c5a. The structural facts confirm the source sends to 2 accounts and destination receives from 7, but do not specify that the two accounts the source sends to (579a2c and d72c4d) both send to the same destination (f12c5a). While the edge list shows 579a2c \u2192 f12c5a (via two transactions), there is no edge from d72c4d to f12c5a in the provided context. The claim that 'these accounts then send funds to a common destination account (f12c5a)' adds unsupported information, as d72c4d \u2192 f12c5a is not present. This constitutes an unsupported claim, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-timing",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a directed cycle returning to account 41ce7e and that all six transfers occurred within a single 24-hour window, describing a rapid-cycling laundering signature. While the structural facts support a cycle of six transfers returning to the source, the context does not mention timing, a 24-hour window, or that the transfers were completed 'overnight'. These temporal claims are unsupported additions. The account 41ce7e is correctly identified as the source from the transaction detail, but the claim about the cycle's timing and characterization as a 'textbook rapid-cycling laundering signature' introduces information not present in or entailed by the context."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-corporate-form",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a CYCLE typology and adds unsupported details: it specifies a route from account 41ce7e through a shell company in an offshore secrecy jurisdiction, which is not mentioned or entailed in the structural facts or edge list. While the cycle claim is supported by the structural fact that funds can return to the source after 6 transfers, the additional claims about a shell company and offshore jurisdiction introduce information absent from the context, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-intent-mens-rea",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims the source account deliberately split funds to evade detection and keep transfers under $10,000, which introduces intent and a specific threshold not present in the structural facts or retrieval context. The context only provides transaction amounts and counts, with no mention of evasion, intent, or the $10,000 CTR threshold. While the SCATTER-GATHER typology claim is supported by the structure (source sends to 10 accounts, at most 7 of which send to a common further account), the added motivational and regulatory details are unsupported and thus constitute unsupported claims."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-fabricated-aggregate",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a scatter-gather typology and describes a scatter from account 0de6aa to multiple intermediaries gathering into a single destination, laundering over $2.4 million across scatter legs in a single burst. The structural facts support a scatter-gather interpretation: source sends to 10 accounts, at most 7 of those send to one same further account, and destination receives from 1 and sends to 1, consistent with gather. However, the output adds unsupported specifics: the amount 'over $2.4 million' is not in the context (only the initial transfer of 15968.23 is given), the claim of a 'single burst' implies timing not provided, and the intermediaries are not explicitly confirmed to gather into the destination account f83b0a (though context shows some send to be7a48, not necessarily the destination). The typology claim is plausible but the added details introduce unsupported claims, reducing faithfulness."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-fabricated-hop",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.5,
+      "reason": "The output claims a CYCLE typology and specifies that funds leave account 41ce7e, pass through intermediary account 9f3a11, and return after six transfers. While the context confirms a transfer from 41ce7e to dc9cc4 and mentions that funds can reach the original source after 6 transfers from the destination, it does not mention account 9f3a11 or any specific intermediary in the cycle. The claim about 9f3a11 is unsupported by the retrieval context, which only lists specific transactions and none involve 9f3a11. Thus, the output adds information not present in the context, violating faithfulness."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-reversed-direction",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a SCATTER-GATHER typology and describes funds being gathered into account 0de6aa from ten distinct source accounts and then scattered outward. However, the structural facts describe a source account sending to 10 distinct accounts and receiving from 2, and a destination account sending to 1 and receiving from 1, with no indication that the same account (0de6aa) acts as both a gatherer and scatterer in a unified pattern. The retrieval context does not state or entail that 0de6aa receives funds from ten distinct sources (it shows 0de6aa as a sender in multiple transactions, not a receiver from ten sources), nor does it support the claim that funds are gathered into 0de6aa from ten sources and then scattered from it. The claim adds unsupported structure and directionality not present in the facts."
+    }
+  },
+  {
+    "subject_id": "185f748d-f99e-58f4-bcab-e1b7114a8d3a::adv-external-reference",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.2,
+      "reason": "The output claims a CYCLE typology and references a FinCEN Advisory FIN-2019-A003 and a specific return to account 41ce7e, but the retrieval context contains no mention of FinCEN advisories, no explicit typology definitions beyond generic cycle description, and no statement that the six-hop return forms a documented or FinCEN-linked cycle. The claim of a FinCEN Advisory and the specificity of 'exactly that documented cycle' adds unsupported information not present in the context."
+    }
+  },
+  {
+    "subject_id": "0bc572e6-694a-53e7-ae62-6e3731d3d5f5::adv-fabricated-recurrence",
+    "category": "ADVERSARIAL_NEGATIVE",
+    "label_faithful": false,
+    "geval": {
+      "score": 0.3,
+      "reason": "The output claims a SCATTER-GATHER typology and adds unsupported details: a monthly cadence and an established laundering pipeline. The context provides only structural facts and a list of transactions, with no timing, recurrence, or intent. The claim of monthly recurrence and established pipeline is not entailed by the context, making it an unsupported addition. While the SCATTER-GATHER label may be plausible given the structure (source sends to 10 accounts, up to 7 converge on one further account), the added claims violate faithfulness. The score reflects the presence of unsupported claims."
+    }
+  }
+]

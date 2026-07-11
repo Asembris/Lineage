@@ -187,13 +187,19 @@ def score_one(t: dict, judge: LocalModel, metrics: list[str]) -> dict:
         except Exception as e:  # judge emitted non-conforming JSON etc. — record, don't crash
             out["faithfulness"] = {"score": None, "error": f"{type(e).__name__}: {str(e)[:160]}"}
     if "hallucination" in metrics:
-        m = HallucinationMetric(model=judge, threshold=0.5, include_reason=True, async_mode=False)
-        m.measure(tc)
-        out["hallucination"] = {"score": m.score, "reason": m.reason}
+        try:
+            m = HallucinationMetric(model=judge, threshold=0.5, include_reason=True, async_mode=False)
+            m.measure(tc)
+            out["hallucination"] = {"score": m.score, "reason": m.reason}
+        except Exception as e:
+            out["hallucination"] = {"score": None, "error": f"{type(e).__name__}: {str(e)[:160]}"}
     if "answer_relevancy" in metrics:
-        m = AnswerRelevancyMetric(model=judge, threshold=0.5, include_reason=True, async_mode=False)
-        m.measure(tc)
-        out["answer_relevancy"] = {"score": m.score, "reason": m.reason}
+        try:
+            m = AnswerRelevancyMetric(model=judge, threshold=0.5, include_reason=True, async_mode=False)
+            m.measure(tc)
+            out["answer_relevancy"] = {"score": m.score, "reason": m.reason}
+        except Exception as e:
+            out["answer_relevancy"] = {"score": None, "error": f"{type(e).__name__}: {str(e)[:160]}"}
     return out
 
 
@@ -219,6 +225,58 @@ def run_calibration(judge_name: str, metric: str = "faithfulness") -> None:
     print(f"-> {out_path}")
 
 
+def _mean(xs: list[float]) -> float | None:
+    xs = [x for x in xs if isinstance(x, (int, float))]
+    return round(sum(xs) / len(xs), 3) if xs else None
+
+
+def _summarize(results: list[dict], metrics: list[str]) -> None:
+    """Report json-parse failure counts and separation on the LABELED subset only.
+
+    We have ground-truth labels for: the 8 authored negatives (label_faithful=False) and the two
+    verified-FLAG faithful anchors. Everything else is unlabeled real prose (descriptive only). No
+    aggregate is allowed to hide the known 0.60 fabricated-account miss, so labeled negatives are
+    printed one per line, not averaged away.
+    """
+    faithful_anchors = {
+        "185f748d-f99e-58f4-bcab-e1b7114a8d3a",
+        "0bc572e6-694a-53e7-ae62-6e3731d3d5f5",
+    }
+    print("\n--- json-parse / call failures per metric (the real full-run count) ---")
+    for metric in metrics:
+        errs = [r for r in results if isinstance(r.get(metric), dict) and r[metric].get("score") is None]
+        print(f"  {metric:16s} failures: {len(errs)}/{len(results)}"
+              + (f"  e.g. {errs[0][metric].get('error')}" if errs else ""))
+
+    print("\n--- LABELED negatives (authored, label_faithful=False) — per tuple, NOT averaged ---")
+    for r in results:
+        if r.get("label_faithful") is False:
+            row = "  ".join(
+                f"{m}={r[m]['score']:.2f}" if isinstance(r.get(m), dict) and isinstance(r[m].get("score"), (int, float))
+                else f"{m}=ERR" for m in metrics
+            )
+            print(f"  {r['subject_id'][-28:]:<28} {row}")
+
+    print("\n--- verified-FAITHFUL anchors (should score HIGH on geval/faithfulness) ---")
+    for r in results:
+        if r["subject_id"] in faithful_anchors:
+            row = "  ".join(
+                f"{m}={r[m]['score']:.2f}" if isinstance(r.get(m), dict) and isinstance(r[m].get("score"), (int, float))
+                else f"{m}=ERR" for m in metrics
+            )
+            print(f"  {r['subject_id'][:12]:<12} {row}")
+
+    print("\n--- mean score by category (descriptive; unlabeled real prose) ---")
+    cats: dict[str, list[dict]] = {}
+    for r in results:
+        cats.setdefault(r.get("category") or "?", []).append(r)
+    for cat, rs in sorted(cats.items()):
+        cells = "  ".join(
+            f"{m}~{_mean([x[m]['score'] for x in rs if isinstance(x.get(m), dict)])}" for m in metrics
+        )
+        print(f"  {cat:22s} n={len(rs):<3} {cells}")
+
+
 def run_full(judge_name: str, metrics: list[str], include_adversarial: bool) -> None:
     judge = build_judge(judge_name)
     tuples = load_tuples(include_adversarial=include_adversarial)
@@ -230,6 +288,7 @@ def run_full(judge_name: str, metrics: list[str], include_adversarial: bool) -> 
     out_path = EVAL_DIR / f"results_{judge_name}.json"
     out_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"-> {out_path}  ({len(results)} scored)")
+    _summarize(results, metrics)
 
 
 def main() -> None:

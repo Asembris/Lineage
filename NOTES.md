@@ -2537,6 +2537,74 @@ among many real ones) — disclosed, not smoothed. RECOMMENDATION: GEval rubric 
 Faithfulness) as the primary metric; gemma primary judge (free, better discriminator) with
 nemotron as the independent zero-shared-failure cross-check.
 
+**RUBRIC PROVENANCE — the rubric was ITERATED on calibration, not pre-registered (in-sample
+caveat, stated the Item-7 way).** The GEval evaluation_steps were written AFTER watching the
+built-in metric fail on the calibration set: I saw additive hallucinations score 1.00, diagnosed
+contradiction-only, and authored the steps to explicitly penalize unsupported additions. So the
+6/8/5/8 calibration agreement is an IN-SAMPLE number for the rubric — it was tuned against those 8
+examples, not validated on a held-out set. This is the same dev-vs-hold-out honesty Item 7 drew:
+the calibration figure is "fitted"; the full 40-tuple run is the mostly-fresh test (only ~5 of the
+40 were in the calibration subset). The built-in metric, by contrast, was NOT tuned on anything —
+its 1.00-on-hallucinations failure is a clean, un-fitted result, which is why keeping its real
+numbers alongside GEval (per approval) is the honest control, not a discarded baseline.
+**Known disclosed miss, kept visible (do NOT smooth into an aggregate):** GEval-gemma scored the
+fabricated-account-among-real-ones negative 0.60 in calibration / 0.50 in the full run — ON the
+FAITHFUL side of the 0.5 threshold despite being labeled unfaithful. A real false-negative on the
+hardest pattern (one fabricated id buried among many real ones). It travels with every Item-8 number.
+
+### THE FULL-RUN NUMBERS (40 tuples = 32 real + 8 authored negatives; 2026-07-11)
+Headline judge gemma+GEval; cross-check nemotron+GEval; built-in Faithfulness/Hallucination kept
+alongside as the un-tuned control (per approval, the Item-7 way — the weak baseline's real numbers
+are reported, not dropped).
+
+**JSON-parse / call failures, from the ACTUAL full run (not "it worked"):**
+- gemma:    GEval 0/40, Faithfulness 0/40, Hallucination **6/40** (gemma emits a malformed verdict
+  key, e.g. `laverdict`, breaking DeepEval's Verdicts schema).
+- nemotron: GEval **0/40** — `response_format=json_object` is wired into the full-run harness
+  (JUDGES['nvidia'].generation_kwargs, read by build_judge in run_full), and it held over all 40.
+
+**THE DELTA — GEval vs built-in Faithfulness on the 8 authored hallucinations (mean geval-faithful
+score, higher = judged more faithful):**
+- built-in FaithfulnessMetric: **0.771** — MISSES them. Four of eight scored a flat **1.00 "fully
+  faithful"**: timing, corporate-form, external-reference, fabricated-recurrence — every one an
+  ADDITIVE unsupported claim, exactly the contradiction-only blind spot, now shown at scale not just
+  in calibration.
+- GEval rubric: **0.287** — CATCHES 7 of 8 below the 0.5 threshold. The one it misses is the
+  fabricated-hop at 0.50 (above).
+- HallucinationMetric adds nothing: ~0.00 on every authored hallucination (contradiction-based, so
+  "no contradiction" = "no hallucination") AND 6/40 parse failures — flaky and blind both.
+
+**GEval-gemma on the 10 LABELED tuples (8 negatives should be <0.5, 2 faithful anchors >=0.5):
+8/10 correct.** 7/8 negatives flagged (miss: fabricated-hop 0.50); 1/2 anchors (hit: cycle 1.00;
+MISS: the verified SG anchor 0.40 — a persistent false-negative on dense-id SG prose, calibration
+0.30 -> full 0.40). nemotron+GEval: 4/10 — it parks half the negatives at 0.50 and scored the
+verified cycle anchor 0.30 (systematic anti-CYCLE bias: CYCLE category mean 0.27 vs SG 0.72). gemma
+is decisively the better single judge; nemotron's value is only as an independent second opinion,
+and the two AGREE the clearest hallucinations are unfaithful (both score reversed-direction,
+external-reference, recurrence low) while DISAGREEING on the hard structural-reasoning cases.
+
+**GENERALIZATION beyond the tuned set (the in-sample rebuttal):** of the 8 authored negatives, only
+3 were seen during rubric iteration (timing, fabricated-hop, reversed). On the 5 FRESH ones
+(corporate-form, intent, fabricated-aggregate, external-reference, recurrence) GEval-gemma scored
+0.30/0.20/0.20/0.40/0.20 — **5/5 flagged below threshold.** The rubric generalizes; it is not just
+replaying calibration examples. On the 3 seen: 2/3 (fabricated-hop the miss).
+
+**Category means (descriptive, unlabeled real prose; gemma GEval):** CYCLE 0.575, SG 0.70,
+GS_OR_STACK 0.06, NO_WITNESS 0.22, ADVERSARIAL 0.287. Coherent signal: rationales on genuinely
+flag-capable, witnessed structures (CYCLE/SG) score more faithful than prose on non-witnessed
+edges (GS-or-STACK / NO_WITNESS), where the model confabulated a structure the graph denies. That
+aligns with the verdict_guard branch mix and is the descriptive story for the 32 unlabeled tuples.
+
+### Honest bottom line for the Item-8 writeup
+The corrected metric (GEval, penalizing unsupported claims) works — gemma flags 7/8 authored
+hallucinations and 5/5 fresh ones, versus the built-in metric that scored 4/8 as perfectly faithful
+— BUT it is not a clean instrument: two disclosed misses stand (fabricated-hop 0.50; faithful SG
+anchor 0.40), the judges are unreliable on dense structural-reasoning prose, and the labeled set is
+only 10 tuples (small, hand-read, rubric partly tuned on 5 of them). Item 8 is a credible SECONDARY
+result — "an LLM-judge faithfulness eval that catches the prose-entailment hallucinations
+verdict_guard structurally cannot, with its own instrument limits disclosed" — not a headline
+number to rival Item 7's detection precision/recall.
+
 ### Retrieval metrics — the 4-doc caveat stands (as Item 3 flagged for the vector index)
 ContextualPrecision/Recall/Relevancy against a 4-document corpus at k=3 are near-guaranteed to look
 strong and will be reported with that caveat loudly attached, or held. The HEADLINE is the
