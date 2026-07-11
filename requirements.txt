@@ -40,3 +40,13 @@ sse-starlette==2.1.3
 pytest==8.3.4
 pytest-asyncio==0.25.0
 httpx==0.28.1
+
+# Item 8 — RAG grounding eval (scoring only; NOT part of the app runtime path).
+# DeepEval drives Faithfulness/Hallucination/AnswerRelevancy over cached agent rationales.
+# The judge is NVIDIA NIM (nemotron) / Ollama gemma — never OpenAI — configured at runtime.
+deepeval==4.0.9
+# truststore lets the eval process verify TLS against the Windows trust store (which trusts
+# AVG's MITM root). Used ONLY by scripts/eval_grounding.py as a process-global inject, because
+# DeepEval constructs its own HTTP client we can't hand a scoped verify= to — unlike the app's
+# openai_client.py / aws_client.py, which scope the same fix to the client they own.
+truststore==0.10.4
