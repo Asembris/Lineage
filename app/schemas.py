@@ -125,6 +125,51 @@ class ProvenanceAuditResponse(BaseModel):
     anomalies: list[ProvenanceEdgeReport]
 
 
+# --- Roadmap Item B: counterfactual "what-if invalidation" --------------------
+
+
+class CounterfactualWindow(BaseModel):
+    """One generation window's slice of the counterfactually-affected set.
+
+    Bucketed identically to belief_performance (both use generation_windows()), so this lines
+    up against the staleness curve: the windows where confidence had already rotted are exactly
+    the ones contributing the fraud. `withdrawn_approvals` are belief-driven approvals in this
+    window that fall after T; `frauds_auto_approved` is their real is_fraud subset.
+    """
+
+    window_start: dt.datetime
+    window_end: dt.datetime
+    withdrawn_approvals: int
+    frauds_auto_approved: int
+
+
+class CounterfactualResponse(BaseModel):
+    """"If this belief had been invalidated at `at`, which downstream verdicts change?"
+
+    Answered against the moat's `decisions` table — the only path carrying a real
+    driving_belief_id link. The belief only ever approves, so invalidation can only WITHDRAW
+    approvals: `withdrawn_approvals` (N) is the affected count, every row an approval, and
+    `frauds_auto_approved` (M) is their real-ground-truth fraud subset — the honest "fraud an
+    earlier invalidation would have stripped the belief's justification from" (never "would have
+    caught"; the fallback verdict is stochastic and not reproduced). `at` is BUSINESS-TIME
+    (a decided_at instant), deliberately not the MVCC `as_of` clock: this is a plain query, no
+    AOST, no content-hash. See app/services/counterfactual.py for the full derivation.
+    """
+
+    belief_id: uuid.UUID
+    rule_text: str
+    belief_status: str
+    originating_agent_id: uuid.UUID
+    formed_at: dt.datetime
+    at: dt.datetime  # the counterfactual instant T (business-time), echoed as parsed
+    total_belief_driven: int  # all belief-driven decisions, for context
+    withdrawn_approvals: int  # N — affected belief-driven approvals after T
+    frauds_auto_approved: int  # M — of N, is_fraud = true (real ground truth)
+    affected_holder_count: int
+    affected_holders: list[uuid.UUID]  # distinct agents that made an affected decision
+    windows: list[CounterfactualWindow]
+
+
 # --- Phase 3: atomic invalidation ---------------------------------------------
 
 
