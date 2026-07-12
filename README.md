@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=22&duration=3600&pause=900&color=E8A33D&center=true&vCenter=true&width=860&lines=Lineage%3A+agent-genealogy+belief-inheritance+forensics;A+living+agent+acts+on+beliefs+inherited+from+ancestors+it+never+met;100%25+hold-out+ring+recall+-+90.8%25+Wilson+precision+floor" alt="Lineage" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=22&duration=3600&pause=900&color=E8A33D&center=true&vCenter=true&width=860&lines=Lineage%3A+agent-genealogy+belief-inheritance+forensics;A+living+agent+acts+on+beliefs+inherited+from+ancestors+it+never+met;No+flag+without+a+witness+the+graph+itself+can+re-derive" alt="Lineage" />
 
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
