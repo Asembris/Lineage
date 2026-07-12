@@ -3606,3 +3606,183 @@ rather than contradict.
 ### (confidence propagation, still gated). The regulatory corpus; the AML console; the recorded video;
 ### the decisions.aml_transaction_id seam; a second belief; a `verdicts` table; any change to the five
 ### tables / aml_* / typology_corpus. Do NOT push without explicit approval.
+
+## Roadmap Item D — confidence propagation through the chain: **INVESTIGATED AND CUT** (2026-07-12)
+
+Item D was explicitly CONDITIONAL in the roadmap — the same gate as C: *"build only if the data
+supports a real signal — verify first, never decorative."* It was verified first, and **nothing
+propagates.** Nothing was built. This entry records WHY with the real numbers, so a later session does
+not re-propose it from the roadmap line alone.
+
+**D DIES OF A DIFFERENT FAILURE MODE THAN C. Do not flatten the two into one story.** C was killed by
+the answer-key test: the only way to name the gen-6 dip a campaign recession was to import
+`_CAMPAIGN_AMP` from the generator — *a ground-truth lookup wearing a detector's clothes*. **D PASSES
+that test.** A per-hop confidence number is derivable from `belief_performance` + `belief_inheritance`
+alone, with zero generator parameters. It is still meaningless. The finding is
+**"computable, generator-free, and meaningless"** — a third failure mode this project had not yet
+named, and the one a future session is most likely to walk into, precisely because it clears the bar C
+set.
+
+NO code, NO migration, NO new table, NO cluster write, NO AML/corpus touch, NO frontend, NO LLM call.
+The investigation ran OFFLINE against the seeded generator (a pure function of SEED, so the 4,000-row
+world reproduces byte-for-byte without the DB) plus read-only SELECTs. Probes:
+`scratchpad/item_d_probe.py`, `scratchpad/item_d_verify.py`.
+
+### THE STRUCTURAL FACT: one timestamp varies per hop, and nothing else
+
+Read from the schema, not assumed:
+- `belief_inheritance` carries exactly `id, belief_id, from_agent_id, to_agent_id, inherited_at,
+  invalidated_at, invalidated_by`. The last two are closure state, written ONLY by
+  `invalidate_belief`. There is **no confidence, no weight, no strength, no per-hop payload of any
+  kind.**
+- `belief_performance` is keyed by `(belief_id, window_start, window_end)` and has **no `agent_id`
+  column at all.** It is a per-belief, per-TIME quantity — never a per-holder one.
+- All 8 inheritance edges carry the identical `belief_id`. There is ONE belief row.
+
+So the only quantity that varies per hop is `inherited_at`, a timestamp, and the only thing you can do
+with it is look up which `belief_performance` window it lands in. **That is a JOIN, not a
+propagation.**
+
+Why the ML analogy the roadmap line borrows does not transfer: uncertainty compounds across layers
+because each layer TRANSFORMS the signal and ADDS its own error. Here every hop copies the same
+immutable row and adds zero error — MVCC proves it, and that IS the two-clock thesis. **The uncertainty
+lives on the WINDOWS (global, shared by every holder), not on the EDGES.** Two chains through the same
+window read the same estimate with the same CI. There is no per-path variance to accumulate, because no
+hop is a measurement.
+
+The join is *legitimately typed* (`inherited_at` and `window_start` are both business-time — this is
+NOT Item B's wrong-clock error), which is exactly what makes it tempting. It is well-formed and it
+still says nothing.
+
+### The data (live cluster, read-only; offline reproduction matches byte-for-byte)
+
+Cluster: agents 24 / beliefs 1 / belief_inheritance 8 / decisions 4000 / belief_performance 8.
+Curve `.924 .952 .876 .852 .724 .556 .624 .528`.
+
+**Per-AGENT belief-driven decisions — the only per-holder measurement that exists at all:**
+```
+agent       gen  status    n    conf    Wilson 95% CI      width
+crimson-0     0  dead    250   0.924   [0.884, 0.951]      0.066
+crimson-1     1  dead    250   0.952   [0.918, 0.972]      0.054
+crimson-2     2  dead    250   0.876   [0.829, 0.911]      0.082
+crimson-3     3  dead    250   0.852   [0.803, 0.891]      0.088
+crimson-4     4  dead    250   0.724   [0.666, 0.776]      0.110
+crimson-5     5  dead    176   0.597   [0.523, 0.666]      0.143
+crimson-5b    5  ALIVE    74   0.459   [0.351, 0.572]      0.221   <-- the branch holder
+crimson-6     6  dead    250   0.624   [0.563, 0.682]      0.119
+crimson-7     7  ALIVE   250   0.528   [0.466, 0.589]      0.123
+```
+
+**The two chains SHARE their first four hops.** crimson-5b's chain is crimson-7's chain TRUNCATED plus
+one branch hop (`inherited_at` 320 days ago, INSIDE window 4; the spine's 4->5 hop is at 300 days ago,
+exactly window 5's start). So they are not two traversals of the decay — they are the same traversal,
+one stopping before the decay begins. crimson-5b's path covers w0-w3 (.924 -> .852, essentially flat);
+crimson-7's continues through w4/w5/w6, which is where the decay actually lives.
+
+### PROOF 1 — the compounded number measures PATH LENGTH, not health (the flat-world test)
+
+The obvious formulation (multiply the belief's measured confidence at each hop's window), with its real
+uncertainty band by Monte-Carlo resampling of each window's binomial:
+- crimson-7 (7 hops): **0.0942**, 95% band **[0.0752, 0.1159]** — the band is **43% of the value.**
+- crimson-5b (5 hops): 0.2860, 95% band [0.2429, 0.3313] — 31% of the value.
+- Sampling error alone: relative SD **0.0945** on the log-product = a **+/-18.5%** band. Item C's
+  per-window regime-shock floor (`_WINDOW_JITTER_SD = 0.03`) adds to that, does NOT shrink with n, and
+  is applied to every window independently — so it compounds along the chain and no amount of data
+  removes it.
+
+**But the band is not what kills it. THE FLAT-WORLD TEST IS.** Re-ran the identical metric on a world
+with ZERO decay — every window pinned at w0's 0.924, the belief never degrading at all:
+```
+                          NO DECAY AT ALL (every window conf = 0.924)
+crimson-7  (7 hops)                 0.5750
+crimson-5b (5 hops)                 0.6735
+```
+**The metric reports crimson-7 as 15% MORE DEGRADED than crimson-5b in a world where the belief never
+degraded.** Every factor is < 1, so a longer chain ALWAYS scores worse. The number is monotone in hop
+count BY CONSTRUCTION. It would look precise, trend reliably, and measure the length of the path
+instead of the health of the belief.
+
+It also carries a free parameter with no principled answer: whether a hop maps to the receiving
+generation's action window, the newest COMPLETE window at the hop instant, or the window the timestamp
+falls in. Three defensible choices, three different numbers, and nothing in the data selects one.
+(The variant "P(conf >= X at EVERY hop)" is the same trap — also a product of numbers < 1, also
+monotone in hop count.)
+
+### PROOF 2 — the same-window CONTROL produces a demonstrable FALSE POSITIVE
+
+`crimson-5` and `crimson-5b` both act in **window 5**, on transactions drawn from the SAME window-5
+process (the generator draws ONE `on_rate` per window; `_agent_for` splits ~30% to the branch with a
+per-row coin flip). **Their true reliability is IDENTICAL BY CONSTRUCTION.** That makes them a perfect
+control: any per-holder confidence metric MUST call them the same.
+- crimson-5: **0.597** (n=176). crimson-5b: **0.459** (n=74). Gap **0.137**.
+- Two-proportion test: **z = +1.99, p = 0.046 — SIGNIFICANT.**
+
+**The shipped world lands on the one-in-twenty type-I error.** Verified against 200,000 null
+simulations (both holders drawing from the identical pooled rate): median gap **0.047**,
+P(gap >= 0.137) = **0.046**, P(a two-proportion test calls it significant) = **0.050** (the textbook
+5%, exactly as it must be). So a per-holder confidence metric would report crimson-5b as materially
+worse than crimson-5 — **and it would be provably WRONG**, because they applied the same belief to the
+same world. This is not a hypothetical risk; the shipped data actually does it.
+
+**The direct Q3 comparison — the two LIVING holders — is a clean negative:**
+- crimson-7 (7 hops, acted w7) **0.528** (n=250) vs crimson-5b (5 hops, acted w5) **0.459** (n=74).
+- Gap 0.069, **z = 1.04, p = 0.30 — NOT significant.** They are statistically indistinguishable. What
+  difference exists is driven by WHEN each acted, not by hop count.
+
+**The ONE comparison that IS significant says nothing about the holders.** "The belief's confidence at
+the instant of each holder's final hop": crimson-5b -> w3 = .852, crimson-7 -> w6 = .624, difference
+0.228, **z = 5.80, p = 6.8e-09**. But both are FLEET-WIDE `belief_performance` rows; neither is a
+property of a holder; and both holders hold the SAME row with the SAME present-day confidence (.528).
+Its significance is GUARANTEED, not discovered — Item C measured the secular decay at z = 15.59,
+p = 8.6e-55, so ANY two sufficiently separated windows differ significantly. It restates exactly one
+fact: crimson-5b branched earlier. That fact is one column, `inherited_at`, already served by
+`GET /beliefs/{id}/lineage`.
+
+### PROOF 3 — the `decisions.confidence` LANDMINE (name it, or a future session propagates noise)
+
+`decisions.confidence` is a REAL per-decision, per-agent column, and it is the obvious thing a naive D
+implementation would reach for and propagate. It is `rng.uniform(0.80, 0.95)` in the backfill
+(`_decision_from`) — **pure noise, carrying no signal whatsoever.** Measured per agent:
+```
+crimson-0 .8749  crimson-1 .8756  crimson-2 .8744  crimson-3 .8731  crimson-4 .8770
+crimson-5 .8760  crimson-5b .8793  crimson-6 .8752  crimson-7 .8784   (sd .043 == uniform(.80,.95))
+```
+**Flat across all eight generations while the real measured confidence falls 0.924 -> 0.528.**
+Propagating it would draw a straight line asserting NO DECAY — directly contradicting the project's
+central claim, from a column that looks authoritative. Do not use this column for anything.
+
+### PROOF 4 — the CONSTITUTIONAL argument (independent of the statistics)
+
+The kill-shot is one belief, one closure, ONE serializable commit, ALL holders corrected at once —
+CLAUDE.md's own words: *"a loop of individual updates defeats the entire point."* **A per-holder
+inherited-confidence number implies holders differ in how far the belief should be trusted, which
+implies graded or per-holder correction.** That is a different system. Shipping that number would
+undercut, on the same screen, the exact property that is the competitive thesis. Even if the statistics
+had come back clean, this alone would gate D.
+
+### D IS THE DEFERRED STALENESS-UNCERTAINTY ITEM WEARING A CHAIN-SHAPED HAT
+
+Not merely similar to it — **it IS it, and cannot be built without it.** `belief_performance` persists
+`confidence` / `false_positive_rate` / `frauds_approved` and **no denominator** (re-confirmed live: no
+`n` column exists). Every CI in this investigation was computed by re-aggregating `n` from `decisions`
+offline — which is precisely the deferred item's proposed remedy (Item B's precedent: a deterministic
+aggregate over immutable columns, no new state). So D decomposes exactly into:
+- **its confidence half** = a decorative join over existing columns (Proofs 1-3), and
+- **its uncertainty half** = the deferred staleness-uncertainty item, already scoped with its own
+  plan-gate and blast radius (certificate schema 1.1 -> 1.2 + the certifier Lambda's independent sync
+  staleness query moving in lockstep).
+
+Building D would be building the same thing twice under two names. The per-holder n range (74-250) this
+investigation surfaced is appended to that item's scoping note — see "Roadmap Item C" -> "THE ONE REAL
+GAP".
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(notes): record Item D — cut (computable, generator-free, and meaningless)` (this entry)
+- `docs(notes): the per-holder n=74 finding — the staleness-uncertainty gap goes live the moment anyone slices per-holder`
+- `docs(readme): record Item D as investigated-and-cut alongside C`
+
+### Explicitly NOT done: Item D itself (CUT — do not re-propose from the roadmap line; re-read this
+### entry first, and note it fails for a DIFFERENT reason than C). The staleness-uncertainty item
+### (REAL, deferred, own plan-gate). The regulatory corpus; the AML console; the recorded video; the
+### decisions.aml_transaction_id seam; a second belief; a `verdicts` table; any change to the five
+### tables / aml_* / typology_corpus. Do NOT push without explicit approval.
