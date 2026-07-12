@@ -46,7 +46,7 @@ graph TB
         TC[typology_corpus<br/>VECTOR 1536 + C-SPANN index]
     end
 
-    D -. "the ONE seam (deferred):<br/>nullable aml_transaction_id FK" .-> ATX
+    D ==> |"THE ONE SEAM (built, 0006):<br/>aml_transaction_id FK — 1,500 decisions"| ATX
     TC -. "validated-string join<br/>typology == aml_pattern_instances.typology" .-> API
 
     style moat fill:#1e2a44,stroke:#6b8cae,color:#e8eef7
@@ -59,9 +59,12 @@ database with `Base.metadata.create_all`. Because `aml_*` and `typology_corpus` 
 metadata, that
 call **physically cannot** create empty evidence/corpus tables in the demo database — the isolation
 is enforced by Python object identity, not discipline. It also keeps Alembic's `target_metadata`
-(the moat) clean and leaves the five-table moat exactly five. Verified structurally: querying
-`information_schema`, **no foreign key crosses the moat / `aml_*` / corpus boundary** in either
-direction (`scripts/verify_aml_ingest.py` check #7).
+(the moat) clean and leaves the five-table moat exactly five. Verified structurally by querying
+`information_schema` (`scripts/verify_aml_ingest.py` check #7): **exactly one foreign key crosses a
+boundary — the sanctioned `decisions → aml_transactions` grounding seam — and every other crossing,
+in either direction, fails the check.** The asymmetry is the rule: *the moat may reference the
+evidence layer; the evidence layer may never reference the moat.* Check #7 carries a one-element
+allowlist **plus a check that the sanctioned edge actually exists**, so its absence would fail too.
 
 **Why the corpus still shares the cluster.** Unlike a Postgres + Pinecone split, `typology_corpus`
 lives on `defaultdb` and shares the AOST timeline — so a vector retrieval can be *time-travelled*
@@ -72,13 +75,41 @@ spanning graph + vectors + time-travel is the competitive thesis.
 - The RAG corpus joins to real ingested pattern instances by a **validated string** (`typology`),
   gated at load time and re-checked at verify — not a cross-metadata FK (which would break the clean
   separation). Every returned `typology` is guaranteed present in `aml_pattern_instances`.
-- A `decisions` row may *eventually* cite a real `aml_transactions` row via a nullable
-  `aml_transaction_id` FK (the "one real seam", deferred). No FK ever runs **from** the evidence
-  layer **into** the moat — the agent layer *reads* the evidence, nothing inherits a transaction.
+- **BUILT (migration 0006).** A `decisions` row cites a real `aml_transactions` row through a
+  nullable, **database-enforced** `aml_transaction_id` FK. 1,500 decisions do so today: azure-0
+  forms a laundering belief → it is inherited down 7 real edges → the *living* azure-7 applies it to
+  every edge of the extract → each decision cites the real row it ruled on, and its `is_fraud` is the
+  real `is_laundering`. The FK is declared in the **migration only**, never on the `Base`-mapped
+  model — declaring it on the ORM would point `Base.metadata` at a table it does not contain and
+  break `create_all` (and with it the `demo` database). No FK ever runs **from** the evidence layer
+  **into** the moat: the agent layer *reads* the evidence; nothing inherits a transaction.
 
-> `aml_pattern_members` is the **answer key**, not evidence. `aml_graph.py` recomputes structure
-> from the *unlabeled* edge set and selects no label column; membership and `is_laundering` are read
-> only by tests (as a scoring oracle) and by demos (to print an oracle column after the fact).
+> ### The oracle boundary — stated precisely, because the flat version is false
+>
+> `aml_pattern_members` and `aml_transactions.is_laundering` are the **answer key**, not evidence.
+> `aml_graph.py` recomputes structure from the *unlabeled* edge set and selects no label column, and
+> `aml_seam.py` (the decider) is label-free **by type** — its whole input is a `Graph` whose `Edge`
+> has nowhere to put a label. `tests/test_oracle_boundary.py` pins this in Python **and in raw SQL**
+> (a label reaching the witness through a `SELECT` string edits no AST `Name` node, so the guard also
+> walks string constants).
+>
+> **What is NOT true — and was claimed here until the seam was built — is that the label "is read
+> only by tests and demos".** The grounding seam decided on all 1,500 edges, so `decisions.is_fraud`
+> is a *copy* of `is_laundering` for the entire extract, and `GET /decisions` serves it. The honest
+> statement has three parts, and all three hold:
+>
+> - the label is **never readable by the DECIDER** (enforced by type, and by the AST tripwire);
+> - it is **never served as EVIDENCE** — `GET /aml/transactions/{id}` and `/interrogate` project no
+>   label column, and a test asserts `is_laundering` is absent from the response body;
+> - it **is served where it is an AUDIT fact** — attached to a decision that was already made
+>   without it. The backfill is two-phase: every verdict is computed from the unlabeled graph
+>   *before* the label query runs at all.
+>
+> That distinction is the whole point. `is_fraud` is the **scorecard**; `is_laundering` on the
+> evidence layer would be the **answer key shown during the exam**. CYCLE's honest 75.4% precision
+> (14 of the 57 edges it fires on are benign) is only *meaningful* because the witness never saw the
+> label — print the label beside the witness's own work and a reader can no longer tell detection
+> from lookup.
 
 ---
 
