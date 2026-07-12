@@ -29,8 +29,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { Loadable } from "../hooks/useConsoleData";
 import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsoleData";
-import type { ProvenanceAuditResponse, UUID } from "../api/types";
-import { getBeliefPerformance, getProvenanceAudit } from "../api/client";
+import type { ProvenanceAuditResponse, UUID, WitnessOutcome } from "../api/types";
+import { countDecisions, getBeliefPerformance, getProvenanceAudit } from "../api/client";
 import { formatCount } from "../lib/format";
 import "./HonestyLedger.css";
 
@@ -40,7 +40,7 @@ const DASH = "—";
  *  marker; `liveKey` (present only when mode==="live") selects which computed value the
  *  row surfaces under its name. */
 type Mode = "live" | "static";
-type LiveKey = "genealogy" | "decisions" | "provenance";
+type LiveKey = "genealogy" | "decisions" | "seam" | "provenance";
 
 interface RowSpec {
   item: string;
@@ -60,7 +60,7 @@ const ROWS: RowSpec[] = [
     note: (
       <>
         Deterministically seeded; the inheritance edges are real rows, the population is
-        fabricated (2 bloodlines, 8 inheritance edges).
+        fabricated (2 bloodlines, 15 inheritance edges — 8 crimson + 7 azure).
       </>
     ),
   },
@@ -73,6 +73,54 @@ const ROWS: RowSpec[] = [
         Real IBM HI-Small AML data (648 accounts / 1,500 edges / 20 instances / 300
         members); benign negatives are <code>is_laundering=0</code> rows <em>anchored to
         the same accounts</em> as the fraud (deliberately adversarial), capped 4:1.
+      </>
+    ),
+  },
+  {
+    item: "Grounding seam — the AML belief's decisions",
+    label: "real evidence, disclosed coverage",
+    mode: "live",
+    liveKey: "seam",
+    note: (
+      <>
+        1,500 decisions cite real IBM <code>aml_transactions</code> rows through a
+        database-enforced FK, and their <code>is_fraud</code> is the real{" "}
+        <code>is_laundering</code>. <b>Two witness outcomes both map to <code>approve</code>, and
+        the verdict alone cannot tell them apart:</b> <code>CONCLUSIVE_NO</code> (the search closed
+        inside the extract — there is no cycle) and <code>INCONCLUSIVE</code> (the search ran off
+        the edge of the 1,500-edge slice and <em>could not determine</em>).{" "}
+        <code>INCONCLUSIVE → approve</code> is a <b>disclosed modeling choice</b>, not a corner
+        case: it is the majority of the extract, and it silently approves most of its laundering
+        rows. The belief's honest failure mode is <b>constant, not stale</b> — its error rate is
+        flat over time, so <code>belief_performance</code> is deliberately <em>not</em> computed
+        for it (an AML rot curve would be a base-rate artifact of the ingestion sample).{" "}
+        <b>The numbers to the left are COUNTED from the cluster, not quoted</b> — this census has
+        twice been corrupted by prose, once misstated and once falsely sourced, so it is no longer
+        entrusted to prose.
+      </>
+    ),
+  },
+  {
+    item: "Ground-truth label (the oracle)",
+    label: "never to the decider; served only as an audit fact",
+    mode: "static",
+    note: (
+      <>
+        Stated precisely, because the flat version — <em>“the label is read only by tests”</em> —{" "}
+        <b>is false, and this document said it until the read surface was built.</b> The seam
+        decided on all 1,500 edges 1:1, so <code>decisions.is_fraud</code> is a copy of{" "}
+        <code>is_laundering</code> for the whole extract and <code>GET /decisions</code> serves it.
+        Three things are true, and each is <em>enforced</em>, not asserted: the label is{" "}
+        <b>never readable by the decider</b> (its entire input is a graph whose edge type has no
+        label field; an AST tripwire pins this in Python <em>and</em> in raw SQL, because a label
+        reaching the witness through a <code>SELECT</code> string edits no syntax node); it is{" "}
+        <b>never served as evidence</b> (<code>/aml/transactions/{"{id}"}</code> and{" "}
+        <code>/interrogate</code> project no label column, and a test asserts{" "}
+        <code>is_laundering</code> is absent from the body); and it is served{" "}
+        <b>only where it is an audit fact</b> — attached to a decision already made without it, by
+        a two-phase backfill that computes every verdict before the label query runs at all.{" "}
+        <code>is_fraud</code> is the <em>scorecard</em>; <code>is_laundering</code> on the
+        interrogation surface would be the <em>answer key shown during the exam</em>.
       </>
     ),
   },
@@ -285,6 +333,55 @@ type Slot<T> =
   | { status: "error" }
   | { status: "ready"; data: T };
 
+/** The seam's census, COUNTED from the cluster — never quoted.
+ *
+ *  Seven `total`s at limit=1 (no rows fetched): the extract size, each witness outcome, and each
+ *  outcome's laundering subset. This is the ledger's thesis applied to the one number that most
+ *  needs it: the 65.3% INCONCLUSIVE→approve disclosure has been corrupted by prose TWICE — once
+ *  misstated (the phantom "728 / 48.5%") and once falsely sourced (a `verify_seam` script that
+ *  never existed). Prose has failed this number in both available ways. A number read from the
+ *  cluster cannot be wrong about the cluster.
+ *
+ *  Degrades to "—" as one unit: a PARTIAL census would be worse than none, because a missing
+ *  denominator turns a disclosure into a boast. */
+interface SeamCensus {
+  total: number;
+  byOutcome: Record<WitnessOutcome, { n: number; laundering: number }>;
+}
+
+const OUTCOMES: WitnessOutcome[] = ["MATCH", "CONCLUSIVE_NO", "INCONCLUSIVE"];
+
+function useSeamCensus(): Slot<SeamCensus> {
+  const [slot, setSlot] = useState<Slot<SeamCensus>>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setSlot({ status: "loading" });
+
+    Promise.all([
+      countDecisions({ kind: "aml" }),
+      ...OUTCOMES.map((o) => countDecisions({ kind: "aml", witnessOutcome: o })),
+      ...OUTCOMES.map((o) =>
+        countDecisions({ kind: "aml", witnessOutcome: o, isFraud: true }),
+      ),
+    ])
+      .then(([total, ...rest]) => {
+        if (cancelled) return;
+        const byOutcome = Object.fromEntries(
+          OUTCOMES.map((o, i) => [o, { n: rest[i], laundering: rest[i + OUTCOMES.length] }]),
+        ) as SeamCensus["byOutcome"];
+        setSlot({ status: "ready", data: { total, byOutcome } });
+      })
+      .catch(() => !cancelled && setSlot({ status: "error" }));
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return slot;
+}
+
 /** Reads the two per-belief live facts (performance window count + provenance verdict)
  *  for the one seeded belief. Both degrade to a slot that renders "—", never throwing. */
 function useLedgerLive(beliefId: UUID | undefined): {
@@ -358,6 +455,7 @@ export function HonestyLedger(props: {
       : "azure laundering belief"
     : undefined;
   const { perfWindows, provenance } = useLedgerLive(beliefId);
+  const seam = useSeamCensus();
 
   // Per-slot degradation, identical idiom to the Inspector: a not-ready number is "—".
   const n = (v: number | undefined) => (v === undefined ? DASH : formatCount(v));
@@ -390,6 +488,7 @@ export function HonestyLedger(props: {
           </>
         ),
     },
+    seam: seamValue(seam),
     provenance: provenanceValue(provenance, beliefTag),
   };
 
@@ -454,6 +553,32 @@ export function HonestyLedger(props: {
       </div>
     </div>
   );
+}
+
+/** The seam's census, rendered from COUNTS — the disclosure, read live rather than retyped.
+ *
+ *  The share and the laundering total are DERIVED from the counts here (not carried as constants),
+ *  so the rendered "65.3%" is arithmetic over live numbers and cannot drift from them. If the
+ *  cluster has no AML decisions the row says so plainly — an honest empty state, not a "0.0%". */
+function seamValue(slot: Slot<SeamCensus>): LiveValue {
+  if (slot.status !== "ready") return { node: DASH };
+  const { total, byOutcome } = slot.data;
+  if (total === 0) {
+    return { node: <>empty — run seed.backfill_aml_decisions</> };
+  }
+  const inc = byOutcome.INCONCLUSIVE;
+  const share = ((inc.n / total) * 100).toFixed(1);
+  const laundering = OUTCOMES.reduce((s, o) => s + byOutcome[o].laundering, 0);
+  return {
+    node: (
+      <>
+        {formatCount(total)} decisions · {formatCount(byOutcome.MATCH.n)} MATCH ·{" "}
+        {formatCount(byOutcome.CONCLUSIVE_NO.n)} CONCLUSIVE_NO ·{" "}
+        {formatCount(inc.n)} INCONCLUSIVE → <b>{share}% could not determine</b>, silently approving{" "}
+        <b>{formatCount(inc.laundering)}</b> of {formatCount(laundering)} laundering rows
+      </>
+    ),
+  };
 }
 
 /** The provenance-audit live fact. CLEAN/INCONCLUSIVE stay cold; a genuinely ANOMALOUS

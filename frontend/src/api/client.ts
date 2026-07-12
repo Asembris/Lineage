@@ -15,6 +15,7 @@ import type {
   LineageResponse,
   ProvenanceAuditResponse,
   UUID,
+  WitnessOutcome,
 } from "./types";
 
 /** Backend base URL. Override with VITE_API_BASE in a .env file. */
@@ -32,7 +33,11 @@ export class ApiError extends Error {
   }
 }
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
+// `boolean` is accepted so a false-y filter still travels: `is_fraud=false` is a REAL filter
+// (decisions the belief got right), and dropping it would silently widen the query to "any".
+function buildQuery(
+  params: Record<string, string | number | boolean | undefined>,
+): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined) search.set(key, String(value));
@@ -78,15 +83,43 @@ export function listAgents(
 
 /** GET /decisions — fleet-wide feed by default, or one agent's history. */
 export function listDecisions(
-  opts: { agentId?: UUID; limit?: number; offset?: number } = {},
+  opts: {
+    agentId?: UUID;
+    amlTransactionId?: UUID;
+    drivingBeliefId?: UUID;
+    kind?: "aml" | "card";
+    witnessOutcome?: WitnessOutcome;
+    isFraud?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<DecisionListResponse> {
   return request<DecisionListResponse>(
     `/decisions${buildQuery({
       agent_id: opts.agentId,
+      aml_transaction_id: opts.amlTransactionId,
+      driving_belief_id: opts.drivingBeliefId,
+      kind: opts.kind,
+      witness_outcome: opts.witnessOutcome,
+      is_fraud: opts.isFraud,
       limit: opts.limit,
       offset: opts.offset,
     })}`,
   );
+}
+
+/** COUNT decisions matching a filter, without fetching any. `limit=1`, read `total`.
+ *
+ *  This is how the honesty ledger reads the seam's census LIVE (1,500 / 57 / 463 / 980, and with
+ *  isFraud, 43 / 5 / 252). It matters that it is COUNTED and not retyped: that census has twice
+ *  been corrupted by prose — once misstated (the phantom "728 / 48.5%"), once falsely sourced (a
+ *  `verify_seam` script that never existed). A number read from the cluster cannot be wrong about
+ *  the cluster. See NOTES.md → "FABRICATED VERIFICATION CITATIONS". */
+export async function countDecisions(
+  opts: Parameters<typeof listDecisions>[0] = {},
+): Promise<number> {
+  const res = await listDecisions({ ...opts, limit: 1 });
+  return res.total;
 }
 
 /** GET /beliefs — belief catalog, optionally filtered by status. */
