@@ -47,7 +47,8 @@ graph TB
         ATX --> APM
     end
     subgraph corpus["RAG CORPUS — CorpusBase metadata (app/corpus_models.py)"]
-        TC[typology_corpus<br/>VECTOR 1536 + C-SPANN index]
+        TC[typology_corpus — 4 rows<br/>VECTOR 1536 · index is vector_l2_ops<br/>query is cosine — INDEX NEVER USED]
+        RC[regulatory_corpus — 233 rows<br/>VECTOR 1536 · vector_cosine_ops<br/>C-SPANN index GENUINELY SELECTED]
     end
 
     D ==> |"THE ONE SEAM (built, 0006):<br/>aml_transaction_id FK — 1,500 decisions"| ATX
@@ -629,9 +630,21 @@ then **violated by the very session that had just read it**. Four separate docum
 > in a type, a metadata boundary, a database constraint, or a test that fails loudly.** Documentation
 > is how you explain a guard. It is not a guard.
 
-There are **eight** instances, each shipped for its own reason and each independently verified to
+There are **ten** instances, each shipped for its own reason and each independently verified to
 **trip** — a guard that cannot fail is theatre, so every one of these had its violation deliberately
 introduced, watched fail with real output, and reverted.
+
+> **The sharpest illustration of this section arrived after it was written, and it is not in the
+> table below — because no guard existed to catch it.** For months, NOTES, README, ARCHITECTURE and
+> `verify_corpus.py` all stated that CockroachDB's vector index went unused *because the corpus was
+> small*. Four documents, in agreement. The observation was true; the **cause was invented**. The
+> index is built `vector_l2_ops` and the query ranks with cosine `<=>` — an opclass that cannot
+> serve that operator **at any row count**. One `EXPLAIN` against a `vector_cosine_ops` index over
+> **four rows** settles it, and nobody ran it, because the existing explanation was plausible and
+> the check was green. **A green check that asserts a true fact for a false reason is the most
+> durable kind of wrong**: it survives review, it survives CI, and it teaches the next session the
+> false thing. `verify_corpus.py` now asserts the *cause*, read from the live catalog — not just
+> the symptom.
 
 | # | The wrong thing | Why a comment was not enough | What makes it impossible | Enforced in |
 |---|---|---|---|---|
@@ -643,6 +656,8 @@ introduced, watched fail with real output, and reverted.
 | **6** | The ground-truth label reaches the decider — turning detection into lookup, and making CYCLE's honest 75.4% precision meaningless | **The obvious tripwire passes while proving nothing.** The deciding path reads the DB through **raw SQL**, so adding `is_laundering` to a query string creates no `ast.Name` and no `ast.Attribute` node. It edits a *string*. Guard green, witness reading the answer key, central claim silently false | `tests/test_oracle_boundary.py` walks **`ast.Constant` string values** as well as Name/Attribute/Import — with docstrings excluded *structurally*, because five modules discuss the oracle in prose precisely in order to refuse it. Both shapes were made to trip | `tests/test_oracle_boundary.py` |
 | **7** | Shipped code cites a probe or a test that **does not exist** — converting "unverified" into "verified" in the reader's mind at zero cost, and reading like diligence | Four such citations sat in the repo through multiple sessions, two documentation passes, and a review explicitly hunting for lying documents. **Nobody follows a citation — that is what a citation is for** | `tests/test_citations.py`: every cited repo path must **exist**; every `module::test` must **resolve to a real test function**; and **`scratchpad/` may be cited only from NOTES.md** — anywhere else it promises a runnable artifact and delivers a deleted file | `tests/test_citations.py` |
 | **8** | An ephemeral probe leaks into the repo — or, worse, the *premise* of guard 7 turns out to be false, and a skeptical reader deletes a guard that was doing real work | `scratchpad/` was asserted to be gitignored by NOTES, by ARCHITECTURE, **and by `test_citations.py`'s own docstring**. `git check-ignore` returned **nothing**. It was merely *untracked* | `scratchpad/` + `**/scratchpad/` in `.gitignore`. **The premise was made TRUE rather than reworded away** — a true rule resting on a false premise is one skeptical reader away from deletion | `.gitignore:37-38` |
+| **9** | The regulatory corpus contaminates the brake's candidate set — and the failure does **not** look like a false flag. At `k=3` over 270 rows, three red flags outrank all four typology definitions, `_doc_for()` returns `None` for every claim, and **every verdict silently collapses to `INSUFFICIENT_COVERAGE`**. The brake becomes a wall | A `source=` filter would have held it. All 12 row-returning `retrieve_typology()` call sites do pass it — but the parameter **defaults to `None`**, so the rule is held by *discipline*. And no test would catch the breach: `test_aml_brake`, `test_aml_interrogate` and `verify_corpus` all pass `source=SOURCE` | A **separate table**. `retrieve_typology()`'s SQL says `FROM typology_corpus` and is therefore *physically incapable* of returning a red flag, whatever arguments it is handed. An AST guard additionally forbids the deciding path from importing `retrieve_regulation` | `migrations/0009` · `app/corpus_models.py` · `tests/test_regulatory_corpus.py` |
+| **10** | A silently corrupted regulatory quote is embedded, retrieved, and cited as authoritative FATF/FFIEC language — **and it reads as more trustworthy than it is**, because the section path we attach to it makes its provenance look impeccable | Nothing downstream can catch it. A chunk is a *quote*; there is no internal consistency check that a quote is real, and a plausible-sounding invented red flag is indistinguishable from a real one by inspection | Every stored entry must **trace back to its source PDF**, re-extracted *independently* of the parser (pypdf, not LlamaParse) at ≥0.95 character-shingle coverage. **Shown to trip:** a plausible fabricated red flag scores **0.189**. A pinned per-document census makes a document that silently contributes **zero** fail with its name on it | `scripts/verify_regulatory.py` · `tests/test_regulatory_corpus.py` |
 
 **Read the middle column, not the last one.** The mechanisms are ordinary — a metadata boundary, a
 CHECK constraint, an AST walk, a `.gitignore` line. What is not ordinary is *why each one exists*:

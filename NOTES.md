@@ -5597,3 +5597,218 @@ written to prevent exactly that*. The generalization is the project's own thesis
 ### (its ledger row states the placeholder honestly); the regulatory corpus; a `verdicts` table; any
 ### re-ingestion of `aml_*`; any change to the five tables / `aml_*` / `typology_corpus`; any new
 ### feature. Do NOT push without explicit approval — held for review of the result.
+
+## ============ THE VECTOR INDEX WAS NEVER USED. THE CAUSE ON FILE WAS INVENTED. ============
+### (2026-07-13 — the regulatory-corpus session, and the most damaging thing this project got wrong)
+
+Item 3 recorded: *"at 4 corpus rows the query planner correctly brute-forces a full scan."*
+`verify_corpus.py` asserted it every run. NOTES said it. README said it. ARCHITECTURE said it.
+
+**The observation was TRUE. The cause was INVENTED, and never once checked.** Read from the live
+catalog — not from the migration file, which is how this hid so long:
+
+    beliefs          VECTOR INDEX ix_beliefs_embedding          (embedding vector_l2_ops)
+    typology_corpus  VECTOR INDEX ix_typology_corpus_embedding  (embedding vector_l2_ops)
+
+Both were created with a bare `CREATE VECTOR INDEX ... (embedding)`. **CockroachDB's default opclass
+is `vector_l2_ops`, which accelerates the L2 operator `<->` ONLY.** And both queries that exist to
+use them — `agent_brain._retrieve_beliefs` and `corpus._retrieval_sql` — rank with `<=>`, COSINE.
+
+**An L2 index cannot serve a cosine query at ANY row count.** Neither index has ever been selected
+by the planner. Not at 4 rows. Not ever. The "distributed vector index" in the sponsor table, in the
+Judging-Criteria alignment, and in the architecture diagram was, as built, **exercised by no query
+in this system.**
+
+### THE MEASUREMENT (live cluster; the first run's stats LAGGED and its negative was thrown away)
+Random unit vectors, planner stats VERIFIED fresh before any plan was trusted (run 1 estimated 200
+rows at n=1000 — that plan was worthless and was discarded rather than reported):
+
+| index opclass | query operator | vector index used? |
+|---|---|---|
+| `vector_l2_ops` (the default — what 0002/0005 built) | `<->` L2 | **YES** |
+| `vector_l2_ops` (the default — what 0002/0005 built) | `<=>` cosine — **what the app runs** | **NO — FULL SCAN** |
+| `vector_cosine_ops` | `<->` L2 | no |
+| `vector_cosine_ops` | `<=>` cosine | **YES** |
+| `vector_cosine_ops`, **n = 4** (the real corpus size) | `<=>` cosine | **YES — no full scan** |
+
+**The last row is the whole finding. ROW COUNT WAS NEVER THE VARIABLE.** A cosine-opclass index over
+four rows is selected. The corpus being small explained nothing; it merely sounded like it did.
+
+### WHY IT SURVIVED EVERY REVIEW — and this is the part worth keeping
+It survived because **a green check asserted a true fact for a false reason.** `verify_corpus.py`
+ran a real EXPLAIN, saw a real FULL SCAN, and reported it honestly — then attributed it to a cause
+nobody had tested. Every later session read the check, saw green, read the explanation, and believed
+it. **Consensus among four documents again, and again none of them was evidence.** This is the same
+disease as scratchpad-was-never-gitignored and the four fabricated citations, but it is the worst
+variant yet: the previous ones were claims with no backing, while this one had a **passing test**
+standing behind it. A false cause with a green check is more durable than a false claim, because
+checking it *feels* redundant.
+
+The decisive experiment cost one EXPLAIN against a four-row table. Nobody ran it for months.
+
+### WHAT WAS FIXED, AND WHAT WAS DELIBERATELY NOT
+- **Fixed:** `verify_corpus.py` now reads the index's OPCLASS from the live catalog and asserts the
+  *cause*, not just the symptom. README (sponsor table + Judging Criteria + ledger), ARCHITECTURE
+  (the schema diagram + section 7) and this log now state it plainly.
+- **NOT fixed, by decision:** the two legacy indexes stay `vector_l2_ops`. **A selected C-SPANN index
+  is an APPROXIMATE (ANN) search; today's full scan is EXACT.** Item 4's Gate 0 depends on WHICH
+  three of four documents retrieval returns, and Item 8's 40-tuple golden set was built against exact
+  retrieval. Flipping the opclass is a live behavioural change to the brake and to a published eval —
+  it needs its own before/after measurement over the real four documents, not a drive-by fix in a
+  session about something else. `verify_corpus.py` and
+  `tests/test_regulatory_corpus.py::test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_l2`
+  now **PIN them as L2**, so the fix cannot happen silently: when someone makes it, a test fails, and
+  that failure is the decision point.
+
+## The regulatory corpus — 233 red flags, and the first working vector index (2026-07-13)
+
+Migration 0009: `regulatory_corpus`, on `CorpusBase`, built `(embedding vector_cosine_ops)`. 233
+verbatim red-flag entries from five primary PDFs. 12 new tests (162 total). `verify_regulatory.py`
+green. **EXPLAIN shows a real `vector search` node over `ix_regulatory_corpus_embedding` — the first
+query in this project whose plan actually contains one.**
+
+### THE SCHEMA DECISION: a NEW TABLE. Guard-class, not convention-class.
+`typology_corpus.typology` is a VALIDATED JOIN KEY into `aml_pattern_instances` — Item 3's invariant,
+and Item 4's Gate 0 rests on it. FATF/FFIEC red flags do not map to IBM's four typologies, so the
+same-table option meant a nullable `typology`.
+
+Audited, not assumed: **12 of 12 row-returning `retrieve_typology()` call sites pass `source=SOURCE`**
+(the only two that don't are the ValueError error-path tests, which return no rows). So the invariant
+would have held — **by discipline.** And `source: str | None = None` — **the default is unscoped.**
+ARCHITECTURE section 7 is an entire section about what happens to rules held by discipline here. A
+separate table makes `retrieve_typology()` — whose SQL says `FROM typology_corpus` — *physically
+incapable* of returning a red flag, whatever it is passed.
+
+**THE CONTAMINATION FAILURE WOULD NOT HAVE LOOKED LIKE A FALSE FLAG — name it, so it is not
+re-proposed.** The agent's query is a NEUTRAL structural summary (degrees, path lengths). At k=3 over
+~270 rows, three regulatory chunks could plausibly outrank all four typology definitions; `_doc_for()`
+then returns None for EVERY claim and **every verdict collapses to INSUFFICIENT_COVERAGE /
+typology_not_retrieved.** The brake does not become unsafe — it becomes a **WALL**. That is Item 4's
+MARGIN_FLOOR mistake, rebuilt. And **no test would have caught it**: test_aml_brake,
+test_aml_interrogate and verify_corpus all pass `source=SOURCE`.
+
+**A RETRIEVED RED FLAG IS CONTEXT, NEVER EVIDENCE. It can never authorize a FLAG.** Item 4 measured
+that retrieval distance gates nothing in either direction (a typology the corpus does not even contain
+retrieved CLOSER than every in-corpus query). Nothing here changes that. An AST guard
+(`test_the_deciding_path_never_imports_the_regulatory_corpus`) keeps the deciding path away from it.
+
+### LLAMAPARSE IS A PARSER AND MUST STAY OUT OF requirements.txt — measured, not asserted
+`llama-cloud-services` pulls **67 packages** (llama-index-core, nltk, tiktoken, banks) and **upgrades
+SQLAlchemy 2.0.36 to 2.0.51 and numpy 2.2.1 to 2.5.1.** That is the Item-8 deepeval dependency break
+landing on the **database layer** of a project whose thesis is the database. So: parse in an ISOLATED
+venv (`scripts/parse_regulatory.py`), **COMMIT the markdown** (`data/corpus/`, a derived artifact that
+is the ingest's actual input), and `scripts/ingest_regulatory.py` reads the markdown on the app's venv.
+CI never sees llama-index. The ingest is reproducible with no LlamaParse key at all.
+Only `pypdf==6.14.2` was added (zero transitive deps; used solely by the fidelity gate). A clean
+`pip install -r requirements.txt` was re-resolved in a throwaway venv before committing — the standing
+practice from Item 8.
+
+### `.gitignore` HAD `data/`, SO THE "COMMITTED" MARKDOWN WAS SILENTLY IGNORED
+Caught by RUNNING `git check-ignore`, not by reading the file. **Git does not descend into an excluded
+DIRECTORY, so a later `!data/corpus/` negation is silently dead.** The fix is `data/*` (contents), not
+`data/`. This is the scratchpad defect in the exact mirror image: a claim of "committed" that git
+quietly contradicted. Re-verified by running the check, per file, in both directions.
+
+### THE TIER DECISION — Agentic was MEASURED and is WORSE. Do not "upgrade" it.
+Cost-effective (`parse_page_with_llm`, 3 cr/page; 58 pages = 174 credits). Fast is unusable (no
+markdown at all, so no headings, so no section paths). Agentic (10 cr/page) was tested on FFIEC (100
+credits) rather than assumed:
+- **Payload IDENTICAL: 129 bullets = 129 bullets, zero loss either way.** Both tiers extract every
+  red flag perfectly. (My first comparison reported "agentic = 0 bullets" — that was MY bug: Agentic
+  writes `*   ` markers and I matched only `- `. A fabricated fidelity failure, caught before it was
+  written up. Check the counter before believing the finding.)
+- **Structure: Agentic emits real heading levels and is LOSSY.** Six of FFIEC's 29 section headings are
+  not headings in its output — FOUR demoted to **bold body text**, TWO absent as strings entirely,
+  their red flags silently absorbed into the preceding section. Its hierarchy is internally
+  inconsistent (Insurance/Shell Company become siblings of the ML part they belong under), and it
+  drops the ML "Funds Transfers" while keeping the TF one — resolving the collision below the WRONG way.
+
+**Complete-and-flat beats hierarchical-and-lossy** when a deterministic rule will be applied to it.
+
+### CHUNKING: THE HEADING LEVELS DO NOT EXIST. The spine is recovered, not read.
+**Every heading LlamaParse emits is `#` (H1), in all five documents.** The obvious reading of the
+structure-aware constraint — read the path off the heading levels — is NOT IMPLEMENTABLE. So each
+document declares a **spine profile**: `parts` / `furniture` / `exclude` / `marker` / `only`.
+
+**`furniture` vs `exclude` is NOT a stylistic split — collapsing them corrupts the corpus in BOTH
+directions, and each was caught by running:**
+- **furniture is TRANSPARENT** (running page headers). FFIEC's title repeats as an H1 on every body
+  page and lands **in the middle of "Funds Transfers"**, which resumes with three more red flags after
+  it. Treat it as a boundary and those three vanish silently. (Guard trips: 14 to 11.)
+- **`exclude` is OPAQUE** (table of contents, case studies, acronyms, references). Treat FATF's TOC as
+  furniture and **its bullets are ingested as red flags** — with a perfectly well-formed provenance
+  path. Caught by the orphan gate.
+
+**The atomic unit is the red-flag ENTRY.** Never force-split (median chunk is 277 chars / ~68 tokens
+against an 8191 limit — splitting would be gratuitous), never merged to hit a target.
+
+**THE SECTION PATH IS LOAD-BEARING, and here is the proof:** FFIEC has TWO sections titled
+**"Funds Transfers"** — 9 entries under Money Laundering, 5 under Terrorist Financing — and two titled
+"Activity Inconsistent with the Customer's Business". Same string, different meaning. Strip the part
+and a terrorist-financing query retrieves a money-laundering red flag **while looking impeccably
+sourced.** Format: `<doc> > <part> > <section> > <lead-in>: <entry>`.
+
+### THREE EXTRACTION HAZARDS, ALL FOUND BY RUNNING, ALL NOW GATED
+1. **FinCEN's numbering is CONTAMINATED.** FIN-2014-A005 emits 0 bullets and 21 numbered items — only
+   **5 are red flags**. Items "6." and "7." sit in the SAME block and are FOOTNOTE DEFINITIONS; a
+   trailing block is a numbered REFERENCE list. A naive number-prefix regex embeds *Often termed
+   "operating outside the geographic footprint."* as an authoritative FinCEN red flag. The rule is
+   STRUCTURAL, not a hardcoded cutoff: **a list is a CONTIGUOUS RUN; a blank line ends it.** The five
+   red flags are five consecutive lines; each footnote is a detached paragraph that merely begins with
+   a number. (My prototype scored this document **0 chunks** — a silently absent authority. Hence the
+   census gate.)
+2. **FATF's sub-clauses arrive FLATTENED into peer bullets.** The real text is one indicator with three
+   sub-clauses; flattened, *"by more than one person;"* becomes a standalone chunk asserting nothing and
+   the actual red flag is decapitated. The signal is TYPOGRAPHIC: **a clause starts LOWERCASE.**
+   A colon rule would miss this one outright — **the parent ends with an EN-DASH.** 7 chunks reassembled.
+3. **Lead-in bullets** ("...in combination with one or more of the following indicators:") whose
+   CAPITAL-starting children are independent indicators that lose their qualifier alone. Carried onto
+   each child, never emitted as a chunk. Distinct from (2), and both shapes are asserted.
+
+### THE FIDELITY GATE IS EXECUTABLE, AND IT TRIPS AT 0.189
+Silently corrupted regulatory text would be embedded, retrieved and cited as authoritative FATF/FFIEC
+language, and **the section path we attach makes it read as MORE trustworthy, not less.**
+
+Two fidelity questions, kept apart because they need different oracles:
+- **CHUNKER fidelity** (CI, hermetic): every chunk is composed only of VERBATIM source lines from the
+  committed markdown, and `body == " ".join(source_lines)`. Covers the 7 reassembled composites, which
+  are exactly the operation that could invent text.
+- **PARSE fidelity** (`scripts/verify_regulatory.py`, local only): **`data/raw/*.pdf` is gitignored, so
+  CI does not have the PDFs.** Asserting parse fidelity in CI would assert the markdown against itself
+  — a check that cannot fail. So the script re-extracts each PDF **independently of LlamaParse** (pypdf)
+  and proves all 233 entries trace back. Worst line coverage **0.973**; FFIEC and FIN-2010 are **1.000**.
+
+**PYPDF IS A NOISY ORACLE, and the naive comparison failed on 8 bodies — every one an ARTIFACT, not
+corruption. Diagnosed, not hand-waved:**
+- pypdf splits words MID-TOKEN on kerning: FATF's *"residential"* extracts as *"residen tial"*.
+- The PDFs render sub-bullet GLYPHS as text — a literal `o` (Wingdings) and a private-use codepoint
+  (Symbol). The stream reads *"...transactions o in short succession..."*, so a correctly-reassembled
+  red flag is not a substring of it. **That mismatch is EVIDENCE the reassembly is right.**
+- pypdf splices FOOTNOTE text into the middle of a FinCEN sentence — its reading order is not the
+  page's visual order.
+
+Hence **12-character shingles over space-stripped text, scored PER SOURCE LINE** (a line is contiguous
+in the PDF; a reassembled body deliberately is not). Robust to all three, still fatal to invention:
+**a plausible, well-formed, fabricated red flag scores 0.189 against a 0.95 floor.** Proven, not claimed.
+
+### GUARDS PROVEN TO TRIP (each broken deliberately, watched fail, reverted byte-identical)
+- census gate: FIN-2014 to a bullet marker -> `DOCUMENT(S) CONTRIBUTED NOTHING: ['FIN-2014-A005']`
+- furniture gate: TOC un-excluded -> `CHUNKS ARE FILED UNDER A NON-RED-FLAG SECTION: 'Table of Contents'`
+- clause gate: lowercase-continuation disabled -> composites 7 to 0
+- page-break gate: furniture made a boundary -> FFIEC "Funds Transfers" 14 to 11
+
+**The furniture gate initially DID NOT TRIP** — removing `Table of Contents` from `exclude` does not
+orphan its bullets, it PROMOTES "Table of Contents" to a section, and every body-text check sails past
+it. A direct `NOT_A_SECTION` assertion was added. *The first version of that guard was theatre.*
+
+### COST, MEASURED
+58 pages (not the ~150 estimated). LlamaParse: **274 credits** (174 for all five at Cost-effective +
+100 for the Agentic comparison) of a 10,000/month allowance. OpenAI: **exactly 233 embedding calls**
+(text-embedding-3-small, ~20k tokens, well under a cent) — approved at 270, held under it.
+
+### Explicitly NOT done (still gated): the typology_corpus/beliefs opclass fix (**exact to approximate;
+### its own session, with a before/after over the real 4 documents — the tests PIN them as L2**); any
+### wiring of the regulatory corpus into a verdict (it is CONTEXT, never evidence — that is MARGIN_FLOOR
+### again); any HTTP route for `retrieve_regulation` (none exists, deliberately); the AML console; the
+### recorded video; re-embedding the crimson belief; `belief_performance` for the azure belief (step 4
+### stays CUT — re-read THE BASE-RATE MIRAGE before re-proposing it).
