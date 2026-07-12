@@ -17,14 +17,47 @@ Lineage keeps two kinds of agent memory, on two different graphs, in one Cockroa
   `decisions`). This is where a rule is **traced**, **time-travelled**, **invalidated atomically**,
   **provenance-audited**, and **counterfactually reversed**.
 
-These two graphs meet nowhere in the current data, and that is a verified fact, not an oversight:
-`decisions.aml_transaction_id` does not exist, the one belief is a card-authorization heuristic
-(`"merchant category 5411 under $180 is safe if account age > 6 months"`), and **no decision in
-this system has ever cited an AML transaction** (established from source under NOTES "Roadmap Item
-6"). So the demo does **not** claim one fraud ring is caught, then invalidated, then reversed as one
-causal story — asserting that a six-hop cycle among bank accounts justifies killing a rule about
-merchant category 5411 would be a document in which every field is individually true and the
-juxtaposition is fabricated. Item 6 already considered and refused exactly that.
+> ### ⚠️ UPDATED 2026-07-12 — THE GROUNDING SEAM (G2/G3/G4) FALSIFIED THIS SECTION'S ORIGINAL PREMISE
+>
+> This document previously stated that the two graphs *"meet nowhere in the current data"*, because
+> `decisions.aml_transaction_id` did not exist, there was only one belief (a card heuristic), and no
+> decision had ever cited an AML transaction. **All three of those facts have changed**, and this
+> section is corrected rather than left to drift — which is the entire reason its beats carry
+> freshness tags. What did NOT change is the two-act structure, and the reason is below.
+
+The two graphs now **do** meet, at exactly one sanctioned place — and the seam is narrower than it
+first sounds:
+
+- `decisions.aml_transaction_id` **exists** (migration 0006), a real database-enforced FK, and it is
+  the **only** edge permitted to cross the moat/evidence boundary in either direction.
+- There are now **two** beliefs. The **azure** belief is about laundering typologies
+  (*"a transfer that completes a directed cycle returning to its account of origin within 12 hops,
+  across at least 3 distinct accounts, indicates laundering"*), formed by azure-0 and inherited down
+  the azure spine to the **living azure-7**.
+- **1,500 decisions now cite real IBM `aml_transactions` rows**, and their `is_fraud` is the real
+  `is_laundering` label — ground truth the deciding rule never saw.
+
+So the demo **can** now show a living agent acting on a belief formed by an ancestor it never met,
+against real, externally-labeled evidence. That is the **provenance** half of a single causal chain,
+and it is real.
+
+**The two-act structure nonetheless STANDS, and it is not inertia.** The chain still stops short of
+one causal story, for a measured reason: a laundering FLAG **corroborates** a cycle belief — it does
+not contradict one — and the *justification* half of the chain was always supposed to be a staleness
+curve measured on AML outcomes. **That curve does not exist, and it cannot be honestly manufactured.**
+Windowing these decisions by transaction time yields a spectacular 0.974 → 0.000 "rot" curve
+(Cochran-Armitage z = −24.90) that is **100% an artifact of the benign sampling** — 91% of the benign
+rows land on day one, and the last two windows contain *zero* benign transactions. Base-rate-free
+measures show the belief's discriminative power is **flat** (per-window recall 1.000 in every window).
+The belief is **imperfect, not stale** — its error rate is constant. Every AML decision therefore
+carries **one fixed `decided_at`**, so there are no windows to draw a fake curve from at all, and
+`belief_performance` is deliberately never computed for it. See NOTES "THE BASE-RATE MIRAGE".
+
+Act 2's staleness story stays where it is honestly measured: the **crimson** belief's simulated world,
+which has real hidden drift by construction and 250 samples per window. Asserting that a six-hop cycle
+among bank accounts justifies killing a rule about merchant category 5411 would still be a document in
+which every field is individually true and the juxtaposition is fabricated. Item 6 refused exactly
+that, and so does this.
 
 The two acts are instead the **same story told on two graphs**, joined honestly by:
 
@@ -64,14 +97,23 @@ as stale.
 ## Pre-flight (demo prep — do this before recording, not on camera)
 
 1. **Restore console state** (the feed, the staleness curve, the counterfactual, and the certificate
-   staleness all read `decisions` / `belief_performance`, which are empty on a fresh cluster):
+   staleness all read `decisions` / `belief_performance`, which are empty on a fresh cluster).
+
+   > **⚠️ TWO ORDERED COMMANDS. THE ORDER IS NOT FREE.** `backfill_decisions` opens with a reseed,
+   > and the reseed **DELETEs every decision** — so running it *second* would destroy the AML rows.
+   > `backfill_aml_decisions` never reseeds, and **refuses to run** (exit 1) if the card backfill
+   > has not been run first, rather than silently building half a world.
 
    ```bash
    PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_decisions
+   PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_aml_decisions
    ```
 
-   Deterministic (~4–5 min): restores 24 agents, 1 **active** belief, 8 inheritance edges, 4,000
-   decisions, and 8 performance windows (confidence `0.924 → 0.528`, byte-identical every run).
+   Deterministic (~4–5 min total): restores 24 agents, **2 active beliefs** (crimson card + azure
+   laundering), **15** inheritance edges (8 crimson + 7 azure), **5,500** decisions (4,000 card +
+   1,500 AML citing real IBM transactions), and 8 crimson performance windows (confidence
+   `0.924 → 0.528`, byte-identical every run). The azure belief has **0** performance windows,
+   deliberately — see NOTES "THE BASE-RATE MIRAGE".
 
 2. **Bring the stack up:**
 
@@ -234,8 +276,14 @@ the roadmap's premise does not survive contact with the data.
   ```
   T = 2025-05-27 (window-4 start, where confidence first cracks `0.852 → 0.724`): **N = 1000**
   belief-driven approvals withdrawn, **M = 392** of them real fraud, across **5 holders**. Exact
-  (each window is exactly 250 rows), reported as *approvals-withdrawn* — never a fabricated "fraud
-  we'd have caught."
+  (each crimson window is exactly 250 rows), reported as *approvals-withdrawn* — never a fabricated
+  "fraud we'd have caught."
+  *(Re-verified 2026-07-12 against current code: N=1000, M=392, 5 holders, total_belief_driven=2000,
+  8 windows — unchanged. The response gained `withdrawn_blocks` and `frauds_caught_by_block` when the
+  counterfactual was made **verdict-aware**; both read **0** here, because the crimson belief only
+  ever approves. That is now a measured property of THIS belief, not an assumption baked into the
+  query: the azure laundering belief blocks, and the old un-split aggregate would have counted the 43
+  laundering rows it correctly **blocked** as auto-approved frauds. See NOTES "G3 + G4".)*
 - **Narration:** *"Had we killed this belief when the data first cracked, 1,000 downstream approvals
   lose their justification — 392 of them real fraud."*
 
@@ -304,8 +352,10 @@ the roadmap's premise does not survive contact with the data.
 - **Narration (verbatim, names the non-causal structure):** *"Two memory surfaces, one CockroachDB
   cluster. On the evidence graph, a flag needs a re-derivable witness or it admits it doesn't know.
   On the genealogy, a rule that rotted is corrected across every living holder in one commit, with a
-  certificate a second machine re-derives from scratch. Different graphs, no shared causal thread —
-  the same refusal to claim more than the data proves."*
+  certificate a second machine re-derives from scratch. The two graphs now touch at exactly one
+  place — a living agent applying an inherited laundering rule to real, labeled transactions — but
+  they still carry no shared causal thread, because the evidence says that belief is imperfect, not
+  stale. The same refusal to claim more than the data proves."*
 
 ---
 
@@ -359,3 +409,29 @@ No migration, no new persisted table, no touch to the regulatory corpus, no Item
 new frontend surface. The AML act (Act 1) is narrated through the existing terminal / `/docs` /
 demo scripts — an **AML console is deferred entirely** as a strong future addition (its own
 plan-gated frontend ladder, per Item 5's and Item 9's own sizing), not folded into F.
+
+## Re-verification Log — the grounding seam (fresh, 2026-07-12)
+
+Re-ran every LIVE beat's command against **current code** after G3/G4 (the second belief + the
+grounded backfill + the verdict-aware counterfactual). Cluster: head 0007, 24 agents, **2 beliefs**,
+15 inheritance edges, **5,500 decisions** (4,000 card + 1,500 AML), 8 crimson perf windows, 0 azure
+perf windows.
+
+| beat | command | result — UNCHANGED unless noted |
+|---|---|---|
+| 5 | `GET /beliefs/898ad0e5…/lineage` | **9 nodes**, origin crimson-0 (`108cf7f4`), fork at depth 5 |
+| 6 | `GET /beliefs/898ad0e5…/performance` | **8 windows, 0.924 → 0.528**, frauds_approved 19 → 118, gen-6 bump `0.556 → 0.624 → 0.528` |
+| 7 | `GET /beliefs/898ad0e5…/counterfactual-invalidation?at=2025-05-27` | **N=1000, M=392**, 5 holders, total_belief_driven=2000, 8 windows. **NEW:** `withdrawn_blocks=0`, `frauds_caught_by_block=0` — the crimson belief never blocks, now *measured* rather than assumed |
+| — | `GET /beliefs/898ad0e5…/provenance-audit` | **CLEAN**, 8 edges, 0 anomalies |
+
+**Section 1's premise was falsified by the seam and has been rewritten** (`decisions.aml_transaction_id`
+now exists; there are two beliefs; 1,500 decisions cite real AML rows). The **two-act structure
+stands** — the seam earns the *provenance* half of a causal chain, never the *justification* half,
+because the AML staleness curve is a base-rate artifact and does not exist. A storyboard that drifts
+from reality is what the freshness tags exist to prevent; this is that mechanism working.
+
+**Also verified fresh:** the first-ever invalidation of a belief with **zero** performance windows —
+a real `POST /beliefs/{azure}/invalidate` produced a valid, hash-verifiable S3 certificate carrying
+`staleness_evidence: {"available": false}` (no `confidence_now` key at all, so nothing was invented),
+while crimson stayed active with all 8 edges open. The closures are genuinely disjoint under a real
+atomic write.
