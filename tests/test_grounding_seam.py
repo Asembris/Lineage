@@ -127,9 +127,16 @@ def test_database_rejects_a_dangling_aml_transaction_id():
     writer-enforced convention.
 
     NOTE the row below is otherwise a PERFECTLY VALID AML decision (merchant/confidence NULL, a real
-    currency), so it satisfies migration 0007's `ck_decisions_kind` CHECK and the ONLY thing that can
-    reject it is the foreign key. Without that care this test would pass on a CheckViolation and
-    prove nothing about the FK — so the failure is asserted to be a FOREIGN KEY violation by name.
+    currency, AND a real basis tag), so it satisfies migration 0007/0008's `ck_decisions_kind` CHECK
+    and the ONLY thing that can reject it is the foreign key. Without that care this test would pass
+    on a CheckViolation and prove nothing about the FK — so the failure is asserted to be a FOREIGN
+    KEY violation by name.
+
+    THIS HAS NOW BEEN SPRUNG TWICE. 0007 first made the probe row CHECK-invalid (it omitted
+    `amount_currency`); 0008 did it again by requiring the txn_ref basis tag, which this probe used
+    to spell 'seam-guard-probe'. Both times the test went red on a CheckViolation while proving
+    nothing about the foreign key. **Any migration that tightens ck_decisions_kind must re-check
+    that this row still satisfies it** — otherwise the FK stops being tested at all.
     """
 
     async def _run():
@@ -142,7 +149,7 @@ def test_database_rejects_a_dangling_aml_transaction_id():
                 text(
                     "INSERT INTO decisions (agent_id, txn_ref, amount, verdict, decided_at, "
                     "is_fraud, aml_transaction_id, amount_currency) "
-                    "VALUES (:a, 'seam-guard-probe', 1, 'approve', now(), false, :t, 'US Dollar')"
+                    "VALUES (:a, 'aml:INCONCLUSIVE', 1, 'approve', now(), false, :t, 'US Dollar')"
                 ),
                 {"a": agent_id, "t": bogus},
             )
@@ -176,14 +183,22 @@ def _assert_check_violation(err) -> None:
 
 
 def _insert(**cols) -> None:
-    """INSERT one decision with exactly the given columns. Rolls back / cleans up either way."""
+    """INSERT one decision with exactly the given columns. Rolls back / cleans up either way.
+
+    `txn_ref` defaults to a CARD-shaped probe ref and is overridable, because migration 0008 made
+    the basis tag structural: an AML probe row MUST carry a real `aml:*` tag or the CHECK rejects it
+    for that reason instead of the one under test. Cleanup is BY ID, not by txn_ref — the id is the
+    only marker that survives both shapes.
+    """
 
     async def _run():
+        probe_id = uuid.uuid4()
         async with engine.connect() as c:
             agent_id = (await c.execute(text("SELECT id FROM agents LIMIT 1"))).scalar_one()
             payload = {
+                "id": probe_id,
                 "agent_id": agent_id,
-                "txn_ref": "ck-kind-probe",
+                "txn_ref": "ck-kind-probe",  # card-shaped; AML cases override it
                 "amount": 42,
                 "verdict": "approve",
                 "decided_at": None,
@@ -205,7 +220,7 @@ def _insert(**cols) -> None:
                 await c.rollback()
                 async with engine.connect() as c2:
                     await c2.execute(
-                        text("DELETE FROM decisions WHERE txn_ref = 'ck-kind-probe'")
+                        text("DELETE FROM decisions WHERE id = :i"), {"i": probe_id}
                     )
                     await c2.commit()
 
@@ -223,6 +238,10 @@ def test_an_aml_decision_may_not_fabricate_a_merchant_or_a_confidence():
     """Item 4 refused the fake merchant and Item D condemned the fabricated confidence.
 
     0007 makes both UNWRITABLE rather than merely discouraged in a comment.
+
+    Every probe below carries a REAL basis tag (`aml:INCONCLUSIVE`), so it satisfies migration
+    0008's clause and the only thing left that can reject it is the merchant/confidence clause this
+    test is actually about. Same discipline as the FK guard above, and for the same reason.
     """
 
     async def _real_txn():
@@ -230,14 +249,15 @@ def test_an_aml_decision_may_not_fabricate_a_merchant_or_a_confidence():
             return (await c.execute(text("SELECT id FROM aml_transactions LIMIT 1"))).scalar_one()
 
     txn = asyncio.run(_real_txn())
+    aml = {"aml_transaction_id": txn, "amount_currency": "Euro", "txn_ref": "aml:INCONCLUSIVE"}
 
     with pytest.raises(IntegrityError) as exc:
-        _insert(aml_transaction_id=txn, amount_currency="Euro", merchant="Bank of Nowhere")
+        _insert(**aml, merchant="Bank of Nowhere")
     _assert_check_violation(exc.value)
 
     with pytest.raises(IntegrityError) as exc:
-        _insert(aml_transaction_id=txn, amount_currency="Euro", confidence=0.87)
+        _insert(**aml, confidence=0.87)
     _assert_check_violation(exc.value)
 
     # ...and the honest shape is accepted (or the constraint would be a wall, not a brake).
-    _insert(aml_transaction_id=txn, amount_currency="Euro")
+    _insert(**aml)
