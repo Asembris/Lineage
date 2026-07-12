@@ -284,6 +284,29 @@ class DecisionOut(BaseModel):
       * `amount_currency` — NULL for Phase-2 card rows: the simulator never declared a currency.
                        AML rows name their real one; the extract spans 14.
     A consumer distinguishes the two kinds by `aml_transaction_id is not None`.
+
+    ===================== READ THIS BEFORE COUNTING AN AML `approve` =====================
+    For an AML decision, `verdict` ALONE IS NOT THE STORY, and reading it as one will mislead you.
+    TWO DIFFERENT WITNESS OUTCOMES BOTH MAP TO `approve`, and they are categorically different:
+
+        witness_outcome   verdict    edges   share    of which laundering
+        MATCH             blocked       57    3.8%     43   a real directed cycle, re-derived
+        CONCLUSIVE_NO     approve      463   30.9%      5   searched; there is no cycle
+        INCONCLUSIVE      approve      980   65.3%    252   COULD NOT TELL — the search ran off
+                                                            the edge of the 1,500-edge extract
+
+    So of the belief's 1,443 approvals, **980 (65.3% of the whole extract) are not "this is clean" —
+    they are "we could not determine", silently approving 252 of the extract's 300 laundering rows.**
+    Mapping "cannot corroborate" -> `approve` is a DISCLOSED MODELING CHOICE (a real system lets a
+    payment through absent evidence), not a corner case, and this proportion must travel with every
+    quote of these decisions.
+
+    `witness_outcome` exists to make that legible FROM THE RESPONSE ALONE. The information was always
+    in `txn_ref` (`aml:INCONCLUSIVE`), but only as an undocumented string convention inside a column
+    named "the transaction reference" — recoverable only by a caller who already knew to look, which
+    is exactly the failure the tag was meant to prevent. Migration 0008 makes the tag structural
+    (`ck_decisions_kind`), so this field is TOTAL for AML rows and NULL for card rows, never absent
+    because a writer forgot. See app/services/aml_seam.py and NOTES.md "THE BASE-RATE MIRAGE".
     """
 
     id: uuid.UUID
@@ -299,16 +322,32 @@ class DecisionOut(BaseModel):
     is_fraud: bool
     # The grounding seam: the REAL aml_transactions row this decision was made about.
     aml_transaction_id: uuid.UUID | None
+    # MATCH | CONCLUSIVE_NO | INCONCLUSIVE for an AML decision; NULL for a card decision.
+    # A PROJECTION of the persisted `txn_ref` — what the agent RECORDED at decision time, never a
+    # fresh re-run of the witness against today's graph. Those are different objects and this
+    # surface deliberately serves only the first. (To re-derive the witness NOW, which is a
+    # different question, call GET /aml/transactions/{id}/interrogate.)
+    witness_outcome: str | None = None
 
 
 class DecisionListResponse(BaseModel):
-    # Paginated: decisions grows to thousands of rows. `agent_id` filter is OPTIONAL —
-    # default is the fleet-wide feed (all agents), narrowing to one agent when provided.
+    """The decision feed. Paginated — `decisions` is the one table in the moat designed to grow.
+
+    Every filter is optional and they AND together. `aml_transaction_id` is the REVERSE LOOKUP:
+    the seam's FK resolves decision -> transaction, and this resolves transaction -> decision
+    ("did any agent act on this money-flow edge, and what did it decide?"). `total: 0` is the
+    honest answer for a transaction no agent ever ruled on.
+    """
+
     decisions: list[DecisionOut]
     total: int
     limit: int
     offset: int
+    # The filters, echoed back as parsed, so a response is self-describing.
     agent_id: uuid.UUID | None
+    aml_transaction_id: uuid.UUID | None = None
+    driving_belief_id: uuid.UUID | None = None
+    kind: str | None = None
 
 
 class BeliefListResponse(BaseModel):
