@@ -169,6 +169,41 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
+    item: "Staleness curve — uncertainty",
+    label: "measured, with its interval",
+    mode: "static",
+    note: (
+      <>
+        The certificate's <code>0.924 → 0.528</code> is no longer a bare point estimate:
+        every window carries the sample size behind it and a 95% Wilson interval (present
+        day is <code>0.528</code>, CI <code>[0.466, 0.589]</code>). <code>n</code> is{" "}
+        <b>re-aggregated from <code>decisions</code></b>, not persisted —{" "}
+        <code>belief_performance</code> still has no denominator column, and the five-table
+        schema is unchanged. If a persisted confidence stops reproducing from the decisions
+        it summarizes, the intervals are <b>withheld</b> rather than pairing a fresh
+        denominator with a stale estimate. A measured decay is asserted only when a Fisher
+        exact test supports it — there is <b>no minimum-sample gate</b>, so a one-decision
+        window disqualifies itself on the evidence.
+      </>
+    ),
+  },
+  {
+    item: "Staleness uncertainty — not cross-checked",
+    label: "shared computation, not an independent check",
+    mode: "static",
+    note: (
+      <>
+        The certifier Lambda computes the intervals with the <i>same shared function</i>, but
+        it does <b>not</b> re-derive and compare them the way it does the closure hash — and
+        that is deliberate. A confidence interval is arithmetic over <code>(k, n)</code>, not
+        a claim about the world, so there is no independent oracle to check it against; both
+        halves read <code>belief_performance</code> at current committed state, so neither is
+        a check on the other. A <code>staleness_verification: agreed</code> block would
+        fabricate the <i>appearance</i> of the closure hash's guarantee while proving nothing.
+      </>
+    ),
+  },
+  {
     item: "Provenance-integrity audit",
     label: "verification, not a patch",
     mode: "live",
