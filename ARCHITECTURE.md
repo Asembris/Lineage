@@ -47,8 +47,9 @@ graph TB
     style corpus fill:#2a1e2e,stroke:#ae7b9c,color:#e8eef7
 ```
 
-**Why three metadatas and not one.** Roadmap Item 0 provisions a throwaway `demo` database with
-`Base.metadata.create_all`. Because `aml_*` and `typology_corpus` live on *different* metadata, that
+**Why three metadatas and not one.** The cluster-isolation work provisions a throwaway `demo`
+database with `Base.metadata.create_all`. Because `aml_*` and `typology_corpus` live on *different*
+metadata, that
 call **physically cannot** create empty evidence/corpus tables in the demo database — the isolation
 is enforced by Python object identity, not discipline. It also keeps Alembic's `target_metadata`
 (the moat) clean and leaves the five-table moat exactly five. Verified structurally: querying
@@ -173,6 +174,35 @@ flowchart TD
   this — non-total row ordering (fixed by `ORDER BY depth, generation, agent_id` over a unique UUID),
   non-canonical serialization, and any `now()`/random in the path.
 
+### When *not* to use `AS OF SYSTEM TIME` — the counterfactual, and the two clocks
+
+The most instructive AOST decision in this codebase is the one where we **refused to use it**.
+
+`GET /beliefs/{id}/counterfactual-invalidation?at=T` answers *"if this belief had been invalidated at
+T, which downstream verdicts change?"* An earlier design note assumed it would call
+`replay.closure_snapshot(belief, as_of=T)` — reusing the machinery above. That would have been a
+**category error**, and naming it is the clearest statement of the project's central distinction:
+
+|  | **MVCC time** (`as_of`) | **Business time** (`at`) |
+|---|---|---|
+| What it addresses | the state of the **database** | the state of the **world** |
+| Where it comes from | `cluster_logical_timestamp()`, an HLC | `decisions.decided_at` / `belief_performance.window_start` |
+| Reachable range | **75 minutes** (`gc.ttlseconds = 4500`) | ~400 days of modeled history |
+| Answers | *"what did we know then?"* | *"what was happening then?"* |
+
+`T` for the counterfactual is a `decided_at` instant roughly **400 days ago**. AOST is therefore both
+the **wrong clock** *and* **out of window** — and worse, the rows in question were all physically
+`INSERT`ed at seed time, so they **never existed in MVCC history at `T` at all**. Time-travelling to
+`T` would faithfully reconstruct a database that contained none of them.
+
+No reconstruction is needed anyway: every belief-driven decision already carries `driving_belief_id`
+and `decided_at`, so the affected set is a plain deterministic `WHERE` over immutable columns —
+`{ driving_belief_id = X AND decided_at > T }`. The parameter is deliberately named `at`, **not**
+`as_of`, so the API surface itself signals which clock is in play (`counterfactual.py:42-54`).
+
+> This is the same discipline as the honesty ledger: an immutable row and a rotted rule are two
+> different facts, and the whole system is built to never let one impersonate the other.
+
 ---
 
 ## 4 · The certificate and the independent certifier
@@ -208,7 +238,7 @@ flowchart LR
     style LAM fill:#1e3a2e,stroke:#6bae8c,color:#e8eef7
 ```
 
-Real end-to-end result (Roadmap Item 6): the endpoint's issue-time hash and the Lambda's
+Real end-to-end result, from a live AWS invocation: the endpoint's issue-time hash and the Lambda's
 AOST-replayed hash are the **same value** —
 `sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` — computed on different
 machines, in different async/sync stacks, from different reads.
@@ -280,8 +310,8 @@ What the brake deliberately does **not** do:
 
 `FLAG_CAPABLE = {CYCLE, SCATTER-GATHER}` is not hand-picked — it is the set measured to have **zero
 cross-typology false witnesses** over all 1,500 edges, and a living-invariant test enforces it. That
-selection **replicates on the never-tuned hold-out** (Item 7): the same two typologies come back
-sound on data no design decision saw.
+selection **replicates on the never-tuned hold-out** (the structural detection eval): the same two
+typologies come back sound on data no design decision saw.
 
 ---
 
