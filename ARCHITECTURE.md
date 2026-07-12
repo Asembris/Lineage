@@ -6,11 +6,18 @@ evaluation numbers, see [README.md](README.md).
 
 ## Contents
 
-1. [Three deliberately-separated schemas](#1-three-deliberately-separated-schemas)
-2. [The atomic invalidation transaction](#2-the-atomic-invalidation-transaction)
-3. [AS OF SYSTEM TIME and deterministic replay](#3-as-of-system-time-and-deterministic-replay)
-4. [The certificate and the independent certifier](#4-the-certificate-and-the-independent-certifier)
-5. [The witness-construction brake](#5-the-witness-construction-brake)
+1. [Three deliberately-separated schemas](#1--three-deliberately-separated-schemas)
+2. [The atomic invalidation transaction](#2--the-atomic-invalidation-transaction)
+3. [AS OF SYSTEM TIME and deterministic replay](#3--as-of-system-time-and-deterministic-replay)
+   — including [when *not* to use it](#when-not-to-use-as-of-system-time--the-counterfactual-and-the-two-clocks)
+4. [The certificate and the independent certifier](#4--the-certificate-and-the-independent-certifier)
+5. [The witness-construction brake](#5--the-witness-construction-brake)
+   — and [5.1 the explanation-faithfulness guard](#51--the-same-discipline-applied-to-prose-the-explanation-faithfulness-guard)
+6. [Verifying the provenance graph itself (A1–A4)](#6--verifying-the-provenance-graph-itself-a1a4)
+
+Seven diagrams, each over real code. The two newest — the faithfulness guard (§5.1) and the
+provenance audit (§6) — are the system's two answers to *"who checks the checker?"*: one guards the
+model's **prose** against the evidence, the other guards the **evidence** against tampering.
 
 ---
 
@@ -313,8 +320,122 @@ cross-typology false witnesses** over all 1,500 edges, and a living-invariant te
 selection **replicates on the never-tuned hold-out** (the structural detection eval): the same two
 typologies come back sound on data no design decision saw.
 
+### 5.1 · The same discipline, applied to prose: the explanation-faithfulness guard
+
+The brake governs the **verdict**. It says nothing about the **story the model tells about the
+verdict** — and a supervisor reads the story. So the agent's narrated `rationale` passes through a
+second, independent guard before a human ever sees it.
+
+```mermaid
+flowchart TD
+    R["LLM rationale (prose)<br/>+ the EXACT evidence it was shown"] --> J{"GEval faithfulness judge<br/>(gemma, local — never OpenAI)"}
+
+    J -->|"score ≥ threshold"| SUP["SUPPORTED<br/>prose shown as written"]
+    J -->|"score &lt; threshold"| UNS["UNSUPPORTED<br/>prose WITHHELD"]
+    J -->|"judge unreachable /<br/>timeout / unparseable"| UNA["UNAVAILABLE<br/>prose WITHHELD"]
+
+    UNS --> DET["deterministic reconstruction<br/>shown in its place"]
+    UNA --> DET
+
+    V["VerdictOutcome<br/>(FLAG / NO_FLAG / INSUFFICIENT_COVERAGE)"] -.->|"passes through<br/><b>UNTOUCHED</b>"| OUT
+    SUP --> OUT["what the supervisor sees"]
+    DET --> OUT
+
+    style V fill:#1e2a44,stroke:#6b8cae,color:#e8eef7
+    style UNA fill:#3a1518,stroke:#E5484D,color:#f7e8e8
+    style DET fill:#1e3a2e,stroke:#6bae8c,color:#e8eef7
+```
+
+Two properties carry the whole design (`faithfulness_guard.py:11-47`):
+
+- **The guard never touches the verdict — only the rationale.** The verdict comes from deterministic
+  structural evidence and never reads the prose. An unfaithful rationale means the *explanation* is
+  untrustworthy, which is a **different fact** from the verdict being wrong: the witness is real
+  whether or not the model narrated it faithfully. Letting a probabilistic prose judge downgrade a
+  structurally-proven FLAG would invert the entire reason the brake exists. A test asserts field-level
+  equality of `verdict` / `reason` / `witness_txn_ids` / `corpus_doc` across the guard.
+- **It fails closed.** Judge down, credits gone, timeout, unparseable score → the prose is
+  **withheld**, never shown unguarded. This is cheap here precisely because the deterministic verdict
+  and the deterministic reconstruction are *always* available: a withheld rationale still leaves a
+  fully-usable finding. The supervisor loses the LLM's gloss and keeps the truth.
+
+**The instrument's limits travel with every result.** `SUPPORTED` means *"passed the check"* — **not
+"proven faithful."** The judge has a nonzero, measured false-negative rate on dense structural prose
+(a fabricated-hop negative scored 0.50; a genuinely faithful SCATTER-GATHER anchor scored 0.40). This
+is a probabilistic guard layered on a deterministic verdict, never a proof. And it is **explicitly not
+a poisoning defense**: it compares prose against the *retrieved rows*, so if those rows were
+themselves poisoned it would happily pass a claim faithful to the poison. Defending the rows is a
+different control — the next section.
+
+---
+
+## 6 · Verifying the provenance graph itself (A1–A4)
+
+Everything upstream trusts `belief_inheritance`. The lineage CTE walks it, the closure `UPDATE`
+flips it, the certificate hashes it. So: **what verifies the edges themselves?**
+
+`GET /beliefs/{id}/provenance-audit` walks a belief's whole closure and proves every edge was created
+by a genuine spawn event, from an ancestor that actually held the belief, before any invalidation.
+
+```mermaid
+flowchart TD
+    E["one belief_inheritance edge<br/>(belief, from_agent, to_agent, inherited_at, invalidated_at)"] --> M{"backing rows present?<br/>(both agents + a spawn time)"}
+    M -->|no| INC["INCONCLUSIVE<br/><i>surfaced, never a silent pass</i>"]
+
+    M -->|yes| A1{"<b>A1</b> genealogy-consistency<br/>from_agent == to_agent.parent_id"}
+    A1 -->|violated| AN["ANOMALOUS<br/>(codes + per-edge evidence)"]
+    A1 -->|ok| A2{"<b>A2</b> spawn-time consistency<br/>inherited_at == to_agent.spawned_at"}
+    A2 -->|violated| AN
+    A2 -->|ok| A3{"<b>A3</b> source-was-a-holder<br/>from_agent held it at inherited_at"}
+    A3 -->|violated| AN
+    A3 -->|ok| A4{"<b>A4</b> not-post-invalidation<br/>inherited_at precedes any<br/>invalidation it depends on"}
+    A4 -->|violated| AN
+    A4 -->|ok| OK["edge ok"]
+
+    OK --> CLEAN["CLEAN — every edge satisfies A1–A4"]
+
+    style CLEAN fill:#1e3a2e,stroke:#3FE0A8,color:#e8eef7
+    style AN fill:#3a1518,stroke:#E5484D,color:#f7e8e8
+    style INC fill:#2a2440,stroke:#8c7bae,color:#e8eef7
+```
+
+Each invariant names a distinct forgery. **A1** violated is a *phantom ancestor* — provenance grafted
+onto a lineage the node never descended from. **A2** violated is an edge inserted *after the fact*, at
+a timestamp corresponding to no spawn event. **A3** violated means inheriting from an ancestor that
+never held the belief. **A4** violated is literally *"provenance traces to a later-invalidated
+source."* The three-way outcome (**CLEAN / ANOMALOUS / INCONCLUSIVE**) deliberately mirrors the AML
+brake's — a missing row is surfaced, never silently treated as clean, the same way an unreachable
+judge fails closed in §5.1.
+
+**The honest scope — this is verification, not a patch.** There is **no live vulnerability here, and
+we will not dress one up.** The only two code paths that ever `INSERT` a `belief_inheritance` row are
+`seed.seed()` and `lifecycle.spawn_child()`; `spawn_child()` is not exposed by any HTTP route; and
+both writers maintain A1–A4 *by construction*. Through the application, an illegitimate edge **cannot
+arise**. What the audit actually defends against is **out-of-band tampering** — a direct SQL write by
+an actor with cluster credentials, a future write path that doesn't preserve the invariants, a buggy
+migration, or a future multi-belief world. Such an edge is the *clean-label* analog: every foreign key
+is real, the timestamp is plausible, and it passes every structural and referential check the database
+can make. Its illegitimacy is visible **only** by walking the provenance chain. That walk is this
+audit.
+
+Proving it works required constructing the attack. `tests/test_provenance_audit.py` seeds the real
+9-node / 8-edge closure into the isolated `demo` database, asserts CLEAN, then injects three poisoned
+edges **by direct SQL that bypasses `spawn_child` entirely** — the exact out-of-band vector — and
+asserts each trips *exactly* its own invariant while every legitimate edge stays OK. Note the last one:
+a legitimately-invalidated closure is **not** flagged, because every real edge's spawn-time
+`inherited_at` precedes the single invalidation commit. The test snapshots `defaultdb` before and after
+and asserts byte-identity, so constructing poison never touches the console's real closure.
+
+**Taxonomy, cited at the confidence it was actually verified:** the inheritance graph is the fleet's
+long-term memory, so an out-of-band edge is memory-store poisoning. OWASP **ASI06 (Memory & Context
+Poisoning)** is the primary citation — **verified against the source**, and its own guidance
+("provenance metadata on every memory write", "periodic evaluation against ground truth") is precisely
+what A1–A4 check. MITRE ATLAS **AML.T0080** is labeled **secondary-sourced**: `atlas.mitre.org` is a JS
+SPA that could not be rendered, so the ID is corroborated across independent secondary sources rather
+than confirmed on the authoritative page. It is labeled that way rather than asserted as primary —
+the same standard as the MCP disclosure. → `app/services/provenance_audit.py`
+
 ---
 
 *Every diagram above corresponds to code under `app/services/` and `lambda/certifier/`; the
-Roadmap-item history and the reasoning behind each decision are recorded in
-[NOTES.md](NOTES.md).*
+engineering history and the reasoning behind each decision are recorded in [NOTES.md](NOTES.md).*
