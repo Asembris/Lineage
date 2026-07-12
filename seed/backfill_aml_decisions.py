@@ -94,7 +94,13 @@ from sqlalchemy import text
 from app.db import SessionLocal, engine
 from app.models import Decision
 from app.services.aml_graph import Outcome, load_graph
-from app.services.aml_seam import TYPOLOGY, SeamDecision, census, decide_all
+from app.services.aml_seam import (
+    TYPOLOGY,
+    SeamDecision,
+    census,
+    decide_all,
+    txn_ref_for,  # the SOLE writer of the basis tag; migration 0008 pins its vocabulary
+)
 from seed.seed import aid, bid
 
 AML_BELIEF = bid("aml-cycle")
@@ -105,13 +111,10 @@ DECIDING_AGENT = aid("azure-7")  # the LIVING holder, acting on azure-0's belief
 # reproducible byte-for-byte. See the module docstring for why it is a single instant at all.
 DECIDED_AT = dt.datetime(2026, 7, 12, 12, 0, 0, tzinfo=dt.timezone.utc)
 
-TXN_REF_PREFIX = "aml"
-
-
-def txn_ref_for(outcome: Outcome) -> str:
-    """`aml:MATCH` | `aml:CONCLUSIVE_NO` | `aml:INCONCLUSIVE` — the decision's BASIS, in the data."""
-    return f"{TXN_REF_PREFIX}:{outcome.value}"
-
+# `txn_ref_for` is imported from app.services.aml_seam — the decider that owns the outcome
+# vocabulary. It used to be defined here, which meant the tag's spelling lived in the WRITER while
+# migration 0008's CHECK enforces it and the read surface projects it: three copies, free to drift.
+# One home now, and a test asserts the migration's literals match it.
 
 # ---------------------------------------------------------------------------------------------
 # PHASE 2 ONLY. This is the module's SOLE reference to the answer key, and it runs strictly after

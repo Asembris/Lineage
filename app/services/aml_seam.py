@@ -31,7 +31,13 @@ The frozen `cycle_witness` returns one of three outcomes, and the payment vocabu
                                 "cannot determine" — and we let the payment through.
 
 **THAT THIRD LINE IS A DISCLOSED MODELING CHOICE AND IT IS NOT A CORNER CASE.** Measured over all
-1,500 ingested edges (`scripts/verify_seam.py`, and asserted in tests/test_grounding_seam.py):
+1,500 ingested edges, and asserted in
+`tests/test_decision_read_surface.py::test_the_witness_census_over_the_real_extract_is_57_463_980`
+(which runs THIS decider over the real extract and then reads the oracle to score it):
+
+(An earlier version of this docstring cited `scripts/verify_seam.py` and `tests/test_grounding_seam.py`.
+NEITHER contained these numbers and the first does not exist — so until G5 the project's single most
+important caveat was defended by a docstring pointing at a missing file. Found by going to look.)
 
     MATCH           57  (3.8%)    43 laundering / 14 benign
     CONCLUSIVE_NO  463  (30.9%)    5 laundering / 458 benign
@@ -49,6 +55,17 @@ carried here, in the decider itself, precisely so it stops being easy to get wro
 BECAUSE THE THIRD LINE EXISTS, THE VERDICT ALONE DOES NOT SAY WHY. So `SeamDecision` carries the
 witness outcome, and the backfill persists it in `decisions.txn_ref` — making the coverage split
 queryable straight from the data, with no schema change and no re-derivation. See the backfill.
+
+THE BASIS TAG IS STRUCTURAL, NOT A CONVENTION (migration 0008)
+---------------------------------------------------------------
+`txn_ref_for()` below is the SOLE writer of that tag and `TXN_REF_TAGS` is the whole legal
+vocabulary. Migration 0008's `ck_decisions_kind` pins EXACTLY these three strings in the database,
+so an AML decision **cannot be written without a valid basis tag** — a future backfill that wrote
+`txn_ref = str(txn_id)` would be REJECTED by CockroachDB rather than silently destroying the only
+in-data carrier of the 65.3% disclosure. That is not hypothetical caution: the understated "728 /
+48.5%" figure has been introduced into this project twice and corrected twice. Prose corrections
+demonstrably do not stick, so the number's carrier is defended by the schema instead.
+(tests/test_decision_read_surface.py asserts the migration's three literals ARE these three.)
 """
 
 from __future__ import annotations
@@ -70,6 +87,38 @@ VERDICT_FOR: dict[Outcome, str] = {
     Outcome.CONCLUSIVE_NO: "approve",
     Outcome.INCONCLUSIVE: "approve",
 }
+
+# --- The basis tag: `decisions.txn_ref` for an AML decision --------------------------------
+# Lives HERE, in the decider that defines the outcome vocabulary, so the backfill (which writes
+# it), the read surface (which projects it), and migration 0008 (which enforces it) cannot drift
+# apart. See the module docstring.
+
+TXN_REF_PREFIX = "aml"
+
+
+def txn_ref_for(outcome: Outcome) -> str:
+    """`aml:MATCH` | `aml:CONCLUSIVE_NO` | `aml:INCONCLUSIVE` — the decision's BASIS, in the data."""
+    return f"{TXN_REF_PREFIX}:{outcome.value}"
+
+
+# The complete legal vocabulary. Migration 0008's CHECK contains exactly these, and a test pins it.
+TXN_REF_TAGS: tuple[str, ...] = tuple(txn_ref_for(o) for o in Outcome)
+
+
+def witness_outcome_of(txn_ref: str) -> str | None:
+    """The witness outcome recorded in a decision's `txn_ref`. None for a CARD decision.
+
+    A PROJECTION of persisted data, never a recomputation — so the field this backs can never
+    drift from the row it describes (unlike re-running the witness, which would answer a subtly
+    different question: what the graph says NOW, not what the agent recorded THEN).
+
+    Total for AML rows by construction: migration 0008 makes any other tag unwritable.
+    """
+    prefix = f"{TXN_REF_PREFIX}:"
+    if not txn_ref.startswith(prefix):
+        return None
+    tag = txn_ref[len(prefix):]
+    return tag if tag in {o.value for o in Outcome} else None
 
 
 @dataclass(frozen=True)
