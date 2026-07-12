@@ -102,7 +102,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Item 7 dev-set numbers",
+    item: "Detection eval — dev-set numbers",
     label: "in-sample",
     mode: "static",
     note: (
@@ -113,7 +113,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Item 8 GEval rubric",
+    item: "Faithfulness eval — GEval rubric",
     label: "partly in-sample",
     mode: "static",
     note: (
@@ -124,7 +124,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Item 8 judge",
+    item: "Faithfulness eval — judge",
     label: "open-model",
     mode: "static",
     note: (
@@ -169,7 +169,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Provenance audit (Item A)",
+    item: "Provenance-integrity audit",
     label: "verification, not a patch",
     mode: "live",
     liveKey: "provenance",
@@ -184,7 +184,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Counterfactual invalidation (Item B)",
+    item: "Counterfactual invalidation query",
     label: "measured, exact",
     mode: "static",
     note: (
@@ -198,7 +198,7 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Explanation-faithfulness guard (Item E)",
+    item: "Explanation-faithfulness guard",
     label: "probabilistic guard",
     mode: "static",
     note: (
@@ -217,12 +217,11 @@ const ROWS: RowSpec[] = [
     mode: "static",
     note: (
       <>
-        <code>GET /aml/transactions/{"{id}"}/interrogate</code> (Item 5),{" "}
-        <code>/beliefs/{"{id}"}/provenance-audit</code> (Item A),{" "}
-        <code>/beliefs/{"{id}"}/counterfactual-invalidation</code> (Item B) are built,
-        tested, and verified against real cluster data but have no console surface yet —
-        each is a separate plan-gated frontend session; listed here rather than left
-        undiscoverable.
+        <code>GET /aml/transactions/{"{id}"}/interrogate</code>,{" "}
+        <code>/beliefs/{"{id}"}/provenance-audit</code>, and{" "}
+        <code>/beliefs/{"{id}"}/counterfactual-invalidation</code> are built, tested, and
+        verified against real cluster data but have no console surface yet — each is a
+        separate plan-gated frontend session; listed here rather than left undiscoverable.
       </>
     ),
   },
