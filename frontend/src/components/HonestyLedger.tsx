@@ -133,10 +133,18 @@ const ROWS: RowSpec[] = [
     liveKey: "decisions",
     note: (
       <>
-        A deterministic <code>python -m seed.backfill_decisions</code> repopulates 4,000
-        rows + 8 windows (curve conf 0.924 → 0.528, byte-identical every run). This row
-        reads live because whether the cluster is currently populated depends on demo
-        activity.
+        This row reads live because whether the cluster is currently populated depends on
+        demo activity — the destructive invalidation demo consumes it. Restoring it is a{" "}
+        <b>three-command procedure, and the order is not free.</b>{" "}
+        <b>
+          <code>python -m seed.backfill_decisions</code> alone is NOT a restore:
+        </b>{" "}
+        it opens with a reseed, and <code>seed.seed()</code> <b>DELETEs every decision</b> —
+        so on its own it repopulates the 4,000 card rows + 8 windows (curve conf 0.924 →
+        0.528, byte-identical every run) <em>and silently destroys the 1,500 AML decisions
+        in the grounding-seam row above.</em> Run{" "}
+        <code>backfill_decisions</code> → <code>backfill_aml_decisions</code> →{" "}
+        <code>embed_beliefs aml-cycle</code>, in that order.
       </>
     ),
   },
