@@ -3290,3 +3290,135 @@ have produced exactly the drift the ledger exists to prevent.
 
 ### Explicitly NOT done: a per-edge provenance-audit UI (data-point only here; its own plan-gated
 ### session); any new backend route; persistence of the ledger; an AML console.
+
+## Roadmap Item 10 (part 2) — the documentation naming + structure pass (2026-07-12)
+
+Item 10 shipped its two documents on 2026-07-11 (entry above). This is the **finishing pass**, not a
+rewrite: README.md and ARCHITECTURE.md were kept and edited, because they were built with the same
+verification discipline as the code. Two problems fixed, plus bringing both current with the five
+items that shipped *after* they were written (9, A, B, E, F). NO code changed except the honesty-
+ledger component's row labels (forced — see below). No migration, no DB write.
+
+### PROBLEM 1 — internal shorthand had leaked into judge-facing docs (17 occurrences)
+README named capabilities as "Item 7", "Item 8", "Item A", "Item B", "Item E" — roadmap sequence
+labels that resolve **only** for someone who has read this file. A judge cannot resolve them at all.
+Audited every occurrence: **14 in README** (two section headings, five prose refs, five honesty-ledger
+row labels, two in Getting Started) and **3 in ARCHITECTURE**. All replaced with the capability's real
+name: *the structural detection eval* (7), *the RAG-grounding faithfulness eval* (8), *the honesty
+ledger* (9), *the provenance-integrity audit* (A), *the counterfactual invalidation query* (B), *the
+explanation-faithfulness guard* (E), *the hero demo storyboard* (F). The letters survive ONLY as
+parenthetical indices into this file, explicitly labeled as such in the roadmap table. **The labels
+stay here in NOTES — this is the engineering log and they are its index.**
+
+### THE HONESTY DEFECT THE VERIFICATION CAUGHT (the load-bearing finding of this session)
+README's Core-innovations §3 claimed the oracle-fit logistic-regression baseline **"only ties on
+F1"**. Re-running `eval_detection.py` fresh: **that is false.** On the **hold-out — the headline set —
+the logreg BEATS the structural detector** (F1 78.7 vs 77.1; recall 80.6 vs 65.3), and the one-line
+`payment_format == ACH` rule has **100% recall and misses nothing at all**. The Evaluation-results
+section already said this correctly ("matches … or beats"), and Item F's Beat 1 had already
+established the roadmap's "we catch what the baseline misses" premise is FALSE — but the punchier,
+more-read blurb had quietly softened it to "ties". **A caveat stated in one section does not license
+an overclaim in another.** Fixed, and the fix is structural: the three-way comparison (structural /
+logreg / naive-ACH, dev + hold-out) is now a TABLE where the losses are bolded and unmissable. The
+leak-independence argument (the witness reads no format field; real-population "flag all ACH" =
+**0.75% precision**, 4,483 / 600,797) is what actually carries the claim, and it survives being shown
+the losses. This is the second time this project's docs pass caught a real defect by re-verifying
+rather than trusting a previously-verified number — do not trust prior numbers just because they were
+once checked.
+
+### PROBLEM 2 — restructure for scannability WITHOUT thinning the caveats
+The hard constraint: every caveat that travels with a number must STILL travel with it after the pass.
+Restructures, each chosen so the caveat becomes *more* prominent, not less:
+- **Judging-criteria alignment: five prose paragraphs → a table with an "Honest limitation" column.**
+  The point is that the caveat is now **welded into the same row as the claim** and cannot be quoted
+  apart. Previously the MCP-configured-not-exercised disclosure was the *fifth sentence of a
+  paragraph*; it is now a dedicated cell. The competitive thesis (one transactional store spanning
+  graph + vectors + time-travel) stays as prose beneath the table — it dies in a cell.
+- **The faithfulness eval's two denominators → a table with a "what it is NOT" column**, so 8/10 is
+  structurally unable to be misread as a score over 40.
+- **The problem diagram: ASCII → mermaid.** The ASCII was misaligned AND could only gesture at the
+  thesis; the mermaid carries **both clocks** in one figure. The prior pass's "renders without
+  mermaid" reason was never really honored (the README already depends on GitHub-rendered badges and
+  a remote typing-SVG, and ARCHITECTURE is all-mermaid).
+
+### NEW DISCLOSURE ADDED (approved) — the single-region caveat
+The cluster is single-region (`aws-eu-central-1`). What Lineage **demonstrates and measures** is
+atomic **cross-key / cross-holder** invalidation at one commit (vs the eventual baseline: 9 commits +
+a real split window). Atomic **cross-*region*** is CockroachDB's documented property but is **argued
+here, not measured** — and FRONTEND.md already called "atomic-across-regions argued-not-demonstrated"
+the audit's worst-ranked criticism. Now stated in the Production-Readiness row rather than left for a
+judge to catch. Getting ahead of it honestly is strictly stronger than being caught by it.
+
+### STALE FACTS FOUND AND CORRECTED (all re-verified live, none trusted from the prior entry)
+- **Tests: 89 → 99.** `pytest --collect-only` = 99; full suite **99 passed in 140.21s (2m20s)**, not
+  the documented ~2m39s. Was wrong in FOUR places: badge, tech-stack row, Getting Started, project
+  tree.
+- **`tests/`: "21 files" → 24** (23 test modules + conftest).
+- **Routes: 12 → 14.** The prior Item-10 entry above records "Endpoints: 12 routes" — **that is now
+  stale** (`provenance-audit` and `counterfactual-invalidation` shipped after it). Re-counted from
+  every `@router` decorator: 1 meta + 2 agents + **7** beliefs + 1 decisions + 1 demo + 2 aml = **14**.
+  README never actually carried a route count at all, so an **API-surface table** was added — a judge's
+  first question is "what can I curl?".
+- **Honesty ledger said `decisions`/`belief_performance` are "Currently empty on the live cluster".**
+  A point-in-time assertion baked into a permanent document; any backfill falsifies it. The console
+  ledger had ALREADY solved this by reading the row LIVE (Item 9); the README now describes it the same
+  way instead of asserting a transient fact. (Live cluster at time of writing: decisions 0 / perf 0 —
+  so it happened to be true, which is exactly what makes this class of claim dangerous.)
+- **Project tree:** services list was missing `provenance_audit`, `counterfactual`, `faithfulness`,
+  `faithfulness_guard`, `aml_interrogate`; the frontend line named 3 of the console's views and omitted
+  the consistency demo and the honesty ledger entirely.
+- **README linked to NOTHING** — not ARCHITECTURE.md, not DEMO.md, not NOTES.md. The deep technical
+  dive was undiscoverable from the front door. Added a doc map.
+- **Roadmap table stopped at Item 8.** Extended through F, named by capability.
+
+### VERIFIED STILL-CORRECT (re-checked, deliberately NOT changed)
+All 16 cells of the detection table reproduce byte-for-byte on a fresh `eval_detection.py` run (CYCLE
+hold-out 100%/100% 38/38, Wilson floor **90.8%**; SCATTER-GATHER's disclosed weak recall 40.6% dev /
+50.0% hold-out; GS and STACK). The 57/463/980 witness census still sums to 1,500 and 43/57 = 75.4%.
+Cluster: CRDB **v25.4.10**, 24 agents / 1 belief / 8 edges / 648 accounts / 1,500 txns / 20 instances
+/ 300 members / 4 corpus rows. The prior pass's verification held up — what rotted was only what
+*counts artifacts*, never what *measures behaviour*.
+
+### ARCHITECTURE.md: 5 → 7 diagrams (recommended, not assumed)
+Investigated whether A / B / E each warrant a diagram; the answer was **no, two do**:
+- **§6 provenance-integrity audit (NEW, full section + diagram).** The only genuinely new *structural*
+  mechanism of the three — a four-invariant classifier (A1–A4) with a three-state outcome that
+  deliberately mirrors the AML brake's CLEAN/ANOMALOUS/INCONCLUSIVE vocabulary. Leads with the honest
+  scope: **no live vulnerability exists**, both legitimate writers preserve A1–A4 by construction, so
+  this is verification + out-of-band tamper detection, NOT a patch. ATLAS `AML.T0080` stays labeled
+  **secondary-sourced**.
+- **§5.1 explanation-faithfulness guard (NEW, subsection + diagram).** Placed UNDER the brake, not as
+  a competing top-level section, because it IS the brake's discipline applied to prose instead of
+  structure. The diagram earns its place by showing the non-obvious safety property: UNAVAILABLE
+  **fails closed**, and the verdict passes through **untouched** (a prose judge that could downgrade a
+  structurally-proven FLAG would invert the reason the brake exists).
+- **The counterfactual gets NO diagram** — it is a deterministic `WHERE` clause. But its one deep idea
+  became a **"when *not* to use AOST"** note inside §3, which is the sharpest available statement of the
+  two-clock thesis: T is a *business-time* instant ~400 days back, so AOST is the wrong clock, outside
+  the 75-min GC window, and pointing at rows that never existed in MVCC history at T. The parameter is
+  named `at`, not `as_of`, precisely to encode that in the API surface.
+
+### The frontend edit was FORCED, not optional
+`HonestyLedger.tsx`'s own docstring names README as the source of truth "so the doc and the console
+cannot diverge". Renaming the ledger rows in README therefore REQUIRED the same rename in the
+component — leaving them mismatched would have manufactured exactly the drift the honesty ledger
+exists to prevent, in the one surface whose entire job is to be trustworthy. `tsc -b` / `oxlint` /
+`vite build` all clean.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(readme): name capabilities, not internal roadmap-item labels`
+- `docs(readme): restructure judging-criteria alignment as a claim/limitation table`
+- `docs(readme): fix the "only ties on F1" overclaim; promote the baseline comparison out of prose`
+- `docs(readme): mermaid problem diagram carrying both clocks`
+- `docs(readme): bring current — API surface, doc map, roadmap through F, verified counts`
+- `docs(architecture): capability names, and the counterfactual as a "when NOT to use AOST" note`
+- `docs(architecture): the faithfulness guard (5.1) and the provenance audit (6)`
+- `fix(frontend): rename honesty-ledger rows to capability names, in step with the README`
+- `docs(notes): record Item 9 (retroactive — the one item with no engineering-log entry)`
+- `docs(notes): record Item 10 part 2` (this entry)
+
+### Explicitly NOT done (still gated): the recorded VIDEO (human task; the README's
+### `<!-- TODO: demo video link -->` placeholder is deliberately still there, NO fabricated URL); the
+### regulatory corpus (untouched, per instruction); Items C/D; the AML console; the
+### decisions.aml_transaction_id seam; any change to the five tables / aml_* / typology_corpus; any
+### new feature. Do NOT push without explicit approval — held for review of the result.
