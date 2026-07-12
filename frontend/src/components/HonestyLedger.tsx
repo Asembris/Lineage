@@ -212,13 +212,49 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Regulatory corpus (FATF/FFIEC/FinCEN)",
-    label: "not built",
+    item: "Vector indexes — two of the three have never been used",
+    label: "shipped defect, half-fixed by decision",
     mode: "static",
     note: (
       <>
-        Gated on a <code>data/raw/</code> drop (sources block automated fetch);{" "}
-        <code>typology_corpus</code> holds the 4 IBM typology definitions only.
+        The most damaging thing this project got wrong, and it survived every review because
+        four documents agreed with each other and nobody ran the check.{" "}
+        <code>beliefs</code> and <code>typology_corpus</code> declare{" "}
+        <code>CREATE VECTOR INDEX … (embedding)</code> — and CockroachDB's default opclass is{" "}
+        <code>vector_l2_ops</code>, which accelerates <code>&lt;-&gt;</code> <em>only</em>. Both
+        of their queries rank with cosine <code>&lt;=&gt;</code>. An L2 index cannot serve a
+        cosine query <em>at any row count</em>, so neither has ever appeared in a plan. The true
+        observation ("the plan is a full scan") had been recorded with a <b>false cause</b> ("only
+        4 rows"). Measured: a <code>vector_cosine_ops</code> index <em>is</em> selected at 1,000
+        rows <em>and at 4</em> — row count was never the variable.{" "}
+        <code>regulatory_corpus</code> is built <code>vector_cosine_ops</code> and its index{" "}
+        <b>is genuinely selected</b> (<code>EXPLAIN</code> shows a real <code>vector search</code>{" "}
+        node). The older two are <b>deliberately left broken</b>: fixing them switches retrieval
+        from exact to approximate and would move Item 4's brake, so it needs its own before/after
+        measurement — and a test now pins them as L2 so it cannot happen silently.
+      </>
+    ),
+  },
+  {
+    item: "Regulatory corpus (FATF/FFIEC/FinCEN)",
+    label: "real primary sources, curated extraction",
+    mode: "static",
+    note: (
+      <>
+        <b>233 red-flag entries</b> from five authoritative PDFs — FFIEC Appendix F (129), FATF
+        Virtual Assets (59), FATF/Egmont TBML (33), FinCEN FIN-2014-A005 (5), FIN-2010-A001 (7) —
+        parsed with <b>LlamaParse</b> (parser only), chunked structure-aware with each entry's
+        section path prepended before embedding, and stored in <b>its own table</b> on the same
+        cluster and MVCC timeline. Every entry is <b>verbatim regulator text</b>:{" "}
+        <code>verify_regulatory.py</code> re-extracts each PDF independently and proves all 233
+        trace back to it — and the gate is shown to <em>trip</em>, a plausible invented red flag
+        scoring 0.189 against a floor of 0.95. It is a <b>separate table from</b>{" "}
+        <code>typology_corpus</code> on purpose: that table's <code>typology</code> is a validated
+        join key into <code>aml_pattern_instances</code>, and red flags do not map to IBM's four
+        typologies. <b>The brake cannot see this corpus, structurally</b> —{" "}
+        <code>retrieve_typology()</code> says <code>FROM typology_corpus</code> and physically
+        cannot return a red flag. <b>A retrieved red flag is context, never evidence</b>: it can
+        never authorize a FLAG. Only a structural witness over the money-flow graph can.
       </>
     ),
   },
