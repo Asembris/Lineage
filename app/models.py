@@ -94,7 +94,12 @@ class BeliefInheritance(Base):
 
 
 class Decision(Base):
-    """Phase 2/3. Created empty in Phase 1."""
+    """Phase 2/3. Created empty in Phase 1. Migration 0006 added the AML grounding seam.
+
+    A decision is either a Phase-2 CARD authorization (synthetic txn_ref, real merchant/amount,
+    is_fraud from the simulator) or an AML decision grounded in a REAL IBM money-flow edge
+    (aml_transaction_id set, merchant/confidence NULL, is_fraud from aml_transactions.is_laundering).
+    """
 
     __tablename__ = "decisions"
 
@@ -103,15 +108,42 @@ class Decision(Base):
         Uuid, ForeignKey("agents.id"), nullable=False
     )
     txn_ref: Mapped[str] = mapped_column(Text, nullable=False)
-    merchant: Mapped[str] = mapped_column(Text, nullable=False)
+    # NULL for AML decisions: a bank-to-bank transfer has no merchant, and inventing one is the
+    # forced fit Item 4 refused ("a fake merchant"). Migration 0006 dropped the NOT NULL.
+    merchant: Mapped[str | None] = mapped_column(Text, nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
+    # The unit of `amount`. NULL for Phase-2 card rows — the simulator never declared a currency,
+    # and inferring "US Dollar" from the belief text's "$180" would manufacture a fact the data does
+    # not contain. AML rows name their real currency (the extract spans 14). See migration 0006.
+    amount_currency: Mapped[str | None] = mapped_column(Text, nullable=True)
     verdict: Mapped[str] = mapped_column(Text, nullable=False)  # approve|decline|blocked
     driving_belief_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("beliefs.id"), nullable=True
     )
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    # NULL for AML decisions: the structural witness (aml_graph.cycle_witness) is DETERMINISTIC and
+    # produces no confidence. Item D proved this column is rng.uniform(0.80, 0.95) noise in the
+    # Phase-2 backfill and concluded "do not use this column for anything" — so fabricating a value
+    # here would add noise to an already-condemned column. Migration 0006 dropped the NOT NULL.
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     decided_at: Mapped[dt.datetime] = mapped_column(_TS, nullable=False)
     is_fraud: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+    # ===================== DELIBERATELY NO ForeignKey. DO NOT "FIX" THIS. =====================
+    # The REAL foreign key (aml_transaction_id -> aml_transactions.id) EXISTS in defaultdb and is
+    # enforced by CockroachDB — migration 0006 creates it. It is intentionally ABSENT here.
+    #
+    # WHY: aml_* lives on `AmlBase` metadata (app/aml_models.py), NOT on `Base`. Item 0 provisions
+    # the throwaway `demo` database with `Base.metadata.create_all` (app/demo_db.py). Declaring
+    # ForeignKey("aml_transactions.id") on this Base-mapped class points Base.metadata at a table it
+    # does not contain, so create_all raises NoReferencedTableError, `demo` can no longer be
+    # provisioned, and the SSE consistency demo BREAKS AT RUNTIME. Verified by running it.
+    #
+    # Keeping the FK in the migration only gets BOTH guarantees: defaultdb enforces "no dangling
+    # references" (a CLAUDE.md non-negotiable) in the DATABASE, while Base.metadata stays free of a
+    # dangling reference so `demo` still provisions. This is the ONE place in the project where the
+    # ORM deliberately understates the schema, and tests/test_grounding_seam.py guards BOTH sides.
+    # Full reasoning: NOTES.md "The grounding seam" -> "THE FK FINDING".
+    aml_transaction_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
 
 
 class BeliefPerformance(Base):
