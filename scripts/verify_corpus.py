@@ -10,9 +10,31 @@ Checks (each PASS/FAIL; exits non-zero on any failure):
   4. AOST time-travel of retrieval RUNS mechanically: the same query as_of a just-captured HLC and
      at present both return the expected top-1 (the SET TRANSACTION AS OF SYSTEM TIME path works
      over the vector search); an out-of-window as_of raises ValueError (-> 400), never a 500.
-  5. EXPLAIN: report the REAL query plan at 4 rows. HONEST label — at this size the planner does a
-     FULL SCAN + top-k and does NOT use the C-SPANN vector index; this proves the mechanism is
-     wired, not retrieval quality at scale. (Not a failure — a stated property.)
+  5. EXPLAIN: report the REAL query plan, and the REAL REASON the vector index is not used.
+
+     ===================== THIS CHECK USED TO STATE A FALSE CAUSE =====================
+     It previously reported the FULL SCAN and attributed it to the corpus being small ("at 4 rows
+     the planner correctly brute-forces"). The observation was true. The cause was WRONG, and it
+     had been repeated in NOTES, in README and in ARCHITECTURE without anyone running the check
+     that would settle it.
+
+     The real cause is an OPCLASS/OPERATOR MISMATCH:
+
+         ix_typology_corpus_embedding  IS  (embedding vector_l2_ops)   <- migration 0005
+         _retrieval_sql                RANKS WITH  `<=>`               <- COSINE distance
+
+     CockroachDB's default vector opclass is `vector_l2_ops`, which accelerates `<->` ONLY.
+     `<=>` needs `vector_cosine_ops`. So this index has NEVER been selected by the planner — not at
+     4 rows, and not at any number of rows. Measured on the live cluster: a cosine-opclass index is
+     selected at 1,000 rows AND at 4; an L2-opclass index is not selected for a cosine query at
+     either. ROW COUNT WAS NEVER THE VARIABLE. See migration 0009, which builds the FIRST index in
+     this project whose opclass matches its operator, and scripts/verify_regulatory.py, which
+     EXPLAINs a plan that really does contain a `vector search` node.
+
+     Fixing THIS index is deliberately deferred: a selected C-SPANN index is an APPROXIMATE search,
+     where today's full scan is EXACT, and Item 4's Gate 0 depends on which three of four documents
+     come back. That is a behavioural change needing its own before/after measurement, not a
+     drive-by. So the full scan is still asserted below — but now for the reason that is TRUE.
   6. structural isolation: NO foreign key touches typology_corpus in either direction (it is on its
      own CorpusBase metadata; the join to aml_* is by string, not FK).
 
@@ -105,16 +127,27 @@ async def main() -> None:
     plan = "\n".join(r[0].encode("ascii", "replace").decode() for r in plan_rows)
     used_vector_index = "ix_typology_corpus_embedding" in plan
     full_scan = "FULL SCAN" in plan
-    print("[explain] query plan at 4 rows:", flush=True)
+    print("[explain] query plan:", flush=True)
     for line in plan.splitlines():
         print("    " + line, flush=True)
-    verdict = ("uses C-SPANN vector index" if used_vector_index
-               else "FULL SCAN + top-k; C-SPANN vector index NOT exercised at 4 rows "
-                    "(mechanism proof, not retrieval-quality at scale)")
-    check("query-plan captured and reported honestly", True, verdict)
-    # At 4 rows we EXPECT the full scan; flag loudly if reality diverges from the documented claim.
-    check("plan matches documented small-scale behavior (full scan, no vector index)",
-          full_scan and not used_vector_index, verdict)
+
+    # The INDEX ITSELF, read from the catalog — this is the fact that explains the plan.
+    async with engine.connect() as c:
+        ddl = str((await c.execute(text("SHOW CREATE TABLE typology_corpus"))).all()[0][1])
+    idx = next((l.strip() for l in ddl.splitlines() if "VECTOR INDEX" in l), "")
+    is_l2 = "vector_l2_ops" in idx
+
+    check("the index's OPCLASS is read from the live catalog (not assumed from the migration)",
+          bool(idx), idx)
+    check("it is vector_l2_ops while the query ranks with `<=>` (cosine) — THE REAL CAUSE", is_l2,
+          "an L2 index cannot serve a cosine query, at ANY row count. NOT a small-corpus effect: "
+          "a cosine-opclass index IS selected at 4 rows (measured). See migration 0009.")
+    check("plan is therefore a FULL SCAN and the vector index is NOT used",
+          full_scan and not used_vector_index,
+          "consistent with the opclass mismatch above" if full_scan and not used_vector_index
+          else "THE PLAN CHANGED — if the opclass was fixed, retrieval is now APPROXIMATE where it "
+               "was EXACT, and Item 4's Gate 0 + Item 8's golden set must be re-measured. That is a "
+               "decision, not a drift.")
 
     # ---- 6. structural isolation: no FK touches typology_corpus ------------------------------
     async with engine.connect() as c:
