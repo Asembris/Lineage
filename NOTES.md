@@ -4632,3 +4632,100 @@ vector is real (cosine distance 1.01 from the placeholder — verified).
 ### deferred frontend session's job); any re-ingestion or re-sampling of `aml_*`; any LLM on the
 ### deciding path; re-embedding the crimson belief. Do NOT push without explicit approval — held for
 ### review of the result.
+
+### G3/G4 PRE-PUSH REVIEW — four documents were lying, and driving the UI is what caught two of them
+
+The five review questions were answered with live evidence. Three came back clean; **two surfaced
+real, live inaccuracies in the project's own credibility documents** — the exact drift those
+documents exist to prevent. Recorded because the pattern is the finding: *"tsc + build pass" is not
+"it renders", and "the numbers are right" is not "the document is true."*
+
+**1. Item 4's soundness + Item 7's hold-out are UNDISTURBED (verified, not assumed).**
+`tests/test_aml_brake.py` 14/14 pass with its asserted constants unchanged. `eval_detection.py`
+reproduces byte-for-byte: fidelity gate PASSES on all four typologies; dev CYCLE R 100.0% (43/43) /
+P 75.4% (43/57); hold-out CYCLE R 100.0% / P 100.0% (38/38, Wilson floor 90.8%); SG hold-out R 50.0%
+(43/86) / P 89.6%; **soundness REPLICATES** ({CYCLE, SCATTER-GATHER} on both sets). None of the eight
+G3/G4 commits touched `aml_graph` / `aml_brake` / `eval_detection` / `aml_models` / `ingest_aml`
+(git-confirmed), and the eval reads the CSV, never the DB — so 5,500 new `decisions` rows are
+structurally unreachable from it. The seam cannot move Item 7's numbers.
+
+**2. THE FIRST INVALIDATION OF A BELIEF WITH ZERO PERFORMANCE WINDOWS — proven end to end, not inferred.**
+A real `POST /beliefs/{azure}/invalidate` against the live cluster + real S3:
+- HTTP **200**. Real atomic closure: **7/7 azure edges** invalidated at one commit, 8 agents, 1 living
+  holder. `certificate_status: written` to real S3.
+- The certificate re-fetched from S3 and its **sha256 re-verified**; `closure_content_hash` present.
+- `staleness_evidence: {"available": false, "window_count": 0, "windows": []}` — and **there is no
+  `confidence_now` key at all**. Nothing was invented. The feared silent `0.0` is unreachable:
+  `staleness_evidence()` short-circuits on `if not rows` before any arithmetic.
+- Tamper check: a **forged** `{available: true, confidence_now: 0.0}` rot curve **breaks the hash**.
+- **Crimson stayed ACTIVE with all 8 edges open** under a real atomic write on azure — the closures
+  are disjoint in the write path, not merely on paper.
+Restored afterwards via the two-command procedure.
+
+**3. THE HONESTY LEDGER WAS LYING IN THREE PLACES — and only DRIVING it found two of them.**
+The ledger is the one surface whose entire job is to be trustworthy, so this is the worst place in
+the project to drift. Playwright @1440 against the live stack, ZERO page errors:
+- **It asserted Item B's DEAD invariant.** The "Counterfactual invalidation query" row said verbatim
+  *"the belief only ever approves"* — the exact claim this session disproved. A static row, so no
+  amount of live-reading would have caught it; only reading the rendered text did. Rewritten to state
+  the verdict-aware counts AND to name the correction (the azure belief blocks; the old aggregate
+  credited its 43 correct blocks as 43 fraud approvals). **README's matching row moved in lockstep** —
+  `HonestyLedger.tsx`'s own docstring makes README the row-for-row source of truth, so it is both or
+  neither.
+- **It rendered "2 belief".** A hardcoded singular from when the fleet had one. Pluralized.
+- **Its two per-belief LIVE rows silently picked `beliefs[0]`** — which resolves to crimson only by
+  UUID sort luck (both beliefs share a `formed_at`, so `list_beliefs` falls through to an id
+  tiebreak). A credibility surface must not depend on that. The belief is now chosen explicitly and
+  its label is RENDERED next to the values (`8 perf windows (crimson card belief)`,
+  `CLEAN · 8 edges · 0 anomalies (crimson card belief)`), so the row cannot come to mean the other
+  belief without saying so.
+Post-fix, live: `24 agents · 3 alive · 2 beliefs` / `5,500 decisions · 8 perf windows (crimson card
+belief)` / `crimson: placeholder · azure: real` / `CLEAN · 8 edges · 0 anomalies (crimson card
+belief)`.
+
+**4. DEMO.md's NUMBERS all held. ITS FOUNDING PREMISE DID NOT.**
+Every cited live beat re-run against CURRENT code (in-process ASGI — see the harness gotcha below):
+lineage **9 nodes**; performance **8 windows 0.924 → 0.528**, frauds_approved 19 → 118, gen-6 bump
+`0.556 → 0.624 → 0.528`; counterfactual **N=1000 / M=392 / 5 holders / total_belief_driven=2000 / 8
+windows**; provenance-audit **CLEAN, 8 edges, 0 anomalies**. All unchanged. The new
+`withdrawn_blocks` / `frauds_caught_by_block` both read **0** for crimson — its only-ever-approves
+behaviour is now a MEASURED property of that belief rather than an assumption baked into the query.
+
+But DEMO.md §1 asserted, as *"a verified fact, not an oversight"*, that the two graphs **"meet
+nowhere in the current data"** because `decisions.aml_transaction_id` does not exist, there is one
+belief, and no decision ever cited an AML transaction. **The seam falsified all three.** Section 1 is
+rewritten in place (not silently patched): the graphs now meet at one sanctioned FK, there are two
+beliefs, and 1,500 decisions cite real IBM rows. **The TWO-ACT structure nonetheless STANDS**, and the
+rewrite says why with the measured reason — the seam earns the *provenance* half of a causal chain and
+never the *justification* half, because the AML staleness curve is a base-rate artifact and does not
+exist. The pre-flight was also fixed: it said "1 active belief" and ran ONE backfill, which is the
+two-backfill landmine sitting in the operator's own instructions.
+
+**5. The two-backfill ordering is documented and the refusal is actionable.** NOTES carries the two
+ORDERED commands; the refusal message names BOTH commands in order and exits **1**:
+```
+=== REFUSING TO RUN — the world is not in a state this backfill can append to ===
+  * THE CARD BACKFILL HAS NOT RUN (crimson decisions=0, belief_performance windows=0).
+    This script APPENDS; it NEVER reseeds, because a reseed here would DELETE the
+    card decisions. Run the two backfills IN ORDER:
+        python -m seed.backfill_decisions       (reseeds + 4,000 card decisions)
+        python -m seed.backfill_aml_decisions   (this script — appends 1,500)
+```
+
+### HARNESS GOTCHA (banked, cost real time): a STALE uvicorn served the OLD DTO and I nearly believed it
+The first Beat-7 re-verification `curl`ed `:8000` and came back **missing `withdrawn_blocks`** — the
+field I had just added and tested. Cause: an ORPHANED uvicorn from a previous session still held
+`127.0.0.1:8000` (its PID resolves to no live process, and `Stop-Process`/`taskkill` both report it
+gone while the socket keeps answering; `0.0.0.0:8000` is separately held by **splunkd**, which must
+NOT be killed). The stale server was serving pre-fix code, so its `/openapi.json` lacked the new
+fields. **A green curl against a stale server is indistinguishable from a green curl against a
+correct one.** Verified instead through `httpx.ASGITransport(app=app)` in-process, which cannot be
+stale by construction — the same transport every route test uses. If a live-HTTP check must be
+trusted, confirm the server's `/openapi.json` carries the field you are testing BEFORE reading the
+result.
+
+### Commits (Conventional Commits, each its own; on main)
+- `fix(ledger): state the embedding as it IS — crimson placeholder, azure real`
+- `fix(ledger): the counterfactual row asserted Item B's dead invariant; name the belief on live rows`
+- `docs(demo): the seam falsified DEMO.md's founding premise — correct it, keep the two acts`
+- `docs(notes): record the pre-push review — four lying documents, two caught only by driving the UI`
