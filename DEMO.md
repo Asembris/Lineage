@@ -173,9 +173,15 @@ the roadmap's premise does not survive contact with the data.
   (→ back to `045adf`). This subject is a real `is_laundering=true` CYCLE member — instance 6, a
   clean 10-account single-component cycle (`num_components=1`); `has_competing_structure=false` and
   all three other typologies return `CONCLUSIVE_NO`. Deterministic, no LLM, free, replayable.
+
+  > **The label is NOT in that response, and that is the point.** `is_laundering` is the *oracle* —
+  > we state it here, after the fact, to tell you the witness was right. `/interrogate` projects no
+  > label column and a test asserts `is_laundering` is absent from the body. The witness re-derived
+  > this ring from the **unlabeled** edge set. If the endpoint served the answer key, the ring would
+  > prove nothing — you could not tell detection from lookup.
 - **Narration:** *"Here's a real laundering ring. Click any hop and the graph re-derives the whole
   cycle — ten real transactions, closing back on themselves. That path is the witness. No path, no
-  flag."*
+  flag."* (If asked *"did it know?"* — no. The witness never sees the label; we check it afterwards.)
 
 ### Beat 3 — The honest cost, and honest uncertainty (~7s)
 
@@ -183,7 +189,8 @@ the roadmap's premise does not survive contact with the data.
   ```bash
   curl -s "http://localhost:8000/aml/transactions/3cda6d1d-f765-5001-9342-0478b1a92232/interrogate"
   ```
-  This transaction is **benign** (`is_laundering=false`) yet CYCLE **and** GATHER-SCATTER **and**
+  This transaction is **benign** (`is_laundering=false` — again the *oracle*, not something the
+  response contains) yet CYCLE **and** GATHER-SCATTER **and**
   STACK all witness it (`has_competing_structure: true`) — it *would* flag. It is the honest face of
   CYCLE's 75.4% dev precision. The same response shows SCATTER-GATHER returning `INCONCLUSIVE` with a
   **named boundary account** — the search hit the edge of the ingested extract and says so rather
