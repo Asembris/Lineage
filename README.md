@@ -325,9 +325,19 @@ pip install -r requirements.txt
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_BUCKET   (optional — certificates)
 #   NVIDIA_API_KEY                  (optional — the grounding-faithfulness eval only)
 
-alembic upgrade head               # apply migrations 0001–0005 to the cluster
-python -m seed.seed                # seed the genealogy (24 agents, 1 belief, 8 inheritance edges)
-python -m seed.backfill_decisions  # optional: 4,000 decisions + 8 performance windows (~4 min)
+alembic upgrade head               # apply migrations 0001–0008 to the cluster
+python -m seed.seed                # seed the genealogy (24 agents, 2 beliefs, 15 inheritance edges)
+
+# The two backfills are ORDERED, and the order is not free. `backfill_decisions` OPENS with a
+# reseed, and `seed.seed()` DELETEs every row of `decisions` — so running the card backfill SECOND
+# would destroy the AML decisions. Run both, in this order:
+python -m seed.backfill_decisions      # reseeds, then 4,000 card decisions + 8 perf windows (~4 min)
+python -m seed.backfill_aml_decisions  # APPENDS 1,500 AML decisions. Never reseeds.
+python -m scripts.embed_beliefs aml-cycle   # optional: a real vector for the laundering belief
+
+# backfill_aml_decisions REFUSES to run (exit 1) if the card backfill hasn't — rather than silently
+# producing a half-populated world, which is the failure mode hardest to notice and easiest to demo
+# by accident.
 
 uvicorn app.main:app --reload      # serves on http://localhost:8000  (sets the Windows selector loop itself)
 ```
@@ -391,8 +401,10 @@ CockroachDB/
 │                            aml_graph · aml_agent · aml_interrogate · verdict_guard
 │                            faithfulness · faithfulness_guard · …
 ├── migrations/versions/     0001 moat · 0002 vector+perf indexes · 0003 invalidation
-│                            0004 AML layer · 0005 typology corpus
-├── seed/                    seed.py (genealogy) · backfill_decisions.py (deterministic decisions)
+│                            0004 AML layer · 0005 typology corpus · 0006 grounding seam
+│                            0007 two-kinds CHECK · 0008 seam read surface (index + basis tag)
+├── seed/                    seed.py (genealogy) · backfill_decisions.py (card decisions)
+│                            backfill_aml_decisions.py (the grounded seam — run SECOND)
 ├── scripts/                 probes · ingest · verify · demos · evals
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
@@ -442,9 +454,14 @@ not a gap.
 | **Confidence propagation through the inheritance chain** *(D)* | **CUT — nothing propagates.** Same conditional gate as C, and it fails for a **different reason, which is the finding.** The belief is **one immutable row**: `belief_inheritance` has no confidence or weight column and `belief_performance` has no `agent_id`, so the only quantity that varies per hop is a **timestamp**. Looking up its window is a *join*, not a propagation — no hop transforms anything, so uncertainty lives on the windows (shared by every holder), never on the edges. **D passes C's generator-lookup test and is still meaningless:** *computable, generator-free, and meaningless.* Proven, not argued — in a world with **zero decay** (every window pinned at 0.924) the compounded number still reports the 7-hop holder as **15% more degraded** than the 5-hop one: it measures **path length, not health**. And the two agents who share window 5 have **identical true reliability by construction**, yet differ by 0.137 at **p = 0.046** — the shipped data realizes the one-in-twenty false positive that any per-holder confidence metric would inherit. The two living holders are **statistically indistinguishable** (0.528 vs 0.459, p = 0.30). Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item D*. |
 
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
-chunking), the `decisions.aml_transaction_id` grounding seam that would join the two graphs into one
-causal chain, an AML console surface, the recorded demo video, and the Time-travel sparkline rendering
+chunking), an AML console surface, the recorded demo video, and the Time-travel sparkline rendering
 the confidence band the API now serves.
+
+*(The `decisions.aml_transaction_id` grounding seam was listed here as future work and is now
+**built** — migration 0006, 1,500 grounded decisions, resolvable in both directions. It earns the
+**provenance** half of a single causal chain and not the **justification** half: the AML staleness
+curve a rot story would need is a base-rate artifact of the ingestion sample and does not exist.
+Measured, and refused rather than shipped — [NOTES.md](NOTES.md) → *THE BASE-RATE MIRAGE*.)*
 
 ---
 
