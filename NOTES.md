@@ -4959,3 +4959,166 @@ row forces a lockstep frontend edit, and this session is scoped backend-only. Fl
 ### real future capability the record-vs-re-derivation split implies — NOT built, deliberately);
 ### the regulatory corpus; any re-ingestion of `aml_*`; any LLM on the deciding path.
 ### Do NOT push without explicit approval — held for review of the result.
+
+## FABRICATED VERIFICATION CITATIONS — a PATTERN, not a housekeeping item (2026-07-12)
+
+**The 57/463/980 census was defended by a citation to a script that does not exist and a test that
+never contained the numbers.** That is not a stale reference. It is a **fabricated verification
+claim, in shipped code, protecting the single most important caveat in the project** — the 65.3%
+INCONCLUSIVE->approve disclosure, the one that silently approves 252 of the 300 laundering rows.
+
+And it is **the second time this specific number has been undermined by something written
+confidently and never checked.** The first was the phantom **"728 / 48.5%"** figure — the
+benign-only inconclusive subset, mistaken for the real one, introduced TWICE and corrected twice.
+So the record now reads:
+
+| # | what was written | what was true |
+|---|---|---|
+| 1 | "INCONCLUSIVE is 728 / 48.5% of the extract" | 980 / **65.3%**. 728 is the benign-only subset. |
+| 2 | "measured … (`scripts/verify_seam.py`, asserted in tests/test_grounding_seam.py)" | The script has never existed. The test never contained the numbers. **Asserted NOWHERE.** |
+
+**THIS NUMBER ATTRACTS CONFIDENT, FALSE PROVENANCE.** Twice now, prose written *about* the
+disclosure has been wrong in a way that made the disclosure look better-supported than it was. Both
+times the prose was fluent, plausible, and unchecked. **Prose is not a defence mechanism for this
+number, and it has now failed in both available ways** — by misstating the value, and by inventing
+its evidence.
+
+**What actually protects the 65.3% today, and it is the only thing that does:**
+- migration **0008's `ck_decisions_kind`** — an AML decision's `txn_ref` MUST be one of the three
+  real basis tags. The database rejects `txn_ref = str(txn_id)`. The disclosure's in-data carrier
+  cannot be silently destroyed by a future backfill.
+- `test_the_witness_census_over_the_real_extract_is_57_463_980` — the census, asserted for the first
+  time, against the real decider over the real extract.
+- `test_the_disclosure_reaches_the_openapi_schema` — the number must be in the DTO docstring.
+These are executable. The docstrings are not, and are no longer trusted to be.
+
+### THE AUDIT: I followed every citation in the repo. There were FOUR, not one.
+Extracted every path-like and `module::test` citation from `app/`, `scripts/`, `seed/`,
+`migrations/`, `tests/`, and the six docs, then checked each resolves:
+
+1. **`scripts/verify_seam.py`** — cited by `aml_seam.py` for the census. **NEVER EXISTED.** The
+   claim was **unbacked**.
+2. **`tests/test_aml_brake.py::test_witness_soundness_against_oracle`** — cited by `aml_graph.py` for
+   `FLAG_CAPABLE`'s soundness (the property that lets the belief be stated as a decision rule at
+   all). **That name has never existed.** The real test is
+   `test_witness_soundness_and_benign_false_positive_rates`, sitting in the same module. The claim
+   was **TRUE and the citation FALSE** — the most insidious variant: following it yields nothing, and
+   a reader concludes an honest claim is unbacked.
+3. **`scripts/probe_closure_hash_parity.py`** — cited by ARCHITECTURE for *"Verified: the async and
+   sync halves hash identically."* **NEVER EXISTED UNDER `scripts/`.** NOTES cites it correctly as
+   `scratchpad/probe_closure_hash_parity.py`. The write-up **silently promoted a gitignored,
+   ephemeral probe into a repo path a reader could supposedly run.** The measurement was real. The
+   artifact is gone.
+4. **`scratchpad/probe_fk_isolation.py`** — cited by **migration 0006's header** as the evidence for
+   its central design decision ("VERIFIED by running it, not by reasoning"). Same evaporation, in a
+   migration. *Found by the new guard, not by me.*
+
+### THE MECHANISM, NAMED SO IT STOPS
+**Probes live in the gitignored `scratchpad/`. A session runs one, verifies something real, writes
+the claim up — and cites the probe.** The probe evaporates at session end. The citation survives,
+now pointing at nothing, reading as if a reader could go and run it. Nobody follows it, because
+following a citation is exactly the work a citation exists to save you.
+
+**A false citation is worse than no citation.** It converts "unverified" into "verified" in the
+reader's mind at zero cost to the writer, and prose review reads straight past it. Three of the four
+above sat in the repo through multiple sessions, a documentation pass (Item 10, twice), and a
+pre-push review that explicitly hunted for lying documents — and none of them was caught, because
+every one of them *reads* like diligence.
+
+### THE FIX IS A GUARD, NOT A RESOLUTION TO BE MORE CAREFUL: `tests/test_citations.py`
+Three properties, each MADE TO TRIP with real output:
+- **(A)** every runnable-looking repo path cited in code or docs EXISTS. (Trip: a made-up
+  `verify_catalog_totals` script path, planted in `catalog.py` → caught, named with file and line.)
+- **(B)** every `module::test` citation resolves to a REAL test function. (Trip: same, with an
+  invented test name.)
+- **(C)** **`scratchpad/` may be cited ONLY in NOTES.md** — never from application code, a migration,
+  or a judge-facing doc. NOTES is the engineering log, where "I ran a one-off probe" is the honest
+  record and the `scratchpad/` prefix is TRUE. Everywhere else it promises a runnable artifact and
+  delivers a deleted file. **This is the rule that would have prevented (3) and (4).**
+
+`KNOWN_PHANTOMS` is a two-entry ledger holding the citations that corrections must be able to NAME in
+order to refute them — the same discipline as `test_oracle_boundary`'s docstring exclusion (a module
+that refuses the oracle must be able to say so). **It is closed. Adding to it is a deliberate act that
+says "we shipped another false citation", and it should feel like one.**
+
+### THE RULE, going forward
+> If a measurement matters enough to cite in shipped code, **commit the probe under `scripts/`** and
+> cite that. If it does not, say plainly that it was a one-off and **name the durable thing that
+> backs the claim now** — a test, a constraint, a shared function. Never cite `scratchpad/` outside
+> NOTES.md, and never name a test without running it.
+
+Migration 0006's header and ARCHITECTURE §"two independently-implemented canonicalizers" are both
+rewritten to do exactly that: they now say the probe is gone, and name the tests and the shared
+canonicalizer that actually hold the design in place.
+
+---
+
+## The ck_decisions_kind trap is now CLOSED BY A GUARD, not by a docstring
+
+**Asked plainly: was it protected? No — it was only documented, and that was not enough.**
+
+`test_database_rejects_a_dangling_aml_transaction_id` needs a probe row that is valid in EVERY way
+except its `aml_transaction_id`, or something else rejects it first and the foreign key is never
+exercised. That property has now broken **twice**:
+- **0007** made the probe CHECK-invalid (it omitted `amount_currency`);
+- **0008** did it again (it required the `txn_ref` basis tag; the probe said `'seam-guard-probe'`).
+
+Both times the FK guard went **red on a CheckViolation while proving nothing about the foreign key**.
+It fails loudly — it does not silently pass — so it is not the worst kind of hole. **But the failure
+is MISDIAGNOSABLE, and that is the real risk:** a future session sees red, sees a `CheckViolation`,
+and "fixes" it by relaxing the assertion to accept one. The FK then silently stops being tested
+forever, and the test still looks like it is doing its job. G2's notes warned about this in prose.
+The prose did not stop 0008 — *I* did it, in this session, having just read the warning.
+
+**So it is now a test.** `_FK_PROBE_SQL` / `_FK_PROBE_TXN_REF` are ONE shared definition used by both
+tests, so they cannot drift, and `test_the_fk_guards_probe_row_is_still_a_valid_row` inserts that
+exact shape with a REAL transaction and asserts the database ACCEPTS it. Tighten `ck_decisions_kind`
+and it fails FIRST, with:
+
+```
+THE FK GUARD'S PROBE ROW IS NO LONGER A VALID DECISION. Some constraint on `decisions` now
+rejects it even with a REAL aml_transaction_id — so test_database_rejects_a_dangling_
+aml_transaction_id is no longer testing the FOREIGN KEY at all; it is being rejected by
+something else.
+
+FIX THE PROBE (_FK_PROBE_SQL / _FK_PROBE_TXN_REF above), do NOT relax the FK guard's
+assertion. This has happened twice already (migrations 0007 and 0008).
+```
+
+Verified by reverting the probe to its pre-G5 value (`'seam-guard-probe'` — the exact historical
+break) and watching it fire, then restoring. **The instruction the next session needs is now in the
+failure output, not in a comment they will not read.**
+
+## The corrected README was EXECUTED, not just written
+
+A corrected doc that was never run is a doc that might still be wrong. So the corrected setup block
+was followed verbatim against the live cluster:
+
+| README line | result |
+|---|---|
+| `alembic upgrade head` | `0008 (head)` |
+| `python -m seed.seed` | 24 agents / 2 beliefs / 15 edges; `decisions` EMPTY |
+| *(out of order, to test the promise)* `backfill_aml_decisions` FIRST | **REFUSED, exit code 1**, printing both commands in order — exactly as README claims |
+| `python -m seed.backfill_decisions` | 4,000 card decisions + 8 windows; curve `0.924 … 0.528` |
+| `python -m seed.backfill_aml_decisions` | 1,500 AML decisions; census 57/463/980, 43/5/252 |
+| `python -m scripts.embed_beliefs aml-cycle` | 1 belief re-embedded |
+
+Independent SELECT afterwards: head 0008, agents 24, beliefs 2, edges 15, card 4,000, aml 1,500,
+perf 8 — **every documented number matched.** The old block (`migrations 0001–0005`, "1 belief, 8
+edges", card backfill "optional", `backfill_aml_decisions` unmentioned) would have produced a world
+with **no seam at all**.
+
+## DEMO.md — the flat claim was NOT there, but a mis-implication was
+Checked, as instructed. DEMO's §1 was already corrected in the G3/G4 pre-push review and its
+verification log correctly prefixes the label with `oracle`. **No flat "never serve the answer key"
+claim.** But Beats 2 and 3 quoted the `/interrogate` response and then stated `is_laundering` in the
+next breath, which reads as though the endpoint returns it. **It does not** — `/interrogate` projects
+no label column and a test asserts its absence from the body. Both beats now say so explicitly, and
+the beat is STRONGER for it: the ring is only impressive *because* the witness re-derived it from the
+unlabeled edge set. If the endpoint served the answer key, the ring would prove nothing.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `fix(citations): three false verification citations, and the guard that ends them`
+- `test(seam): the FK guard's probe row is now checked, not just documented`
+- `docs(demo): the label is the oracle, not something /interrogate returns`
+- `docs(notes): fabricated verification citations are a PATTERN, and the 65.3% attracts them`
