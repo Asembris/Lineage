@@ -35,11 +35,16 @@ first sounds:
   across at least 3 distinct accounts, indicates laundering"*), formed by azure-0 and inherited down
   the azure spine to the **living azure-7**.
 - **1,500 decisions now cite real IBM `aml_transactions` rows**, and their `is_fraud` is the real
-  `is_laundering` label — ground truth the deciding rule never saw.
+  `is_laundering` label — ground truth the deciding rule never saw. **The coverage caveat travels
+  with them, every time they are quoted:** the witness could `MATCH` only **57**; it returned
+  `INCONCLUSIVE` on **980 — a 65.3% could-not-determine rate** *(an unrelated quantity from Beat 1's
+  65.3% hold-out **recall**; see NOTES "THE 65.3% COLLISION")* — and `INCONCLUSIVE → approve`
+  silently approves **252 of the 300 laundering rows**.
 
 So the demo **can** now show a living agent acting on a belief formed by an ancestor it never met,
 against real, externally-labeled evidence. That is the **provenance** half of a single causal chain,
-and it is real.
+and it is real. **The demo shows it rather than asserting it — see the [Bridge](#bridge-10s--the-one-place-the-two-graphs-touch-and-the-one-thing-it-does-not-buy) beat**, which reuses Act 1's two
+exhibits and produces the decisions a living agent already made about them.
 
 **The two-act structure nonetheless STANDS, and it is not inertia.** The chain still stops short of
 one causal story, for a measured reason: a laundering FLAG **corroborates** a cycle belief — it does
@@ -131,12 +136,14 @@ as stale.
 3. Confirm `GET http://localhost:8000/health` → `{"status":"ok"}` and the console loads at
    `http://localhost:5173`.
 
-**Budget ≈ 90 seconds of narration.** Beat timings below sum to ~90s; stage directions and commands
-are for the operator, not spoken.
+**Budget ≈ 95 seconds of narration.** The beat timings below sum to ~95s — Act 1 **40s** (beats 0–4)
++ the Bridge **10s** + Act 2 **40s** (beats 5–9) + closing **5s**. Stage directions and commands are
+for the operator, not spoken. *(An earlier revision billed this as 90s with Act 1 at "~32s", which
+its own beats never summed to; the Bridge adds the other 5s.)*
 
 ---
 
-# ACT 1 — Detection on the evidence graph (~32s)
+# ACT 1 — Detection on the evidence graph (~40s)
 
 *The agent reads a money-flow graph and refuses to flag without a witness it can re-derive.*
 
@@ -157,7 +164,10 @@ the roadmap's premise does not survive contact with the data.
 - **The honest facts to state (all re-confirmed this session):**
   - The **naive** single-feature baseline (`payment_format == ACH`) has **100% recall** — it misses
     *nothing*; the oracle-fit logistic regression even **out-recalls and out-F1s** the structural
-    detector on the hold-out (logreg R 80.6% / F1 78.7% vs structural R 65.3% / F1 77.1%).
+    detector on the hold-out (logreg recall 80.6% / F1 78.7% vs structural **hold-out recall
+    65.3%** / F1 77.1%). *(That 65.3% is a **recall** figure. The Bridge beat's 65.3% is an
+    unrelated **coverage** figure — same number, different quantity; see NOTES "THE 65.3%
+    COLLISION". Neither is ever written bare.)*
   - Structure's real, leak-independent edge is **precision + auditability**: hold-out **CYCLE recall
     100% (38/38), precision 100% (38/38), Wilson 95% lower bound 90.8%**; the witness uses no format
     field, so it does not ride the synthetic ACH artifact (real-population "flag all ACH" precision =
@@ -197,12 +207,19 @@ the roadmap's premise does not survive contact with the data.
   ```
   This transaction is **benign** (`is_laundering=false` — again the *oracle*, not something the
   response contains) yet CYCLE **and** GATHER-SCATTER **and**
-  STACK all witness it (`has_competing_structure: true`) — it *would* flag. It is the honest face of
+  STACK all witness it (`has_competing_structure: true`). It is the honest face of
   CYCLE's 75.4% dev precision. The same response shows SCATTER-GATHER returning `INCONCLUSIVE` with a
   **named boundary account** — the search hit the edge of the ingested extract and says so rather
   than guessing.
+
+  > **This cost is not hypothetical — and the Bridge beat produces the receipt.** An earlier version
+  > of this beat said the transaction *"would"* flag. Since the grounding seam shipped, it **did**:
+  > the living azure-7 ruled on this exact row and **blocked** it (`witness_outcome: MATCH`,
+  > `is_fraud: false`) — one of the **14 benign transactions among CYCLE's 57 fires**. The false
+  > positive is a **durable, FK-linked row in `decisions`**, not a thought experiment. Verified
+  > fresh; see the Bridge Log.
 - **Narration:** *"And it shows its costs. This one is benign, but three structures fire on it — so
-  it would flag, and the console says so. When the search runs off the edge of the data, it doesn't
+  it flags, and the console says so. When the search runs off the edge of the data, it doesn't
   guess; it says 'insufficient coverage' and names where it stopped."*
 
 ### Beat 4 — The narration guard (~5s, reference)
@@ -219,15 +236,74 @@ the roadmap's premise does not survive contact with the data.
 
 ---
 
-## TRANSITION (~5s) — theme + substrate, no causation
+## BRIDGE (~10s) — the one place the two graphs touch, and the one thing it does not buy
 
-> **Discipline:** the script says nothing like "and *because* of that fraud ring…". The two graphs
-> share a theme and a cluster, never a causal thread. The transition states exactly that.
+> **Discipline, unchanged:** the script still says nothing like *"and **because** of that ring, we
+> kill the rule."* The two graphs now **touch** — at exactly one database-enforced foreign key — but
+> they still carry **no causal thread**. This beat is where that is said out loud, on camera, rather
+> than left for a judge to catch.
 
-- **On screen:** switch from the terminal/AML view to the console (`localhost:5173`).
-- **Narration (verbatim, non-causal):** *"That was the memory Lineage **reads**. It keeps a second
-  kind it **inherits** — not transactions, but beliefs, passed down a family tree of dead agents.
-  Same cluster, same rule: authority isn't correctness. Here, the evidence is time."*
+**The two transactions you just watched were already ruled on** — not by a script written for this
+demo, but by the **living azure-7**, applying a laundering belief that **azure-0 formed and it never
+met**, seven generations up a spine of dead agents. Every hop is a real row.
+
+- **⬤ LIVE — verified fresh this session** *(Bridge Log, below)*. The **reverse lookup**: from a
+  transaction, back to the decision an agent made about it.
+
+  ```bash
+  # the hero ring from Beat 2 — what did the fleet actually DO about it?
+  curl -s "http://localhost:8000/decisions?aml_transaction_id=045adfd2-a822-566f-9cd2-6a17fc150539"
+  #   verdict: blocked · witness_outcome: MATCH · is_fraud: true    ← a real laundering ring, BLOCKED
+
+  # the benign transaction from Beat 3 — same belief, same MATCH, different truth
+  curl -s "http://localhost:8000/decisions?aml_transaction_id=3cda6d1d-f765-5001-9342-0478b1a92232"
+  #   verdict: blocked · witness_outcome: MATCH · is_fraud: false   ← a benign transfer, BLOCKED ANYWAY
+
+  # and where that belief came from
+  curl -s "http://localhost:8000/beliefs/ea4f9135-cdf4-5739-abca-3e3d417b85be/lineage"
+  #   8 nodes · azure-0 → azure-7 · 7 real inheritance edges
+  ```
+
+  **That is CYCLE's 75.4% dev precision, in the record, on the two transactions already on screen:**
+  one of the 43 it gets right, one of the 14 it gets wrong. Beat 3's cost is no longer hypothetical
+  — the false positive is a **durable, FK-linked row** a supervisor can go and find.
+
+- **What the seam earns, stated exactly:** the **provenance** half of a single causal chain. A
+  living agent → a belief inherited from an ancestor it never met → applied to **real, externally
+  labeled evidence** → each decision citing the real IBM row it ruled on, through a
+  database-enforced FK → `is_fraud` taken from the real `is_laundering`, a label the deciding rule
+  **never saw**. Every link is a real row, and the chain resolves in **both** directions.
+
+- **What it does NOT earn — and this is the beat's punchline:** the **justification** half. That
+  would be proof the rule went *stale*, and **we measured for it, and it is not there.** Windowing
+  these decisions by transaction time yields a spectacular `0.974 → 0.000` rot curve
+  (Cochran-Armitage z = −24.90) that is **100% an artifact of the benign sampling** — 91% of the
+  benign rows land on day one, and the last two windows contain *zero* benign transactions.
+  Base-rate-free measures show the belief's discriminative power is **flat** (per-window recall
+  1.000 in every window). **The belief is imperfect, not stale.** So every AML decision carries **one
+  fixed `decided_at`** — there are no windows to draw a fake curve *from* — and `belief_performance`
+  is deliberately never computed for it. See NOTES *"THE BASE-RATE MIRAGE"*.
+
+> **The honest limit, quoted with the decisions it belongs to** — as it must be, every time.
+> Of azure-7's 1,500 decisions the witness could **MATCH** only **57**. It returned `CONCLUSIVE_NO`
+> on **463** (searched; there is no cycle) and **`INCONCLUSIVE` on 980 — a 65.3%
+> could-not-determine rate** — because the search ran off the edge of the 1,500-edge extract.
+> `INCONCLUSIVE → approve` is a **disclosed modeling choice**, not a corner case: it silently
+> approves **252 of the extract's 300 laundering rows**. Every decision carries `witness_outcome`
+> so a verdict can never be read without its basis, and the honesty ledger **counts** this census
+> from the cluster rather than quoting it.
+>
+> ⚠️ **Not the same number as Beat 1's `65.3%` hold-out recall.** Two unrelated quantities that
+> happen to share a value: that one is the **detector's performance**; this one is the **seam's
+> coverage**. Never write either bare — see NOTES *"THE 65.3% COLLISION"*.
+
+- **On screen:** the two reverse-lookup responses side by side, then switch to the console
+  (`localhost:5173`).
+- **Narration (verbatim, non-causal):** *"Those two transactions? A living agent already ruled on
+  both — using a rule it inherited from an ancestor seven generations dead. It blocked both. One was
+  laundering. One wasn't. Real rows, one real foreign key, real labels. That's the provenance half of
+  a causal chain. The half we don't have is proof that rule went stale — we measured for it, and it
+  isn't there, so we don't claim it. But we do have a rule where it **is** there."*
 
 ---
 
@@ -400,7 +476,7 @@ Every ⬤ LIVE beat above was run this session; the captured results:
 | 2 | Interrogate hero | `GET /aml/transactions/045adfd2…/interrogate` | `CYCLE MATCH · RING · flag_capable · 10 hops (closed)`: `045adf→148a71→d3b7bc→1579aa→d76933→07ffb8→609cd1→291bb1→c793d7→13f812`; `has_competing_structure=false`; instance 6, `num_components=1`; oracle `is_laundering=true`. (The 6-hop `2f1c1d6c…` is an equally-real but weaker alternate: fewer hops, and its SCATTER-GATHER returns `INCONCLUSIVE` rather than `CONCLUSIVE_NO`.) |
 | 3 | Benign-cost exhibit | `GET /aml/transactions/3cda6d1d…/interrogate` | oracle `is_laundering=false`; CYCLE(10-hop)+GATHER-SCATTER+STACK all `MATCH`; `has_competing_structure=true`; SCATTER-GATHER `INCONCLUSIVE` w/ named boundary |
 | — | Backfill (prep) | `python -m seed.backfill_decisions` | 4,000 decisions, 8 windows, conf **0.924→0.528**, gen-6 dip (0.556→0.624→0.528) intact, frauds_approved 19→118 |
-| 4 | Investigate data | `GET /beliefs` (active) | 1 active belief `898ad0e5…` |
+| 4 | Investigate data | `GET /beliefs` (active) | **2** active beliefs — crimson card `898ad0e5…` (this beat's subject) + azure laundering `ea4f9135…` *(was "1 active belief" until the grounding seam seeded the second; corrected 2026-07-12)* |
 | 5 | Trace / lineage | `GET /beliefs/898ad0e5…/lineage` | 9 nodes, origin crimson-0, **fork at depth 5** (crimson-5b alive + crimson-5 dead), 2 living holders |
 | 6 | Time-travel / perf | `GET /beliefs/898ad0e5…/performance` | 8 windows `0.924→0.528`, frauds_approved 19→118 |
 | 7 | Counterfactual | `GET /beliefs/898ad0e5…/counterfactual-invalidation?at=2025-05-27` | **N=1000, M=392**, 5 holders, total_belief_driven=2000 |
@@ -425,6 +501,7 @@ Every ⬤ LIVE beat above was run this session; the captured results:
 |---|---|---|
 | Detection numbers (1) | Reference (re-run fresh) | Deterministic, read-only, ~20s; cite the crosstab so anyone can check the ACH artifact. |
 | Interrogate hero + cost (2, 3) | **Live** | Deterministic, free, offline-replayable; no OpenAI, no reseed. Safe to hammer. |
+| **The Bridge** | **Live** | Three read-only GETs (two reverse lookups + one lineage), all indexed point lookups, no cost, no writes. It reuses Beats 2–3's exhibits deliberately: the audience has already seen those two transactions interrogated, so the decisions made about them land without new setup — and the false positive lands hardest. Requires the backfills (pre-flight). |
 | Faithfulness guard (4) | Reference | Paid-adjacent (Ollama up) + the scoped-TLS caveat; nothing new shown by re-running. |
 | Console reads: Investigate/Trace/Time-travel/Counterfactual (5–8) | **Live** | Read-only GETs, no cost, no writes; require the backfill (prep). |
 | **Invalidate (9)** | **Live on camera** | The kill-shot and the whole thesis. Destructive → the reset note. |
@@ -443,9 +520,10 @@ plan-gated frontend ladder, per Item 5's and Item 9's own sizing), not folded in
 ## Re-verification Log — the grounding seam (fresh, 2026-07-12)
 
 Re-ran every LIVE beat's command against **current code** after G3/G4 (the second belief + the
-grounded backfill + the verdict-aware counterfactual). Cluster: head 0007, 24 agents, **2 beliefs**,
-15 inheritance edges, **5,500 decisions** (4,000 card + 1,500 AML), 8 crimson perf windows, 0 azure
-perf windows.
+grounded backfill + the verdict-aware counterfactual). Cluster at the time: head 0007, 24 agents,
+**2 beliefs**, 15 inheritance edges, **5,500 decisions** (4,000 card + 1,500 AML), 8 crimson perf
+windows, 0 azure perf windows. *(Migration head is now **0008** — the seam's read surface: the
+partial index behind the reverse lookup, and the structural basis tag. No beat's result moved.)*
 
 | beat | command | result — UNCHANGED unless noted |
 |---|---|---|
@@ -465,3 +543,34 @@ a real `POST /beliefs/{azure}/invalidate` produced a valid, hash-verifiable S3 c
 `staleness_evidence: {"available": false}` (no `confidence_now` key at all, so nothing was invented),
 while crimson stayed active with all 8 edges open. The closures are genuinely disjoint under a real
 atomic write.
+
+---
+
+## Bridge Log — the seam's decisions, run fresh (2026-07-12)
+
+The Bridge beat reuses Act 1's two existing exhibits, so its claims are only as good as the seam's
+verdicts **on those exact rows**. Both were produced by running `aml_seam.decide()` — the real,
+label-free decider — over the real 1,500-edge extract, and reading the oracle **only afterwards**,
+never by trusting a prior note:
+
+| subject | witness_outcome | verdict | witness | oracle `is_laundering` *(read after the fact)* | what it is |
+|---|---|---|---|---|---|
+| **Beat 2 hero** `045adfd2…` | `MATCH` | **blocked** | 10-hop closed ring | **true** | one of the **43** CYCLE gets right |
+| **Beat 3 cost** `3cda6d1d…` | `MATCH` | **blocked** | 10-hop | **false** | one of the **14** it gets wrong |
+
+Both are among the seam's **57 MATCH** decisions. The full census reproduced exactly from the live
+extract — **MATCH 57 · CONCLUSIVE_NO 463 · INCONCLUSIVE 980 = 1,500** — so the 65.3%
+could-not-determine share quoted in the Bridge is the number the decider actually produces, not a
+figure carried forward from prose. *(This census has been corrupted by prose twice — once misstated
+as "728 / 48.5%", once sourced to a `verify_seam.py` that never existed. It is asserted by
+`tests/test_decision_read_surface.py::test_the_witness_census_over_the_real_extract_is_57_463_980`,
+which is a real test that really runs.)*
+
+| the belief itself | value |
+|---|---|
+| azure belief id | `ea4f9135-cdf4-5739-abca-3e3d417b85be` — **active** |
+| rule | *"A transfer that completes a directed cycle returning to its account of origin within 12 hops, across at least 3 distinct accounts, indicates laundering."* |
+| originator | **azure-0** `5aa71f6d…` (generation 0, dead) |
+| lineage | **8 nodes**, depth 0 → 7, **7 real inheritance edges**, linear (no fork) |
+| living holder | **exactly one** — azure-7 `426137f2…` |
+| `belief_performance` windows | **0**, deliberately — see NOTES *"THE BASE-RATE MIRAGE"* |
