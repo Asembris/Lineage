@@ -395,13 +395,60 @@ def test_filters_and_together_rather_than_overriding_one_another():
     asyncio.run(_run())
 
 
-def test_an_unknown_kind_is_422_never_a_silent_empty_page():
-    """`?kind=laundering` must not quietly return zero rows as if that were the answer."""
+def test_the_census_is_COUNTABLE_through_the_api_not_merely_readable():
+    """THE 65.3% AS SEVEN `total`s — which is what lets the honesty ledger read it LIVE.
+
+    This is the difference that matters. A number a surface can COUNT from the cluster cannot be
+    wrong about the cluster. A number a surface RETYPES from prose can be wrong in both available
+    ways — and this exact census has been wrong in both: misstated once (the phantom "728 / 48.5%")
+    and falsely sourced once (a `verify_seam` script that never existed). So the ledger no longer
+    quotes it; it counts it.
+
+    Seven calls at limit=1, reading only `total`, against the controlled world seeded here.
+    """
+
+    async def _run():
+        await _seed_controlled_world()  # 3 AML decisions: one MATCH (fraud), one of each other
+
+        async def total(**q) -> int:
+            qs = "&".join(f"{k}={v}" for k, v in q.items())
+            async with _client() as c:
+                r = await c.get(f"/decisions?limit=1&{qs}")
+            assert r.status_code == 200, r.text
+            return r.json()["total"]
+
+        assert await total(kind="aml") == 3
+        for outcome in ("MATCH", "CONCLUSIVE_NO", "INCONCLUSIVE"):
+            assert await total(kind="aml", witness_outcome=outcome) == 1, outcome
+
+        # is_fraud is an AUDIT fact and it composes: only the MATCH row is labelled laundering here.
+        assert await total(kind="aml", witness_outcome="MATCH", is_fraud="true") == 1
+        assert await total(kind="aml", witness_outcome="CONCLUSIVE_NO", is_fraud="true") == 0
+        assert await total(kind="aml", witness_outcome="INCONCLUSIVE", is_fraud="true") == 0
+
+        # The filter matches the PERSISTED basis tag, so it can never disagree with the field.
+        async with _client() as c:
+            rows = (await c.get("/decisions?kind=aml&witness_outcome=INCONCLUSIVE")).json()
+        assert [d["witness_outcome"] for d in rows["decisions"]] == ["INCONCLUSIVE"]
+        assert rows["witness_outcome"] == "INCONCLUSIVE"  # echoed back
+
+    asyncio.run(_run())
+
+
+def test_an_unknown_kind_or_outcome_is_422_never_a_silent_empty_page():
+    """A typo'd filter must not quietly return zero rows as if that were the answer.
+
+    Especially `witness_outcome`: a silent empty page here would read as "there are no INCONCLUSIVE
+    decisions" — i.e. it would silently REFUTE the disclosure this whole surface exists to carry.
+    """
 
     async def _run():
         async with _client() as c:
-            r = await c.get("/decisions?kind=laundering")
-        assert r.status_code == 422, r.text
+            bad_kind = await c.get("/decisions?kind=laundering")
+            bad_outcome = await c.get("/decisions?witness_outcome=INSUFFICIENT_COVERAGE")
+            lowercase = await c.get("/decisions?witness_outcome=inconclusive")
+        for r in (bad_kind, bad_outcome, lowercase):
+            assert r.status_code == 422, r.text
 
     asyncio.run(_run())
 

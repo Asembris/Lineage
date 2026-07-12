@@ -337,6 +337,12 @@ class DecisionListResponse(BaseModel):
     the seam's FK resolves decision -> transaction, and this resolves transaction -> decision
     ("did any agent act on this money-flow edge, and what did it decide?"). `total: 0` is the
     honest answer for a transaction no agent ever ruled on.
+
+    `total` WITH `witness_outcome` + `is_fraud` IS AN AGGREGATE, and deliberately so: seven calls at
+    `limit=1` yield the seam's entire census (1,500 / 57 / 463 / 980; 43 / 5 / 252) without pulling a
+    single row. The console's honesty ledger reads the 65.3% disclosure that way — LIVE from the
+    cluster — because this exact number has twice been corrupted by prose (misstated once, falsely
+    sourced once), and a number read from the data cannot be wrong about the data.
     """
 
     decisions: list[DecisionOut]
@@ -348,6 +354,8 @@ class DecisionListResponse(BaseModel):
     aml_transaction_id: uuid.UUID | None = None
     driving_belief_id: uuid.UUID | None = None
     kind: str | None = None
+    witness_outcome: str | None = None
+    is_fraud: bool | None = None
 
 
 class BeliefListResponse(BaseModel):

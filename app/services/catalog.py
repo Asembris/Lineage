@@ -18,7 +18,8 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.services import certificate
-from app.services.aml_seam import witness_outcome_of
+from app.services.aml_graph import Outcome
+from app.services.aml_seam import txn_ref_for, witness_outcome_of
 
 
 async def list_agents(
@@ -49,6 +50,8 @@ async def list_decisions(
     aml_transaction_id: uuid.UUID | None = None,
     driving_belief_id: uuid.UUID | None = None,
     kind: str | None = None,
+    witness_outcome: str | None = None,
+    is_fraud: bool | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -58,6 +61,21 @@ async def list_decisions(
     `aml_transaction_id` — THE REVERSE LOOKUP. See below.
     `driving_belief_id`  — every decision one belief drove.
     `kind`               — 'aml' | 'card'. The two kinds `ck_decisions_kind` makes structural.
+    `witness_outcome`    — MATCH | CONCLUSIVE_NO | INCONCLUSIVE. See below.
+    `is_fraud`           — the recorded ground truth. An AUDIT fact (see the oracle boundary).
+
+    `witness_outcome` + `is_fraud` EXIST TO MAKE THE 65.3% DISCLOSURE COUNTABLE, not merely
+    readable. With them, the seam's whole census is seven `total`s — 1,500 / 57 / 463 / 980 and
+    43 / 5 / 252 — instead of a client pulling 1,500 rows to aggregate them, or (worse) a human
+    retyping the numbers into prose. That distinction is load-bearing: this specific census has now
+    been corrupted TWICE by prose, once by misstating the value (the phantom "728 / 48.5%") and once
+    by inventing its evidence (a `verify_seam` script that never existed). The console's honesty
+    ledger reads it LIVE through these filters, so it cannot be wrong about it. See NOTES
+    "FABRICATED VERIFICATION CITATIONS".
+
+    The `witness_outcome` filter matches on the persisted `txn_ref` basis tag — the same vocabulary
+    `aml_seam` writes and migration 0008 enforces — so it can never disagree with the field the
+    surface serves.
 
     THE REVERSE LOOKUP is the one direction the seam did not resolve. The FK runs
     decisions -> aml_transactions, so a decision resolves its money-flow edge in one hop; the
@@ -90,6 +108,14 @@ async def list_decisions(
         clauses.append("aml_transaction_id IS NOT NULL")
     elif kind == "card":
         clauses.append("aml_transaction_id IS NULL")
+    if witness_outcome is not None:
+        # Matched against the persisted basis tag, through the decider's own vocabulary — never a
+        # hand-written 'aml:' + value, which could drift from what aml_seam writes.
+        clauses.append("txn_ref = :basis")
+        params["basis"] = txn_ref_for(Outcome(witness_outcome))
+    if is_fraud is not None:
+        clauses.append("is_fraud = :is_fraud")
+        params["is_fraud"] = is_fraud
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
 
     async with engine.connect() as conn:

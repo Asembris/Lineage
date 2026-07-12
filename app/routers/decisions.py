@@ -43,6 +43,18 @@ async def list_decisions(
         "authorization. The two kinds migration 0007's ck_decisions_kind makes structural. "
         "Anything else -> 422, never a silent empty page.",
     ),
+    witness_outcome: str | None = Query(
+        None,
+        pattern="^(MATCH|CONCLUSIVE_NO|INCONCLUSIVE)$",
+        description="The BASIS of an AML decision. Pair with `limit=1` and read `total` to COUNT "
+        "an outcome: this is what makes the 65.3% disclosure countable rather than merely readable "
+        "(1,500 / 57 / 463 / 980, and with is_fraud=true, 43 / 5 / 252). Anything else -> 422.",
+    ),
+    is_fraud: bool | None = Query(
+        None,
+        description="The recorded ground truth. An AUDIT fact — the label attached to a decision "
+        "AFTER it was made, never readable by the decider (see the oracle boundary).",
+    ),
     limit: int = Query(50, ge=1, le=200, description="Page size (max 200)."),
     offset: int = Query(0, ge=0, description="Rows to skip."),
 ) -> DecisionListResponse:
@@ -57,6 +69,8 @@ async def list_decisions(
         aml_transaction_id=aml_transaction_id,
         driving_belief_id=driving_belief_id,
         kind=kind,
+        witness_outcome=witness_outcome,
+        is_fraud=is_fraud,
         limit=limit,
         offset=offset,
     )
@@ -69,4 +83,6 @@ async def list_decisions(
         aml_transaction_id=aml_transaction_id,
         driving_belief_id=driving_belief_id,
         kind=kind,
+        witness_outcome=witness_outcome,
+        is_fraud=is_fraud,
     )
