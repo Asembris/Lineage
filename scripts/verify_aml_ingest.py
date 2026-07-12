@@ -189,10 +189,29 @@ async def main() -> None:
             "JOIN information_schema.constraint_column_usage ccu "
             "  ON tc.constraint_name = ccu.constraint_name "
             "WHERE tc.constraint_type = 'FOREIGN KEY'"))).all()
+    # THE ONE PERMITTED CROSSING EDGE (migration 0006, the grounding seam). A `decisions` row may
+    # cite a REAL aml_transactions row, so exactly this FK is expected to cross the boundary — and
+    # it is a real, database-enforced constraint on purpose: it is what makes CLAUDE.md's "no
+    # dangling references" true of the seam. Everything else, IN EITHER DIRECTION, still fails.
+    #
+    # Note the asymmetry this allowlist preserves: the moat may REFERENCE the evidence layer; the
+    # evidence layer may never reference the moat (Item 1's rule — aml_* stays a standalone,
+    # independently-loadable extract). An ('aml_*' -> moat) pair is NOT in this set and never will be.
+    ALLOWED_CROSSINGS = {("decisions", "aml_transactions")}
     crossing = sorted({(ch, pa) for ch, pa in fks
-                       if ch.startswith("aml_") != pa.startswith("aml_")})
-    check("no FK crosses the aml_/moat boundary", not crossing,
-          f"{crossing}" if crossing else "aml_ FKs stay within aml_; moat FKs stay within moat")
+                       if ch.startswith("aml_") != pa.startswith("aml_")}
+                      - ALLOWED_CROSSINGS)
+    check("no UNSANCTIONED FK crosses the aml_/moat boundary", not crossing,
+          f"{crossing}" if crossing else
+          "the only crossing is the sanctioned decisions->aml_transactions grounding seam")
+
+    # ...and the sanctioned edge must actually EXIST. The ORM deliberately omits this FK (see
+    # app/models.py::Decision), so the migration is the ONLY thing enforcing it — an allowlist that
+    # tolerated its ABSENCE would quietly convert a database guarantee into a writer's promise.
+    seam_present = ("decisions", "aml_transactions") in {(ch, pa) for ch, pa in fks}
+    check("the grounding-seam FK (decisions->aml_transactions) exists", seam_present,
+          "database-enforced" if seam_present else
+          "MISSING — re-apply migration 0006; nothing else enforces it")
 
     await engine.dispose()
     print("\n" + ("=== ALL CHECKS PASSED ===" if not _fails
