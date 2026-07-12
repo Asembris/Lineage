@@ -5235,3 +5235,105 @@ that `/openapi.json` carries the field you are testing **and that a DB-backed ro
 - `feat(ledger): the 65.3% is read LIVE from the cluster, never quoted`
 - `fix(gitignore): scratchpad/ was never actually ignored — make the claim true`
 - `docs(notes): the ledger's LIVE rows survive schema change; its STATIC rows rot`
+
+## ============ CONSENSUS AMONG DOCUMENTS IS NOT EVIDENCE. ONLY RUNNING THE CHECK IS. ============
+### (2026-07-12 — the sharpest lesson in this project, and it deserves to stand alone)
+
+**FOUR documents agreed with each other. All four were wrong. And the falsehood was sitting INSIDE
+THE GUARD WRITTEN TO PREVENT EXACTLY THIS.**
+
+The claim: *"`scratchpad/` is gitignored."* It was stated in NOTES. It was stated in ARCHITECTURE.
+It was stated in migration 0006's header by implication. And it was stated in
+**`tests/test_citations.py`'s own docstring — in the very sentence explaining why citing
+`scratchpad/` is forbidden BECAUSE it is gitignored.**
+
+```
+$ git check-ignore -v scratchpad/
+$                                   # <- nothing. It was never ignored. Merely untracked.
+```
+
+One command. Four documents, months of sessions, two full documentation passes, a pre-push review
+explicitly hunting for lying documents, and a brand-new anti-fabrication guard — **and not one of
+them was the thing that found it. The command was.**
+
+### WHY THIS IS THE PROJECT'S BEST ARGUMENT FOR "RUN IT, DON'T READ IT"
+Every failure this session shares one shape, and this is its purest instance:
+
+- The **phantom 728** was plausible prose that nobody recomputed.
+- **`scripts/verify_seam.py`** was a plausible citation that nobody followed.
+- **`test_witness_soundness_against_oracle`** was a plausible test name that nobody ran.
+- **`ck_decisions_kind`'s probe row** broke twice behind a docstring that warned about it.
+- And **"scratchpad is gitignored"** was a plausible fact that nobody checked — *including the guard
+  whose whole purpose was to stop plausible-but-unchecked claims.*
+
+**A document agreeing with another document is not corroboration. It is COPYING.** Four sources
+saying the same false thing is not four pieces of evidence; it is *one* unchecked assumption, cited
+four times, and the agreement makes it HARDER to doubt, not easier. That is the trap: consensus
+looks exactly like verification and costs nothing to manufacture.
+
+> **THE RULE: a claim about the repository's own behaviour must be settled by RUNNING the command
+> that decides it, never by reading a document that asserts it — no matter how many documents
+> assert it, and no matter that one of them is the guard you just wrote.**
+
+### THE MOST DAMNING DETAIL, STATED PLAINLY
+`test_citations.py` exists to kill "confident provenance that nobody followed." **Its own docstring
+contained confident provenance that nobody had followed.** The guard was, at the moment of its
+writing, an instance of the disease it was written to cure. If that can happen to a guard authored
+*while actively hunting this exact bug*, it can happen to anything — which is precisely why the fix
+is executable and not editorial.
+
+### WAS RULE (C) VACUOUS? NO — AND THE DISTINCTION IS THE WHOLE POINT
+Asked, and checked rather than reasoned about. **Rule (C)'s MECHANISM never read `.gitignore`.** It
+is a source scan: it greps shipped code and judge-facing docs for the string `scratchpad/...`. So it
+was **never vacuous** — it caught migration 0006's citation for real, and it trips today:
+
+```
+A GITIGNORED, EPHEMERAL PROBE IS CITED AS IF IT WERE A REPO ARTIFACT...
+    app/services/catalog.py:3    cites `scratchpad/probe_counts.py`
+    ARCHITECTURE.md:118          cites `scratchpad/probe_atomic_commit.py`
+```
+(planted in both an app module and a judge-facing doc; caught in both; reverted.)
+
+What was false was not the rule but its **JUSTIFICATION**. And that is a real hazard, not a
+technicality: **a TRUE rule resting on a FALSE premise is one skeptical reader away from deletion.**
+The next session reads *"forbidden because scratchpad/ is gitignored"*, runs `git check-ignore`, sees
+nothing, and reasonably concludes the rule is founded on a mistake — and deletes a guard that was
+doing real work. **So the premise was made TRUE (`scratchpad/` + `**/scratchpad/` in `.gitignore`),
+not reworded away.** Same posture as every other guard here: make the wrong thing unrepresentable.
+
+Verified after the fix, by the same command that exposed the bug:
+```
+$ git check-ignore -v scratchpad/ frontend/scratchpad/
+.gitignore:38:**/scratchpad/    scratchpad/
+.gitignore:38:**/scratchpad/    frontend/scratchpad/
+$ git check-ignore -v scratchpad/probe_whatever.py scratchpad/nested/deep.py
+.gitignore:38:**/scratchpad/    scratchpad/probe_whatever.py
+.gitignore:38:**/scratchpad/    scratchpad/nested/deep.py
+```
+
+### DID ANY PROBE EVER ACTUALLY LEAK INTO THE REPO? Checked, not assumed. **NO — zero.**
+Nothing structurally prevented it for the project's entire life, so this had to be RUN:
+```
+git ls-files                | grep scratchpad   ->  0   (nothing tracked now)
+git log --all --diff-filter=A --name-only       ->  0   (no scratchpad path EVER added, any commit)
+git rev-list --all --objects | grep scratchpad  ->  0   (no such path in the ENTIRE object graph)
+```
+Also swept for the adjacent artifacts nothing was stopping either — committed `*.log`, `*.mjs`
+drivers, screenshots, stray root-level `.py`: **none.** (`frontend/src/assets/hero.png` is a real
+asset.)
+
+**So the discipline held perfectly — for zero structural reasons.** It was habit, sustained across
+dozens of sessions, and habit is exactly what does not survive a tired session or a new contributor.
+This is the fourth instance of the same correction: *don't rely on the next session reading the
+note.* The gitignore now does what forty sessions of care were doing for free.
+
+### THE PROJECT ALREADY KNEW THE RIGHT PATTERN. IT JUST APPLIED IT INCONSISTENTLY.
+`scripts/` contains **four committed probes** — `probe_aml.py`, `probe_aws.py`, `probe_crdb.py`,
+`probe_hop_index.py`. Those are precisely what rule (C) demands: *a probe that matters enough to
+cite belongs in `scripts/`, committed, runnable by the reader.* The project has been doing the right
+thing all along **for the probes it happened to remember to commit**, and citing the vanished ones as
+if they were the same kind of object. Rule (C) is not a new idea — **it is this project's own
+existing practice, made mandatory instead of optional.**
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(notes): consensus among documents is not evidence — only running the check is`
