@@ -5,7 +5,7 @@
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
 [![CI](https://github.com/Asembris/Lineage/actions/workflows/ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/ci.yml)
-&nbsp;![tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)
+&nbsp;![tests](https://img.shields.io/badge/tests-150%20passing-brightgreen)
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -360,7 +360,7 @@ run on 5173.
 ### Tests & evals
 
 ```bash
-pytest                                          # 118 tests against the real cluster (~2m30s)
+pytest                                          # 150 tests against the real cluster (~3m15s)
 PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
 ```
 
@@ -379,7 +379,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # struct
 | AWS | S3 (certificates) + Lambda (certifier) |
 | Eval judge | NVIDIA NIM (nemotron) / Ollama (gemma) via DeepEval — never OpenAI |
 | Frontend | React 19 + Vite + TypeScript, framer-motion, react-three-fiber, oxlint |
-| Tests | pytest (118, live-cluster) |
+| Tests | pytest (150, live-cluster) |
 
 ---
 
@@ -400,8 +400,12 @@ CockroachDB/
 │   ├── routers/             agents · beliefs · decisions · demo · aml   (14 routes)
 │   └── services/            time_travel · replay · lineage · invalidation · certificate
 │                            consistency · corpus · provenance_audit · counterfactual
-│                            aml_graph · aml_agent · aml_interrogate · verdict_guard
-│                            faithfulness · faithfulness_guard · …
+│                            aml_seam ← the grounding seam's DECIDER: label-free by type.
+│                                       Its whole input is a Graph whose Edge cannot hold a
+│                                       label — which is what makes the oracle boundary a
+│                                       claim about TYPES, not about reviewer attention.
+│                            aml_graph · aml_agent · aml_interrogate · aml_evidence
+│                            verdict_guard · faithfulness · faithfulness_guard · …
 ├── migrations/versions/     0001 moat · 0002 vector+perf indexes · 0003 invalidation
 │                            0004 AML layer · 0005 typology corpus · 0006 grounding seam
 │                            0007 two-kinds CHECK · 0008 seam read surface (index + basis tag)
@@ -410,7 +414,8 @@ CockroachDB/
 ├── scripts/                 probes · ingest · verify · demos · evals
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
-├── tests/                   25 files, 118 tests (all live-cluster)
+├── tests/                   29 files, 150 tests (all live-cluster) — incl. test_oracle_boundary
+│                            (the AST tripwire) and test_citations (no fabricated provenance)
 ├── frontend/                React 19 + Vite console — three views:
 │                            console (tree · feed · inspector) · consistency demo (2D + 3D)
 │                            · honesty ledger
