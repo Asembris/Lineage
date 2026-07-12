@@ -5,7 +5,7 @@
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
 [![CI](https://github.com/Asembris/Lineage/actions/workflows/ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/ci.yml)
-&nbsp;![tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)
+&nbsp;![tests](https://img.shields.io/badge/tests-99%20passing-brightgreen)
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -166,6 +166,33 @@ configured in `.mcp.json`; see the Technical Implementation note above for its h
 
 ---
 
+## API surface
+
+**14 routes.** One governed write; everything else is a read. Interactive docs at `/docs`.
+
+| Route | What it does | Console |
+|---|---|---|
+| `GET /health` | liveness | — |
+| `GET /agents` | full genealogy — every agent, `parent_id` edges | tree |
+| `GET /agents/{id}/beliefs?as_of=` | **the deposition** — one agent's beliefs at a past instant, real `AS OF SYSTEM TIME` | time-travel |
+| `GET /beliefs` | belief catalog | inspector |
+| `GET /beliefs/{id}/lineage` | **the trace** — recursive CTE back through `belief_inheritance` to the origin ancestor | trace |
+| `GET /beliefs/{id}/performance` | measured staleness windows — the real 0.924 → 0.528 curve | time-travel |
+| `GET /beliefs/{id}/replay` | content-hashed closure snapshot, AOST-reproducible | — |
+| `GET /beliefs/{id}/provenance-audit` | **A1–A4 provenance-integrity verdict** — CLEAN / ANOMALOUS / INCONCLUSIVE | ledger *(top-line verdict only)* |
+| `GET /beliefs/{id}/counterfactual-invalidation?at=T` | **"what if we'd killed it at T?"** — N approvals withdrawn, M of them real fraud. `at` is **business time, not the MVCC clock** | no UI yet |
+| `POST /beliefs/{id}/invalidate` | ⚠️ **the one governed write** — atomic fleet-wide kill in a single serializable txn + S3 certificate | invalidate |
+| `GET /decisions` | fleet-wide decision feed, or one agent's history | feed |
+| `GET /aml/transactions/{id}` | one money-flow edge | — |
+| `GET /aml/transactions/{id}/interrogate` | **click-to-interrogate** — re-derives the structural witness across all four typologies, surfaces competing structures | no UI yet |
+| `GET /demo/consistency/stream` | SSE — real observer samples of the atomic-vs-eventual proof (isolated `demo` db) | consistency |
+
+The two "no UI yet" routes are real, tested, and verified against live cluster data — they simply
+have no console surface, and the [honesty ledger](#honesty-ledger) says so rather than leaving them
+undiscoverable.
+
+---
+
 ## Evaluation results
 
 ### The structural detection eval (per-edge, ring-membership ground truth, 95% Wilson CI)
@@ -254,11 +281,15 @@ to rival the detection eval's precision.
 
 ## Honesty ledger
 
+Every claim this system makes, labeled by provenance. **This table is also a live console view** —
+the [Ledger](frontend/src/components/HonestyLedger.tsx) tab reads the LIVE rows straight from the
+cluster, so the document and the running system cannot quietly disagree.
+
 | Item | Label | Note |
 |---|---|---|
-| Agent genealogy (24 agents, 2 bloodlines, 1 belief, 8 inheritance edges) | **synthetic** | Deterministically seeded; the inheritance edges are real rows, the population is fabricated |
+| Agent genealogy | **synthetic** | 2 bloodlines, 8 inheritance edges. Deterministically seeded — the inheritance edges are real rows, the population is fabricated. *(The console reads the agent/belief counts live.)* |
 | AML transactions (648 accounts / 1,500 edges / 20 instances / 300 members) | **real + sampled** | Real IBM HI-Small AML data; benign negatives are `is_laundering=0` rows *anchored to the same accounts* as the fraud (deliberately adversarial), capped 4:1 |
-| `decisions` / `belief_performance` | **measured, reproducible** | Currently empty on the live cluster; a deterministic `python -m seed.backfill_decisions` repopulates 4,000 rows + 8 windows (curve conf 0.924 → 0.528, byte-identical every run) |
+| `decisions` / `belief_performance` | **measured, reproducible** | Whether the cluster is currently populated depends on demo activity — the destructive invalidation demo consumes it. A deterministic `python -m seed.backfill_decisions` repopulates 4,000 rows + 8 windows (curve conf 0.924 → 0.528, byte-identical every run). *(The console reads populated-or-empty live, so this row can never go stale.)* |
 | Belief embedding vector | **placeholder → real** | Phase-1 seed uses a deterministic placeholder; real `text-embedding-3-small` vectors via `scripts/embed_beliefs.py` |
 | Detection eval — dev-set numbers | **in-sample** | Selection decisions (`FLAG_CAPABLE`, SG tightening) were made on this set; the hold-out is the never-tuned figure |
 | Faithfulness eval — GEval rubric | **partly in-sample** | Rubric iterated on 5 of the calibration examples; generalizes 5/5 on fresh authored negatives, but "never tuned" is false for the calibration subset |
@@ -315,7 +346,7 @@ run on 5173.
 ### Tests & evals
 
 ```bash
-pytest                                          # 89 tests against the real cluster (~2m39s)
+pytest                                          # 99 tests against the real cluster (~2m20s)
 PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
 ```
 
@@ -334,7 +365,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # struct
 | AWS | S3 (certificates) + Lambda (certifier) |
 | Eval judge | NVIDIA NIM (nemotron) / Ollama (gemma) via DeepEval — never OpenAI |
 | Frontend | React 19 + Vite + TypeScript, framer-motion, react-three-fiber, oxlint |
-| Tests | pytest (89, live-cluster) |
+| Tests | pytest (99, live-cluster) |
 
 ---
 
@@ -352,17 +383,21 @@ CockroachDB/
 │   ├── resilience.py        transient-CRDB retry/backoff
 │   ├── ratelimit.py         per-IP/route rate limiter
 │   ├── demo_db.py           isolated `demo` database engine
-│   ├── routers/             agents · beliefs · decisions · demo · aml
+│   ├── routers/             agents · beliefs · decisions · demo · aml   (14 routes)
 │   └── services/            time_travel · replay · lineage · invalidation · certificate
-│                            consistency · corpus · aml_graph · aml_agent · verdict_guard · …
+│                            consistency · corpus · provenance_audit · counterfactual
+│                            aml_graph · aml_agent · aml_interrogate · verdict_guard
+│                            faithfulness · faithfulness_guard · …
 ├── migrations/versions/     0001 moat · 0002 vector+perf indexes · 0003 invalidation
 │                            0004 AML layer · 0005 typology corpus
 ├── seed/                    seed.py (genealogy) · backfill_decisions.py (deterministic decisions)
 ├── scripts/                 probes · ingest · verify · demos · evals
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
-├── tests/                   21 files, 89 tests
-├── frontend/                React 19 + Vite console (genealogy tree · decision feed · inspector)
+├── tests/                   24 files, 99 tests (all live-cluster)
+├── frontend/                React 19 + Vite console — three views:
+│                            console (tree · feed · inspector) · consistency demo (2D + 3D)
+│                            · honesty ledger
 └── data/raw/                IBM HI-Small AML dataset (Trans.csv + Patterns.txt)
 ```
 
@@ -370,25 +405,43 @@ CockroachDB/
 
 ## Roadmap status
 
-**Shipped (Roadmap Items 0–8, verified, CI green):**
+**Shipped — every row verified against the live cluster, CI green.** *(The bracketed letters are
+internal engineering-log labels; they index into [NOTES.md](NOTES.md) and mean nothing on their own.)*
 
-| # | Item |
+| Capability | What it is |
 |---|---|
-| 0 | Cluster isolation — dedicated `demo` database for the destructive stream |
-| 1 | AML evidence-layer ingestion (four additive `aml_*` tables, bounded verified subgraph) |
-| 2 | Reversible-deterministic replay over the lineage timeline (content-hashed closure snapshot) |
-| 3 | CockroachDB-native RAG — typology corpus with real embeddings + AOST-over-vector-search |
-| 4 | Grounded AML agent with the STRICT-BRAKE (FLAG requires a witness) |
-| 5 | Click-to-interrogate a transaction, with competing-witness conflict surfacing |
-| 6 | Content-addressed pre-kill state + the independent cross-machine certifier |
-| 7 | Forensic detection eval — dev + never-tuned hold-out precision/recall |
-| 8 | RAG-grounding faithfulness eval (open-model judge) |
+| **Cluster isolation** *(0)* | Dedicated `demo` database so the destructive stream can't touch console state |
+| **AML evidence-layer ingestion** *(1)* | Four additive `aml_*` tables — a bounded, verified subgraph of IBM HI-Small |
+| **Deterministic replay** *(2)* | Reversible, content-hashed closure snapshot over the lineage timeline |
+| **CockroachDB-native RAG** *(3)* | Typology corpus, real embeddings, AOST-over-vector-search |
+| **The witness-construction brake** *(4)* | Grounded AML agent where a FLAG is unreachable without a structural witness |
+| **Click-to-interrogate** *(5)* | Re-derive a transaction's witness on demand, surfacing competing structures |
+| **The cross-machine certifier** *(6)* | Content-addressed pre-kill state + an independent Lambda that re-derives the same hash |
+| **The structural detection eval** *(7)* | Dev + never-tuned hold-out precision/recall, with the baselines that beat us printed |
+| **The RAG-grounding faithfulness eval** *(8)* | Open-model judge over the agent's prose, two denominators kept apart |
+| **The honesty ledger** *(9)* | The provenance table above, as a live console view reading the cluster in real time |
+| **The provenance-integrity audit** *(A)* | A1–A4 invariant verifier over a belief's inheritance closure — CLEAN / ANOMALOUS / INCONCLUSIVE |
+| **The counterfactual invalidation query** *(B)* | "Had we killed this belief at T, what changes?" — exact N approvals withdrawn, M of them real fraud |
+| **The explanation-faithfulness guard** *(E)* | Live, fail-closed check that withholds any rationale asserting more than the rows support |
+| **The hero demo storyboard** *(F)* | Two-act walkthrough, every beat tagged LIVE / FRESH / HISTORICAL — see **[DEMO.md](DEMO.md)** |
 
 Also complete: Phases 1–3 (the belief-inheritance spine, agents, and the money-shots), Phase 4
-hardening, and the full React frontend (Frontend Phases 1–6).
+hardening, and the full React console (Frontend Phases 1–6).
 
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
-chunking), the `decisions.aml_transaction_id` grounding seam, and a hero attack demo.
+chunking), the `decisions.aml_transaction_id` grounding seam that would join the two graphs into one
+causal chain, an AML console surface, and the recorded demo video.
+
+---
+
+## Where to go next
+
+| Document | What's in it |
+|---|---|
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | The deep technical dive — seven mermaid diagrams over real code: schema separation, the atomic invalidation txn, AOST + deterministic replay, the certificate/certifier hash agreement, the witness brake, the faithfulness guard, the A1–A4 provenance audit |
+| **[DEMO.md](DEMO.md)** | The hero demo storyboard — two acts, ~90 seconds, every beat tagged with how it was verified and a build-time verification log |
+| **[NOTES.md](NOTES.md)** | The engineering log — every decision, every dead end, every honesty call, in the order they happened |
+| **[FRONTEND.md](FRONTEND.md)** | The console's design constitution — tokens, the four supervisor interactions, phase discipline |
 
 ---
 
