@@ -428,9 +428,23 @@ internal engineering-log labels; they index into [NOTES.md](NOTES.md) and mean n
 Also complete: Phases 1–3 (the belief-inheritance spine, agents, and the money-shots), Phase 4
 hardening, and the full React console (Frontend Phases 1–6).
 
+### Investigated and cut
+
+Recorded rather than silently dropped — a roadmap line that the data refuses to support is a finding,
+not a gap.
+
+| Capability | Verdict |
+|---|---|
+| **Temporal drift / belief-decay detection** *(C)* | **CUT — the data does not support it.** The item was conditional (*"build only if the data supports a real signal — verify first, never decorative"*). It was verified first. **As detection it is a duplicate:** the decay is already computed from real outcomes, rendered as the full 8-window curve, embedded in the certificate, and made actionable by the counterfactual — and an automated "this belief is rotting" verdict over a population of **one** belief would return a constant, with two of its three states structurally unreachable. **As drift *characterization* it is refuted:** the curve's one non-monotonic feature, the gen-6 dip, is **not distinguishable from noise** (p = 0.12 at n=250/window), and the modeled campaign's true effect (+0.0227) is **smaller than the per-window noise SD (0.03)** — so it does not shrink with more data. A detector that named it correctly could only do so by reading the generator's own constants. Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item C*. |
+
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
 chunking), the `decisions.aml_transaction_id` grounding seam that would join the two graphs into one
-causal chain, an AML console surface, and the recorded demo video.
+causal chain, an AML console surface, the recorded demo video — and **measured uncertainty on the
+staleness curve**, the one place this project's own Wilson-CI discipline is not yet applied
+(`belief_performance` persists no sample size, so the certificate's `0.924 → 0.528` carries no
+interval; the real present-day figure is `0.528`, 95% CI `[0.466, 0.589]`). Latent rather than live —
+every window today holds exactly 250 decisions by construction — and scoped as its own plan-gated item
+because closing it moves the certificate schema and the certifier Lambda in lockstep.
 
 ---
 
