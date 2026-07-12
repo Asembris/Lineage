@@ -5410,3 +5410,132 @@ simply 65.3%. The only defence is labelling, and it must survive every future ed
 ### Commits (Conventional Commits, each its own; on main; held for review before push)
 - `fix(demo): the reset note told the operator to destroy the seam — three ordered commands`
 - `docs(notes): restore instructions have lied twice; and the 65.3% collision`
+
+## G6 — DOCUMENTATION. The seam reaches the four judge-facing surfaces. (2026-07-12)
+
+The seam has existed since G2–G5 and the docs had never caught up with it. G6 brings README,
+ARCHITECTURE and DEMO current, to the standard Item 10 held: **every number verified fresh, every
+claim checkable, every caveat travelling with its number.** No new features. The only code touched
+was `HonestyLedger.tsx`, and that edit was FORCED (README is its row-for-row source of truth).
+
+### THE LIVE LANDMINE — found first, fixed first, and it is the session's most important finding
+See the entry above (*RESTORE INSTRUCTIONS HAVE NOW LIED TWICE*). DEMO's **production reset note** —
+the command an operator runs **repeatedly, between takes, under time pressure** — said to restore
+with `seed.backfill_decisions` **alone**. That command opens with `run_seed()`, and `seed.seed()`
+DELETEs every decision: following it verbatim **destroys all 1,500 AML decisions.** It had survived
+the G3/G4 review that fixed the *identical* defect in the same file's pre-flight, 200 lines above.
+Fixed as its own commit, before any other work. **Pre-flight and reset note are now the SAME three
+ordered commands**, and each names the other — there is exactly one way to rebuild this world.
+
+### STALE FACTS FOUND AND CORRECTED (all re-measured; none trusted from a prior entry)
+- **Tests: 118 -> 150.** Wrong in FOUR places (badge, Getting Started, tech-stack row, project tree).
+  Full suite: **150 passed in 195.43s** — so the documented "~2m30s" was stale too (**~3m15s**).
+- **`tests/`: 25 files -> 29.**
+- **Routes: still 14 — verified, NOT changed.** The seam added **filters, not routes**, which is
+  exactly why the API table looked correct while becoming materially incomplete.
+- **`aml_seam.py` was absent from the project tree** — the decider the *entire oracle-boundary claim
+  rests on*, missing from a tree that listed a dozen lesser services.
+- **DEMO:** "1 active belief" -> 2; "head 0007" -> 0008; Act 1's header claimed ~32s while its own
+  beats summed to 40s (the budget is now honestly ~95s with the Bridge).
+
+### THE SEAM WAS INVISIBLE IN THE DEMO — and that was worse than the problem it was avoiding
+DEMO's only treatment of the seam was a warning blockquote in section 1 explaining that a *previous
+version of this document had been wrong*. **Five sessions of work read as an erratum.** Same in
+README: the seam had **no roadmap row at all**, appearing only as an italic parenthetical under
+"Next:".
+
+**THE TWO-ACT STRUCTURE STANDS** — Item F's call is unchanged and was re-derived, not inherited. The
+*justification* half of a single chain was always going to be a staleness curve on AML outcomes; that
+curve is a base-rate artifact; G1 measured it and CUT step 4 **before the seam was ever built**.
+Nothing G2–G5 shipped changed that. A single act would have to *imply* the laundering evidence
+motivates the invalidation. It does not.
+
+**So the ~5s prose TRANSITION — whose whole job was to apologise for the absence of a causal thread —
+became a ~10s BRIDGE that SHOWS the one place the graphs touch.** And the investigation found the
+bridge needs **no new exhibit**, which is the best thing in this session:
+
+### RUN, NOT REASONED: both of DEMO's existing Act-1 exhibits are among the seam's 57 MATCH decisions
+Verified by running `aml_seam.decide()` over the real extract and reading the oracle **only
+afterwards** — never by trusting that "the seam uses the same witness as /interrogate":
+```
+Beat 2 HERO  045adfd2...  MATCH -> blocked  10-hop witness  is_laundering=true    <- 1 of the 43
+Beat 3 COST  3cda6d1d...  MATCH -> blocked  10-hop witness  is_laundering=false   <- 1 of the 14
+```
+**The living azure-7 had ALREADY ruled on both of the transactions the audience just watched**, on a
+belief azure-0 formed and it never met. It blocked both. One was laundering. One wasn't. **That is
+CYCLE's 75.4% precision, in the record, on the two exhibits already on screen** — and the honest limit
+becomes the punchline rather than a disclaimer, which is the move the honesty ledger made for README.
+
+**Consequent correction: Beat 3's "it WOULD flag" was stale in the honest direction. It DID.** The
+false positive is a **durable, FK-linked row in `decisions`**, not a thought experiment. The cost
+exhibit stopped being hypothetical the moment the seam shipped, and nobody had noticed.
+
+### THE 65.3% COLLISION (own entry above) — two unrelated quantities, one number, one page
+DEMO's only `65.3` was the structural detector's **hold-out RECALL**; README carried **both** meanings.
+Adding the seam's coverage figure to DEMO would have put them near each other. Every occurrence in all
+three docs now carries its noun (**"65.3% hold-out recall"** vs **"65.3% could-not-determine"**), and
+the baseline table carries an explicit warning. **The qualifier is the disambiguator, not redundancy.**
+
+### ARCHITECTURE — it said the seam EXISTS (G5) and described almost none of how it WORKS
+Zero occurrences of: `65.3%`, `0007`, `0008`, `witness_outcome`, `ck_decisions_kind`, the reverse
+lookup, the partial index, the base-rate mirage, or the **fixed `decided_at`** — the design decision
+that makes the mirage unrepresentable — **absent entirely**. New **section 1.1** (with a diagram of
+the two-phase backfill: *the order IS the integrity argument*), covering the CHECK, the basis tag, the
+projection-not-re-derivation distinction, the planner output proving the partial index is usable, and
+the trap stated **as a trap**.
+
+### SECTION 7 — "MAKE THE WRONG THING UNREPRESENTABLE", named as a design principle for the first time
+The project's defining technique was discoverable only by reading this file end to end. It is now a
+section: **eight** instances, each with *the wrong thing it forbids*, *why a comment was not enough*,
+and *the file that enforces it*. **Four of the eight were written only AFTER the corresponding prose
+warning had already failed at least once** — and one (the gitignore) was found false *inside the guard
+written to prevent exactly that*. The generalization is the project's own thesis turned on itself:
+**a convention is an inherited belief, and it goes stale the same way.**
+
+### G6 VERIFICATION GATE — all green
+- **150 backend tests pass**, 197.12s — re-run AFTER the doc changes, not before.
+- **Citation guard green before AND after** (4 tests). Every new path/test cited in this session was
+  confirmed to resolve: `.gitignore:37-38`, `seed/backfill_aml_decisions.py:112` (`DECIDED_AT`),
+  `aml_seam.py`, `test_oracle_boundary.py`, `test_citations.py`, migrations 0006-0008.
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk).
+- **THE CORRECTED DEMO RESET PROCEDURE WAS EXECUTED, NOT JUST WRITTEN** — the G5 standard, and the
+  entire point of the hazard-class entry. All three commands, in order, verbatim from the document:
+
+  | DEMO.md line | result |
+  |---|---|
+  | `python -m seed.backfill_decisions` | 4,000 card decisions + 8 windows; curve `0.924 ... 0.528` |
+  | `python -m seed.backfill_aml_decisions` | 1,500 AML decisions; census **57/463/980**, **43/5/252** |
+  | `python -m scripts.embed_beliefs aml-cycle` | 1 belief re-embedded (1536 dims) |
+
+- **Cluster restored + INDEPENDENTLY re-verified with real SELECTs** (not a script's echo): head
+  **0008**, 24 agents / 3 alive, **2** beliefs (both active), **15** edges, **5,500** decisions
+  (4,000 card / 1,500 AML), **8** crimson perf windows, **0** azure perf windows,
+  **`count(DISTINCT decided_at) = 1`** for AML (the mirage still unrepresentable), 1,500
+  `aml_transactions` (**NOT** re-ingested), crimson curve `.924 .952 .876 .852 .724 .556 .624 .528`
+  byte-identical, and the **ONE** sanctioned crossing FK present.
+- **The Bridge beat + README's census block were DRIVEN over the real HTTP surface** (in-process
+  ASGI — cannot be stale; the orphaned-uvicorn lesson), with `/openapi.json` asserted to carry
+  `witness_outcome` and all five filters **before any result was trusted**:
+  reverse lookup on both exhibits -> `blocked` / `MATCH` / `is_fraud` true & false; azure lineage -> 8
+  nodes; the census counted live -> **1500 / 57 / 463 / 980** and **43 / 5 / 252**, share **65.3%**;
+  a typo'd `?witness_outcome=MATCHED` -> **422**, never a silent empty page.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `fix(demo): the reset note told the operator to destroy the seam`
+- `docs(notes): restore instructions have lied twice; and the 65.3% collision`
+- `docs(demo): the Bridge — the one place the two graphs touch, and what it does not buy`
+- `docs(architecture): the seam's mechanics (1.1), and the design principle behind them (7)`
+- `docs(readme): the verified counts — 150 tests, 29 files, 3m15s — and aml_seam in the tree`
+- `docs(readme): the API surface carries the seam's six filters and witness_outcome`
+- `docs(readme): the seam makes two judging-criteria answers stronger — and adds three limitations`
+- `docs(readme): label both 65.3%s — they are unrelated quantities that share a number`
+- `docs(readme): a real roadmap row for the grounding seam`
+- `docs(notes): record G6` (this entry)
+
+### G6 explicitly NOT done (still gated): the AML CONSOLE (the frontend that would render the seam's
+### decisions — its own plan-gated session); the recorded VIDEO (human task; the README placeholder
+### is deliberately still there, NO fabricated URL); `belief_performance` for the azure belief (step 4
+### stays CUT — re-read THE BASE-RATE MIRAGE before re-proposing it); re-embedding the crimson belief
+### (its ledger row states the placeholder honestly); the regulatory corpus; a `verdicts` table; any
+### re-ingestion of `aml_*`; any change to the five tables / `aml_*` / `typology_corpus`; any new
+### feature. Do NOT push without explicit approval — held for review of the result.
