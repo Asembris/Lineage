@@ -4729,3 +4729,233 @@ result.
 - `fix(ledger): the counterfactual row asserted Item B's dead invariant; name the belief on live rows`
 - `docs(demo): the seam falsified DEMO.md's founding premise — correct it, keep the two acts`
 - `docs(notes): record the pre-push review — four lying documents, two caught only by driving the UI`
+
+## G5 — THE READ SURFACE (2026-07-12). The chain resolves in BOTH directions.
+
+The seam (G2/G3/G4) made the causal chain EXIST. G5 makes it RESOLVABLE. **144 backend tests pass**
+(130 prior + 14 new). Migration head **0008**. No frontend, no LLM, no certificate change, no new
+table, no re-ingestion, no `belief_performance` for the azure belief (step 4 stays CUT).
+
+### THE INVESTIGATION'S HONEST FINDING: the forward chain ALREADY COMPOSED. G5 is thin, on purpose.
+Before writing a line, the four hops were walked with EXISTING endpoints:
+`GET /decisions` -> `GET /aml/transactions/{id}` -> `GET /aml/transactions/{id}/interrogate` ->
+`GET /beliefs/{id}/lineage` -> azure-0. **Every hop already resolved to real rows.** So NO
+"causal-chain resolver" endpoint was built — it would have wrapped calls that already compose, which
+is the one thing the brief forbade. What did not exist was the REVERSE direction and the
+contract-level legibility of the disclosure. Those, and only those, are what shipped.
+
+### THE REVERSE LOOKUP — measured, not assumed, and CockroachDB volunteered the fix
+The FK runs decisions -> aml_transactions. Nothing resolved the other way: looking at a flagged
+transaction there was **no route and no index** to ask "did any agent act on this?"
+```
+EXPLAIN SELECT ... FROM decisions WHERE aml_transaction_id = $1     -- BEFORE 0008
+  -> scan  table: decisions@decisions_pkey   spans: FULL SCAN
+     estimated row count: 5,500 (100% of the table)
+  -> index recommendations: 1
+     CREATE INDEX ON defaultdb.public.decisions (aml_transaction_id) ...
+```
+The optimizer emitted that recommendation **unprompted**. Measured latency **89.4ms** (full scan) vs
+**47.6ms** (indexed pkey point lookup, same table, n=20) — ~48ms is the Cloud round-trip floor, so
+the scan roughly DOUBLED it and was the only component that grows.
+
+**The 42ms did not force the migration and it was not claimed to.** The honest case is structural:
+`decisions` is THE growth table in this schema — it is the only read surface paginated at all,
+precisely because `agents`/`beliefs` are bounded-small and it is not. Shipping a read surface whose
+defining query is a declared FULL SCAN, in a project whose thesis is that CockroachDB is the memory
+layer, is what a judge running EXPLAIN finds.
+
+**PARTIAL index, and the implication was VERIFIED, not assumed.** `WHERE aml_transaction_id IS NOT
+NULL` indexes the 1,500 seam rows and none of the 4,000 card NULLs. It is only usable if the
+optimizer PROVES `col = $1` implies `col IS NOT NULL`. That is CockroachDB's inference to make, not
+ours to assume — so it was checked against the real planner before the design was trusted:
+```
+• index join                                                        -- AFTER 0008
+└── • scan
+      estimated row count: 1 (0.02% of the table)
+      table: decisions@ix_decisions_aml_txn (partial index)
+      spans: [/'00639d06-…' - /'00639d06-…']
+```
+Median latency **89.4ms -> 51.0ms** — i.e. down to the round-trip floor. The index is deliberately
+NOT `STORING (...)` (which CRDB still recommends): the index join for a single row is one extra KV
+read, we are already at the floor, and a STORING index must be kept in sync with every future
+DecisionOut field — a maintenance trap for no measured gain.
+
+### `witness_outcome` — the 65.3% reached the DATA in G4, but never reached the CONTRACT
+G4 put the disclosure in three places, and NOTES called `txn_ref` the carrier that made it "one
+GROUP BY away, forever". **True for someone with SQL and this file. FALSE for an API caller.**
+`DecisionOut.txn_ref` was a bare `str` with no description; the DTO docstring explained the
+merchant/confidence/currency nullability and said nothing about the tag; nothing reached
+`/openapi.json`. So a caller saw **1,443 approvals** and could not tell that 980 of them mean *"we
+could not tell"* rather than *"we checked and it is clean"* — recoverable only by someone who already
+knew to look, which is the exact failure the tag was introduced to prevent. **Data-reachable is not
+contract-reachable. Different audiences.**
+
+`witness_outcome` (MATCH | CONCLUSIVE_NO | INCONCLUSIVE; NULL for card rows) is now a first-class
+field, PROJECTED from the persisted `txn_ref` — never re-derived from the graph. That distinction is
+load-bearing and is why the field does not simply call the witness again: **the persisted outcome is
+what the agent RECORDED at decision time; interrogate's outcome is a FRESH re-derivation from the
+current graph.** They are different objects. They agree today only because the extract is static —
+a fact about the data, not a guarantee. Serving them side by side in one payload would silently
+assert they are the same thing, which is the "every field individually true, the juxtaposition
+fabricated" failure this project rejected in Item 6's reading (b) and caught again in the base-rate
+mirage. Hence also: **the reverse lookup mounts on `/decisions`, NOT on `/aml`.** "Did any agent act
+on this?" is a question about the MOAT, and a decision carries `is_fraud`; hanging it off `/aml`
+would put the answer key one hop from the witness's own work, under the prefix whose entire
+discipline is that it does not go there.
+
+### THE BASIS TAG IS NOW STRUCTURAL (0008's `ck_decisions_kind`), AND THE OLD CHECK PROVED WHY
+Nothing stopped a future backfill writing `txn_ref = str(txn_id)` — the OBVIOUS thing to write, since
+`txn_ref` means "transaction reference" on every other row in the table — silently destroying the
+only in-data carrier of the coverage split, with **no test failing**. Not hypothetical: the
+understated "728 / 48.5%" figure has been introduced into this project TWICE and corrected twice.
+Prose corrections demonstrably do not stick, so the number's carrier is now defended by the schema.
+
+0008's AML branch adds `txn_ref IN ('aml:MATCH','aml:CONCLUSIVE_NO','aml:INCONCLUSIVE')`. **MADE TO
+TRIP, with real output:** under 0007's constraint the database **ACCEPTED** `txn_ref = str(txn_id)`
+on an AML row (`DID NOT RAISE <class 'IntegrityError'>`). Under 0008 that insert, plus `aml:`,
+`aml:MATCHED`, and `txn-0001`, are all rejected with `CheckViolation`, while a real tag is accepted.
+The vocabulary's ONE home is `aml_seam.TXN_REF_TAGS` (the decider owns the outcome enum); the
+migration cannot import app code, so a test asserts its three SQL literals ARE that tuple. Sixth
+instance of the house move — make the wrong thing unrepresentable.
+
+### ====== 0008 SPRANG G2's OWN TRAP, ON G2's OWN TESTS. READ BEFORE TIGHTENING THE CHECK ======
+`test_database_rejects_a_dangling_aml_transaction_id` inserts an otherwise-valid AML probe row so
+that **only the FK can reject it**, and asserts the error is a foreign-key violation BY NAME. Its
+probe used `txn_ref = 'seam-guard-probe'`. **0008's new clause rejected it as a CheckViolation — so
+the FK guard went red while proving nothing about the foreign key.** Same for
+`test_an_aml_decision_may_not_fabricate_a_merchant_or_a_confidence` (`'ck-kind-probe'`).
+
+This is the SECOND time: 0007 did it first (its probe omitted `amount_currency`), and G2's notes
+record fixing it. **ANY migration that tightens `ck_decisions_kind` must re-check that those probe
+rows still satisfy it** — otherwise the constraint under test stops being tested at all. Both probes
+now carry a real basis tag, and `_insert` cleans up BY ID (its old `DELETE ... WHERE txn_ref =
+'ck-kind-probe'` could not survive an overridable txn_ref). The warning is now in the test's own
+docstring, not only here.
+
+### FOUND BY GOING TO LOOK: the census was asserted NOWHERE, behind a docstring citing a missing file
+`aml_seam.py` stated the 57/463/980 split was "measured over all 1,500 ingested edges
+(`scripts/verify_seam.py`, and asserted in tests/test_grounding_seam.py)". **`scripts/verify_seam.py`
+does not exist. `test_grounding_seam.py` never contained those numbers.** The project's single most
+important caveat was defended by a citation to a file that was never written. It is now asserted in
+`test_the_witness_census_over_the_real_extract_is_57_463_980`, which runs the real decider over the
+real extract and then reads the oracle to score it (43/5/252, sum 300). The docstring names the real
+test and records the correction.
+
+### NO TEST MAY DEPEND ON A BACKFILL — a rule this session had to learn by breaking it
+The first draft of `test_decision_read_surface.py` asserted `total == 1500` / `4000` / `5500` against
+the live backfill. `seed.seed()` DELETEs every decision, and **`test_read_endpoints.py` calls
+`run_seed()`** — so the assertions passed alone and failed in the suite, on ORDERING. (Observed:
+`decisions` at 0 mid-session, 7 tests red.) The house idiom is test_read_endpoints': **reseed, then
+insert the controlled set you assert on.** The file now seeds its own 3 AML + 5 card decisions; the
+CENSUS is asserted against the DECIDER over `aml_transactions` (reference data `seed.seed()` never
+touches), so it is a fact about the witness and the extract rather than about whether a backfill ran.
+
+### THE TWO ACCIDENTS THAT MADE THE SEAM DISCOVERABLE — neither is a guarantee
+Before the filters, the 1,500 AML decisions were findable ONLY because of two facts about this seed:
+- **(a)** every AML decision shares ONE fixed `decided_at` (2026-07-12T12:00Z) that is NEWER than
+  every card decision (`card_max` = 2026-06-29), so a newest-first feed happens to put them on page 1;
+- **(b)** azure-7 happens to make **card=0 / aml=1500**, so `?agent_id=azure-7` happens to isolate
+  them perfectly.
+
+Neither is a contract. A future session that moved the seam's `decided_at` (do not — see THE
+BASE-RATE MIRAGE) or gave azure-7 a single card decision would break discoverability **silently**.
+`?driving_belief_id=` and `?kind=aml|card` are the SEMANTIC paths, and a test asserts all three agree
+today so the accidents' failure is survivable.
+
+### THE ORACLE BOUNDARY — the flat claim is FALSE, and it became false when the seam shipped
+This is the session's most important finding and it is a first-class correction, not a footnote.
+
+**"We never serve the answer key" is no longer true as stated.** The seam decided on every edge, 1:1
+(verified: 1,500 transactions, 1,500 AML decisions, 1,500 distinct cited ids, **zero transactions
+with no decision**), so `decisions.is_fraud` is a copy of `is_laundering` for the **entire extract**,
+and `GET /decisions` serves it. Nothing is contaminated by this — the decider is label-free BY TYPE,
+`eval_detection.py` reads the CSV and never the database, and no code path reads `is_fraud` to decide
+anything — but the sentence was wrong, and a credibility document that is wrong is the worst kind.
+
+**THE CORRECTED STATEMENT, which is what may be claimed:**
+> The label is **never readable by the DECIDER**; it is **never served as EVIDENCE on the evidence
+> layer**; and it is served **only where it is an AUDIT fact — attached to a decision that was
+> already made without it.**
+
+All three hold, and each is enforced rather than asserted: the decider's input is a `Graph` whose
+`Edge` has no label field (`test_oracle_boundary`); `GET /aml/transactions/{id}` projects no label
+and a test asserts `is_laundering` is absent from the body; the backfill is two-phase, so every
+verdict exists before the label query runs at all.
+
+**Same bits, different epistemic position.** `is_fraud` is the SCORECARD — the recorded outcome of an
+act, and the whole forensic point is to be able to say "the belief was wrong here". `is_laundering`
+served on the interrogation surface would be the ANSWER KEY SHOWN DURING THE EXAM: CYCLE's honest
+75.4% precision (14 of 57 fires are benign) is only *meaningful* because the witness never saw the
+label; print the label beside the witness's work and a reader can no longer tell detection from
+lookup. **`catalog.py` and `schemas.py` are both on `test_oracle_boundary.DECIDING_PATH`, so the
+existing tripwire already guards this session's code for free** — naming the label in either fails
+the build. That is why G5 needed no new oracle guard, and it is why the corrected sentence is
+maintainable rather than aspirational.
+
+### DOCS WERE LYING ABOUT MORE THAN THE ORACLE — ARCHITECTURE never caught up with G2/G3/G4
+Checked README, ARCHITECTURE, DEMO for the flat claim, as instructed. The flat claim lived **only in
+ARCHITECTURE**, but going to look surfaced that **ARCHITECTURE and README both still described the
+seam as UNBUILT**, several sessions after it shipped:
+- **ARCHITECTURE mermaid, L49:** `D -. "the ONE seam (deferred)" .-> ATX` — a dotted, deferred edge
+  for a database-enforced FK carrying 1,500 rows. Now a solid, labelled `THE ONE SEAM (built, 0006)`.
+- **ARCHITECTURE L76:** "may *eventually* cite … (the 'one real seam', deferred)". Rewritten to the
+  built mechanism, including the FK-in-migration-not-ORM divergence and why.
+- **ARCHITECTURE L63:** "**no foreign key crosses** the moat / `aml_*` / corpus boundary **in either
+  direction**" — FALSE since 0006. Now states the ONE sanctioned crossing and the asymmetry rule
+  (*the moat may reference the evidence layer; the evidence layer may never reference the moat*),
+  which is what check #7 actually enforces.
+- **ARCHITECTURE L79-81:** the flat oracle claim. Replaced with the three-part statement above.
+- **README setup block:** `alembic upgrade head  # apply migrations 0001–0005`, `seed the genealogy
+  (24 agents, 1 belief, 8 inheritance edges)`, and a card backfill described as "optional" with **no
+  mention of `backfill_aml_decisions` at all**. This was an OPERATIONAL lie: following the README
+  verbatim leaves a world with no AML decisions. Corrected, with the two-backfill ordering and the
+  reason the order is not free.
+- **README "Next:"** still promised the grounding seam as future work. Now records it as built, and
+  says plainly what it earns (**provenance**) and what it does not (**justification** — the AML rot
+  curve is a base-rate artifact and does not exist).
+- **README file tree:** migrations stopped at 0005; `backfill_aml_decisions.py` absent.
+
+DEMO.md needed no change (its §1 was already corrected in the G3/G4 pre-push review, and its
+`is_laundering` mentions are all the sanctioned after-the-fact oracle column).
+README's honesty-ledger rows were each re-checked and are all still TRUE — **no ledger row was added,
+deliberately**: `HonestyLedger.tsx`'s docstring makes README the row-for-row source of truth, so a new
+row forces a lockstep frontend edit, and this session is scoped backend-only. Flagged, not taken.
+
+### G5 VERIFICATION GATE — all green
+- **144 backend tests pass** (130 prior + 14 new), ~4m09s. Every new guard was MADE TO TRIP with real
+  failure output: the index guard (real `FULL SCAN` plan in the message), the CHECK guard
+  (`DID NOT RAISE` under 0007), the tag-drift guard (names both sides), the OpenAPI guard (fails when
+  the 65.3% leaves the docstring).
+- `scripts/verify_aml_ingest.py` — **ALL CHECKS PASSED**. `aml_transactions` still 1,500: NOT
+  re-ingested, NOT re-sampled.
+- `ensure_demo_ready()` still provisions `demo` (24 agents / 2 beliefs / 15 edges / **0** `aml_*`
+  tables). 0008 targets defaultdb only; demo is untouched.
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green. **NO frontend change was
+  needed** — verified rather than assumed: the console renders `txn_ref` verbatim in two places, so
+  an added OPTIONAL field creates no lie (unlike G2's `formatAmount`, which had to move).
+- **Cluster restored and INDEPENDENTLY re-verified with real SELECTs** (not a script's echo): head
+  **0008**, 24 agents, 2 beliefs, 15 edges, **5,500** decisions (4,000 card / 1,500 AML), 8 crimson
+  perf windows, **0 azure perf windows**, 1,500 aml_transactions, `aml_instants = 1`, crimson curve
+  `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical, census 57/463/980 + 43/5/252 reproduced.
+- **The chain walked end-to-end over HTTP, and BACK** (in-process ASGI, which cannot be stale —
+  the G3/G4 orphaned-uvicorn lesson; `/openapi.json` was also asserted to carry `witness_outcome` and
+  the 65.3% before any result was trusted).
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(schema): migration 0008 — an access path for the reverse lookup, and a structural basis tag`
+- `refactor(seam): the basis-tag vocabulary gets one home in the decider`
+- `feat(api): the decision surface resolves a transaction back to the decision made about it`
+- `test(read): the reverse lookup, the census, and the guard that keeps the 65.3% alive`
+- `fix(test): 0008 sprang G2's own trap — the seam probes must satisfy the CHECK under test`
+- `docs(architecture): the seam is BUILT, and the flat "answer key" claim was false`
+- `docs(readme): the two-backfill order, migrations to 0008, and the seam is no longer "next"`
+- `docs(notes): record G5 — the read surface, and the oracle boundary restated precisely`
+
+### G5 explicitly NOT done (still gated): the AML CONSOLE (the frontend that would render any of
+### this — its own plan-gated session, per every prior backend item); a ledger row for the oracle
+### boundary (forces a lockstep HonestyLedger.tsx edit — flagged, not taken); `belief_performance`
+### for the azure belief (step 4 stays CUT — re-read THE BASE-RATE MIRAGE before re-proposing it);
+### any certificate change; a `verdicts` table; a "does the record still reproduce?" surface (the
+### real future capability the record-vs-re-derivation split implies — NOT built, deliberately);
+### the regulatory corpus; any re-ingestion of `aml_*`; any LLM on the deciding path.
+### Do NOT push without explicit approval — held for review of the result.
