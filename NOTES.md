@@ -3805,3 +3805,227 @@ GAP".
 ### (REAL, deferred, own plan-gate). The regulatory corpus; the AML console; the recorded video; the
 ### decisions.aml_transaction_id seam; a second belief; a `verdicts` table; any change to the five
 ### tables / aml_* / typology_corpus. Do NOT push without explicit approval.
+
+## The staleness-uncertainty item — the last real gap, closed (2026-07-12)
+
+Not a roadmap letter. This item exists because the project found it **in itself**: Item C's
+investigation surfaced it while cutting Item C, and Item D's investigation sharpened it while
+cutting Item D. Both cut entries defer to it by name. Delivered: the numbers justifying the single
+irreversible governed write now carry their sample size and their 95% interval, computed by the
+endpoint and the certifier Lambda through ONE shared function. Certificate schema **1.1 -> 1.2,
+additive only**. **NO migration, NO new table, NO change to the five-table moat**, and
+`performance.py` was not touched. 118 tests pass (99 prior + 19 new), Lambda redeployed and both
+tri-state branches verified live on real AWS.
+
+### THE GAP, restated as it was verified (not re-derived from the prior entries)
+Every quantitative claim in Lineage carried its uncertainty EXCEPT the staleness numbers — and
+those are the ones a supervisor acts on. `belief_performance` persists `confidence` /
+`false_positive_rate` / `frauds_approved` and **no denominator**, so `confidence_now: 0.528` sat in
+a hash-covered document as a bare point estimate: a reader could not tell whether it summarized 250
+samples or 5. It is really **0.528, 95% CI [0.466, 0.589]** — a band 12 points wide.
+
+### THE N-SOURCE DECISION: (b) re-aggregate from `decisions`. (a) is STRICTLY MORE WORK, not just more.
+Two candidates were weighed: (a) add a denominator column to `belief_performance` — the first
+five-table moat change since Phase 1; or (b) re-aggregate `n` at read time. **(b), and the argument
+is not merely "cheaper".**
+- **(a) CONTAINS (b).** Backfilling a new denominator column onto existing rows would itself have to
+  re-aggregate from `decisions`. So (a) is (b) plus a migration.
+- **A stored `n` is also WEAKER.** It cannot tell you whether the persisted `confidence` has gone
+  stale relative to the decisions it was derived from. The re-aggregation can, because the same
+  query that yields `n` also yields `correct` — see the tri-state below.
+- Item B's precedent applies exactly: a deterministic aggregate over immutable columns, no new
+  persisted state. Item C's own investigation had already computed every CI this way.
+- **`performance.py` therefore needs NO CHANGE AT ALL.** It already returns `n` in its in-memory
+  report dict; it simply never persisted it, and now nothing needs it to.
+
+**The load-bearing SQL detail:** the window BOUNDS come from the persisted `belief_performance`
+rows, not from `generation_windows()`. That is what lets the Lambda — which **cannot** import
+`app.sim.transactions` — run the identical aggregate. Verified on the live cluster: the join plans
+as a lookup join on `decisions@ix_decisions_belief_time`, the `(driving_belief_id, decided_at)`
+index migration 0002 created for exactly this per-window aggregation. Not a scan.
+
+**(b)'s ONE real weakness, stated rather than glossed:** (a) would be immune to a retention-pruning
+scenario that (b) is not — prune `decisions` while keeping `belief_performance` and the denominator
+collapses. Three things bound it, and none of them is "it won't happen": no table here has a
+retention policy; the only writer is the backfill, which rewrites `decisions` and
+`belief_performance` together; and — decisively — **once the interval is inside the certificate it
+is hash-covered and self-contained**, so pruning could only affect FUTURE certificates, never an
+already-issued document (the same self-containment argument the post-audit `pre_invalidation_state`
+fix rests on). And the degradation is graceful: `n = 0` yields `unavailable`, never a wrong number.
+
+### ============ THE LOCKSTEP RESOLUTION — READ THIS BEFORE "FIXING" ANYTHING HERE ============
+
+**A future session WILL be tempted to add a `staleness_verification: agreed` block to the
+certificate, by analogy with `closure_verification`. That would be WRONG, and the analogy is what
+makes it wrong.** This entry preempts it explicitly, the way Item D's entry preempts a future
+per-hop confidence metric.
+
+**Item 6's rule — "hash-coverage proves a document has not CHANGED; it can never prove the document
+was TRUE" — is a rule about CLAIMS ABOUT THE WORLD.** The closure hash asserts *"the world at
+`snapshot_hlc` was this."* The certifier re-derives it because **an INDEPENDENT ORACLE exists**:
+CockroachDB's own MVCC history, replayed `AS OF SYSTEM TIME` on separate compute, in a different
+language's driver stack. Two reads, one world, one hash to compare. That is a real check.
+
+**A confidence interval is not a claim about the world.** It is `wilson_ci(k, n)` — pure arithmetic,
+no I/O, nothing to corroborate. Two independent implementations of Wilson agreeing would prove only
+that two parties can do algebra. The thing that CAN be wrong is the **READ** `(k, n)` — and for
+staleness **there is NO oracle to re-derive against.** Item 6 established this and it is still true
+in the source: BOTH halves read `belief_performance` at **CURRENT COMMITTED STATE** (never AOST —
+the Lambda's perf read sits in its `autocommit=True` block, outside the AOST txn), so, in Item 6's
+own words, *"neither is a check on the other."* Re-aggregating `n` from `decisions` does not change
+that; both halves still read current state. **A `staleness_verification: agreed` block would
+therefore FABRICATE THE APPEARANCE of the closure hash's hard-won guarantee while proving nothing** —
+the same "every field true, juxtaposition fabricated" move Item 6 refused when it rejected reading
+(b), and the same move `aml_graph.py` refuses when it declines to read `aml_pattern_members`.
+
+**So: does the Lambda "simply carry" the endpoint's interval instead?** It structurally CANNOT. The
+endpoint and the Lambda each build their **OWN** certificate for the same invalidation (Item 6's
+deferred finding: there is no single canonical certificate per invalidation). The Lambda never sees
+the endpoint's `staleness_evidence`. It builds its own from its own query.
+
+**What DOES apply, with full force, is the SHARED-CANONICALIZER obligation.** If the Wilson formula,
+the window shape, and the support criterion were implemented twice, the interval on the endpoint's
+certificate and the interval on the Lambda's certificate **for the same event** would silently drift
+apart — the exact false guarantee that forced `canonical_json`/`closure_world` into `certificate.py`.
+So the statistics live THERE (already import-safe with zero app deps, which is why the Lambda can
+reach them at all), and each half supplies only its own `(k, n)`.
+
+**Not a cross-check. A shared computation. The distinction is the whole point.**
+`tests/test_staleness_uncertainty.py::test_the_lambda_does_not_grow_its_own_statistics` asserts the
+sharing AND documents in its own docstring that it deliberately does NOT assert a comparison.
+
+**The SQL text is NOT shared, and that follows Item 6's precedent rather than departing from it.**
+`:b` (SQLAlchemy) vs `%(belief_id)s` (psycopg) cannot be one string. Item 6 did not share
+`_BELIEF_SQL`/`_CLOSURE_SQL` either — it shared the DICT SHAPE (`closure_world`) and the DIGEST, and
+added a test asserting both SELECTs project the same column sets. Same here:
+`certificate.STALENESS_COLUMNS` is the contract, and
+`test_both_halves_staleness_selects_project_the_same_columns` mirrors
+`test_certifier_closure_verification`'s guard exactly.
+
+### THE THIN-WINDOW GUARD — and the DEFECT the first design shipped into a test
+
+`performance.py` writes a row for any `n >= 1`. It **still does, and should**: refusing to persist a
+measured window would be the first time this project DELETED a real measurement, and would make the
+curve lie by omission (the "first vs last window" reading would silently skip a window that existed).
+The row is true. What was missing was its PRECISION, not its right to exist. **There is no
+minimum-n gate anywhere** — that would repeat Item 4's rejected `MARGIN_FLOOR`: a threshold with no
+principled derivation, withholding a real finding for a reason with no bearing on the question.
+
+The approved plan said the support criterion would be **disjoint 95% Wilson intervals**, with a note
+that non-overlap is conservative (stricter than a two-proportion test). **That note is FALSE at
+extreme small n, and the criterion fails OPEN exactly where the thin-window guard is supposed to
+bite. Caught by the test written to prove it worked:**
+- A final window of **n=1, k=0** gives Wilson **[0.000, 0.793]**.
+- A healthy first window is **[0.884, 0.951]**.
+- **Those are DISJOINT** — so a non-overlap rule reports **"measured decay SUPPORTED" off a SINGLE
+  decision.**
+- **Fisher's exact p for that table is 0.080.** Observing one wrong call when the true rate is 0.924
+  happens 7.6% of the time; "same rate" cannot be rejected at all.
+
+The textbook property (disjoint CIs => the rates really differ) holds for **symmetric
+normal-approximation** intervals. **Wilson intervals at extreme small n break it.** The criterion is
+therefore a two-sided **FISHER EXACT** test on first-vs-last window, at the same 95% already carried
+by the intervals (not a second hand-tuned knob), **AND** requiring the movement to be downward (a
+belief that got significantly BETTER must not hand a certificate evidence for killing it). Fisher is
+exact at every n, so the thin window disqualifies ITSELF — which is what the non-overlap rule only
+*appeared* to do.
+- `test_interval_non_overlap_would_have_called_that_one_sample_window_a_supported_decay` **pins the
+  DEFECT, not the behaviour**, so nobody "simplifies" the criterion back to comparing the intervals.
+- The Wilson intervals are still what the READER is shown; Fisher is what the DOCUMENT is willing to
+  assert. Different jobs; the block reports both.
+
+### THE TRI-STATE (`uncertainty.sample_agreement`) — the one new failure mode (b) introduces, closed
+Re-aggregating `n` fresh while `confidence` stays persisted creates a way to be confidently wrong:
+pair a FRESH denominator with a STALE point estimate. So the aggregate selects `correct` as well and
+the block re-derives the confidence:
+- **`agreed`** — every window's `correct/n` reproduces its persisted `confidence`. Intervals emitted.
+- **`disagreed`** — a persisted confidence does NOT reproduce; `belief_performance` is stale w.r.t.
+  `decisions`. **Intervals WITHHELD** (the point estimates and the true counts still stand).
+- **`unavailable`** — a window has no decisions to aggregate. Withheld, never faked.
+House style throughout: the brake's `INSUFFICIENT_COVERAGE`, the certifier's
+`unavailable`-is-never-a-pass, the provenance audit's `INCONCLUSIVE`.
+
+### NOT given an interval: `false_positive_rate`
+Structurally 0 in every window because this belief **only ever approves** (its failure mode is
+approving fraud — false negatives — never false positives; NOTES Phase 2 says so). An interval there
+would dress a **structural impossibility** as an uncertain estimate. It also has a DIFFERENT
+denominator (legit rows, not all rows) — the three-denominators discipline says keep them apart.
+`test_false_positive_rate_has_no_interval` pins it.
+
+### THE REAL NUMBERS (live cluster, after `seed.backfill_decisions`; reproduce byte-for-byte)
+```
+ w    conf     n   Wilson 95% CI    width   fr_appr
+ 0   0.924   250   [0.884, 0.951]   0.066        19
+ 1   0.952   250   [0.918, 0.972]   0.054        12
+ 2   0.876   250   [0.829, 0.911]   0.082        31
+ 3   0.852   250   [0.803, 0.891]   0.088        37
+ 4   0.724   250   [0.666, 0.776]   0.110        69
+ 5   0.556   250   [0.494, 0.616]   0.122       111
+ 6   0.624   250   [0.563, 0.682]   0.119        94
+ 7   0.528   250   [0.466, 0.589]   0.123       118
+```
+- **when formed 0.924 [0.884, 0.951] n=250 -> present day 0.528 [0.466, 0.589] n=250.**
+- `sample_agreement: agreed`, `decay_supported: true`, **Fisher exact p = 1.56e-24** (consistent with
+  Item C's z = -9.93 for the same comparison).
+- The per-HOLDER n range Item D surfaced (74-250, crimson-5b at 74) is **now derivable** from the
+  same aggregate — but nothing slices by holder, so nothing exposes it. **Item D is still CUT**: the
+  gap it named is closed at the WINDOW level, and its per-holder confidence metric remains
+  meaningless for the four reasons in its own entry. Do not read this item as reviving D.
+
+### VERIFIED LIVE ON REAL AWS (the Phase-3 "real invocation" standard, both branches)
+`build.py -> deploy.py -> demo_certifier.py`. The redeploy was clean (`state=Active
+last=Successful`) — Item 6's `Architectures=["x86_64"]` create-only-parameter bug stayed fixed.
+- **Scenario A** (invalidate via the SERVICE, no counterparty cert): `closure_hash_agreement:
+  unavailable` + `staleness_sample_agreement: agreed`. **The two tri-states are INDEPENDENT and this
+  scenario proves it** — a missing counterparty for the closure hash says nothing about whether the
+  staleness read is internally consistent.
+- **Scenario B** (invalidate via `POST /beliefs/{id}/invalidate`): `closure_hash_agreement: agreed`,
+  `staleness_sample_agreement: agreed`, `decay_supported: true` (Fisher p = 2.75e-30 on the demo's
+  2-window curve, n=200), cert re-fetched from S3 and sha256 re-verified.
+- **The closure hash is UNCHANGED** at `sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff`
+  — Item 6's exact recorded value. That is the *confirmation* that `staleness_evidence` sits OUTSIDE
+  the cross-checked closure hash, precisely as Item 6 documented.
+
+### SCHEMA 1.1 -> 1.2 IS ADDITIVE — proven empirically, not just structurally
+`_digest` hashes every key except `content_hash`, and `verify()` re-derives over the same set with
+**no version branch**, so a document is always checked against the keys IT carries. The decisive
+evidence was already in S3, from the 1.0 -> 1.1 bump having run this exact experiment: **117
+certificate objects, 66 at schema 1.0 and 51 at 1.1, and ALL 117 verify under current code.** Hard
+constraint honoured: **add siblings, never reshape**. `confidence_now` stays a bare float and gains
+`confidence_now_ci_low`/`_ci_high`/`_sample_size`. Reshaping it into `{point, lo, hi}` would not
+break `verify()` — which is exactly why `test_confidence_now_is_still_a_bare_float` exists.
+
+### Mechanics / gotchas
+- `GET /beliefs/{id}/performance` reads through `certificate._STALENESS_SQL` + `staleness_evidence`
+  ON PURPOSE. The console and the hash-covered certificate must never be able to state different
+  intervals for the same belief. One instrument, two consumers — the same call Item E made when it
+  shared the GEval rubric between the live guard and the offline eval.
+- `scripts/eval_detection.py` keeps its OWN `wilson_ci` **deliberately**: it is app-free by design
+  (`tests/test_eval_detection.py` imports it with zero app imports) and its intervals are never
+  compared against, nor printed in the same artifact as, these. **Do not "unify" them** — that would
+  couple the eval to the app package for no guarantee.
+- **CLUSTER RACE, hit live this session:** mid-investigation `decisions` went 400 -> 0 between two
+  probes. Cause: a **CI run reseeding `defaultdb`** (S3 certificate timestamps ran right up to the
+  minute — `test_atomic_invalidation` writes real certs to real S3). No local pytest was running.
+  This is the documented CI-vs-LOCAL collision (Phase 4). Poll the cluster until it is stable before
+  backfilling; do not race CI.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(certificate): measured uncertainty on the staleness curve (schema 1.1 -> 1.2)`
+- `feat(certifier): the Lambda reads sample sizes and uses the shared staleness builder`
+- `feat(api): GET /beliefs/{id}/performance carries sample sizes + Wilson intervals`
+- `test(staleness): hermetic uncertainty tests + the two halves' column-set parity`
+- `feat(certifier): the demo prints the staleness interval, not two bare floats`
+- `docs(readme): the staleness curve now carries its uncertainty`
+- `fix(frontend): add the staleness-uncertainty ledger rows, in step with the README`
+- `docs(notes): record the staleness-uncertainty item` (this entry)
+
+### Explicitly NOT done (still gated): the FRONTEND Time-travel sparkline rendering the band (its own
+### plan-gate, per every prior backend item's precedent — the API now serves the data; that session
+### must also extend `BeliefPerformanceWindow` in `frontend/src/api/types.ts`); any per-HOLDER
+### confidence surface (Item D is CUT — re-read its entry; this item does not revive it); a
+### `staleness_verification` cross-check (REFUSED — see the lockstep section; this is not an
+### oversight); an interval on `false_positive_rate` (refused, structurally 0); the regulatory
+### corpus; the AML console; the recorded video; the decisions.aml_transaction_id seam; a second
+### belief; a `verdicts` table; any change to the five tables / aml_* / typology_corpus.
+### Do NOT push without explicit approval — held for review of the result.
