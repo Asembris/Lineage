@@ -4501,12 +4501,20 @@ this by using the real transaction timestamp.
 `decisions`**. So the card backfill DESTROYS the AML decisions, and an AML backfill that reseeded
 would destroy the card ones. They are not interchangeable and their order is not free.
 
-**RESTORE PROCEDURE — TWO ORDERED COMMANDS:**
+**RESTORE PROCEDURE — THREE ORDERED COMMANDS:**
 ```
 python -m seed.backfill_decisions           # reseeds, then 4,000 card decisions + 8 perf windows
 python -m seed.backfill_aml_decisions       # APPENDS 1,500 AML decisions. NEVER reseeds.
-python -m scripts.embed_beliefs aml-cycle   # optional: a real vector for the azure belief
+python -m scripts.embed_beliefs aml-cycle   # the reseed re-plants the PLACEHOLDER; this restores
+                                            # the azure belief's REAL vector. Not optional.
 ```
+> **G6 AMENDMENT.** This block said *"TWO ORDERED COMMANDS"* while listing three, and marked the
+> third **"optional"**. It is not optional: `seed.seed()` re-plants the placeholder embedding on
+> every reseed, so skipping it leaves the azure belief on a placeholder vector while README's
+> honesty-ledger row asserts it carries a **real** one. Same procedure now appears in README's
+> setup block, DEMO's pre-flight, and DEMO's reset note — **there is exactly one way to build this
+> world, and all four sites say the same three commands.** See *RESTORE INSTRUCTIONS HAVE NOW LIED
+> TWICE* (it was three).
 `backfill_aml_decisions` **REFUSES TO RUN** (loudly, **exit code 1**, verified) if the card backfill
 has not run — rather than silently producing a half-populated world, the failure mode hardest to
 notice and easiest to demo by accident.
@@ -5338,15 +5346,36 @@ existing practice, made mandatory instead of optional.**
 ### Commits (Conventional Commits, each its own; on main; held for review before push)
 - `docs(notes): consensus among documents is not evidence — only running the check is`
 
-## ====== RESTORE INSTRUCTIONS HAVE NOW LIED TWICE. THIS IS A HAZARD CLASS. (2026-07-12, G6) ======
+## ====== RESTORE INSTRUCTIONS HAVE NOW LIED **THREE TIMES**. THIS IS A HAZARD CLASS. (2026-07-12, G6) ======
 
 **Any instruction that tells a human how to REBUILD THE WORLD is a piece of executable code that
-lives in prose, and this project has now shipped a broken one twice.**
+lives in prose, and this project has now shipped a broken one three times.**
+
+> **THE THIRD WAS FOUND BY THE SWEEP THIS ENTRY DEMANDED, AND THAT IS THE ENTRY EARNING ITS KEEP.**
+> The original version of this section said *"twice"*, listed the two known sites, and prescribed
+> the rule *"grep for the SHAPE, not the sentence."* Doing exactly that — one `grep` for every
+> invocation of `seed.seed` / `backfill_decisions` / `backfill_aml_decisions` / `embed_beliefs` /
+> `alembic upgrade` / `run_seed` across all six documents — **immediately turned up a third, in the
+> honesty ledger.** A localized fix does not fix the class. **Sweeping does.**
 
 | # | where | what it said | what it would actually do |
 |---|---|---|---|
 | 1 | **README setup block** (found in G5) | `alembic upgrade head  # apply migrations 0001–0005`; seed "1 belief, 8 edges"; the card backfill "optional"; `backfill_aml_decisions` **not mentioned at all** | Followed verbatim: a world with **no seam**. No AML decisions, ever. |
 | 2 | **DEMO.md production reset note** (found in G6) | *"Between takes, restore with:"* → **`python -m seed.backfill_decisions`**, one command, described as restoring "24 agents, belief back to active, 8 inheritance edges" | `backfill_decisions` **opens with `run_seed()`** (`backfill_decisions.py:124`), and `seed.seed()` **DELETEs every row of `decisions`**. Followed verbatim it **DESTROYS all 1,500 AML decisions** and leaves the operator with a card-only world, a dead seam, a `—` in the honesty ledger's live census row, and no idea why. |
+| 3 | **The HONESTY LEDGER itself** — README's `decisions` / `belief_performance` row **and the same row rendered live in the running console** (`HonestyLedger.tsx`) (found by the G6 sweep) | *"A deterministic `python -m seed.backfill_decisions` repopulates 4,000 rows + 8 windows."* | **The same destructive command, presented as the way to repopulate the world — in the one surface whose entire job is to be trustworthy.** And it sits **two rows below the grounding-seam census row it would destroy**: follow it and the row above degrades to `—`, in the very view a judge opens to check whether this project tells the truth about itself. |
+
+**SITE 3 IS THE WORST OF THE THREE, and it is not close.** Sites 1 and 2 are setup docs. Site 3 is
+**the credibility surface**, it is **rendered in the product**, and its damage is **visible in the
+adjacent row** — the seam census going to `—` is exactly what a reader would see, and they would have
+no way to know the ledger's own instruction had caused it. *A ledger that tells you to destroy the
+thing it is vouching for.*
+
+**AND IT IS A REPEAT OF A KNOWN LESSON.** The previous session's entry — *"THE LEDGER'S LIVE ROWS
+SURVIVE SCHEMA CHANGE. ITS STATIC ROWS ROT"* — concluded exactly this: the row's **live value** was
+correct the whole time; **the static prose in its own note** was the thing that lied. It happened
+again, in the same component, in the same class of note, one session later. **The rule stands and it
+is now proven twice on itself:** anything in a ledger note that is not read from the cluster is prose,
+and prose rots at the speed the schema moves.
 
 **#2 IS THE WORSE OF THE TWO, AND THE PLACEMENT IS WHY.** The README block is run once, carefully,
 by someone setting up. The reset note is run **repeatedly, under time pressure, between takes**, by
@@ -5370,6 +5399,35 @@ cluster and tabulated each line's real result ("The corrected README was EXECUTE
 written"). **G6 does the same for the corrected DEMO procedure** — see the G6 verification gate.
 Both fixes were found the same way every real defect in this project is found: by going and looking
 at what the command actually does, rather than at what the paragraph says it does.
+
+### THE SWEEP — EVERY SITE IN EVERY DOC, AND ITS VERDICT (G6; re-run this grep, do not trust this table)
+```
+grep -nE 'seed\.seed|backfill_decisions|backfill_aml_decisions|embed_beliefs|alembic upgrade|run_seed' \
+     README.md ARCHITECTURE.md DEMO.md NOTES.md FRONTEND.md CLAUDE.md
+```
+An **INSTRUCTION** tells a reader to rebuild the world and must be correct AND complete. A
+**REFERENCE** describes the machinery or records history and is judged only on truth.
+
+| doc | site | kind | verdict |
+|---|---|---|---|
+| README | Getting started, setup block | **INSTRUCTION** | ✅ correct — three ordered commands. *(G6: `embed_beliefs` was marked **"optional"**; it is not — the reseed re-plants the placeholder, so skipping it makes the ledger's "azure: real" row FALSE. Fixed.)* |
+| README | honesty ledger, `decisions`/`belief_performance` row | **INSTRUCTION** | ❌ **WAS WRONG — SITE 3.** Fixed. |
+| README | honesty ledger, embedding row | REFERENCE | ✅ true (`seed.seed()` re-plants the placeholder — that is exactly why the third command exists) |
+| README | project tree | REFERENCE | ✅ true |
+| ARCHITECTURE | §6 (`seed.seed` / `spawn_child` are the two writers) | REFERENCE | ✅ true |
+| ARCHITECTURE | §7 (`backfill_aml_decisions.py:112` = `DECIDED_AT`) | REFERENCE | ✅ true (line checked) |
+| DEMO | pre-flight | **INSTRUCTION** | ✅ correct — three ordered commands (G6) |
+| DEMO | production reset note | **INSTRUCTION** | ✅ correct — three ordered commands (G6; **was site 2**) |
+| DEMO | build-time verification log row | REFERENCE | ✅ true — a record of what was run on 2026-07-11, before the seam existed. History, not an instruction. |
+| NOTES | G3/G4 "RESTORE PROCEDURE" block | **INSTRUCTION** | ⚠️ header said *"TWO ORDERED COMMANDS"* while listing **three**, third marked "optional". Amended in place. |
+| NOTES | G5 "the corrected README was EXECUTED" table | REFERENCE | ✅ true — an execution record |
+| NOTES | ~30 other hits | REFERENCE | ✅ engineering-log history; **deliberately not rewritten** |
+| **FRONTEND.md** | — | — | **zero hits** |
+| **CLAUDE.md** | — | — | **zero hits** |
+| **`HonestyLedger.tsx`** | `decisions`/`belief_performance` note | **INSTRUCTION, RENDERED IN THE PRODUCT** | ❌ **WAS WRONG — SITE 3's other half.** Moved in lockstep. |
+
+**Four INSTRUCTION sites now exist and all four say the same three commands.** That is the invariant
+to preserve: *there is exactly one way to build this world.* A fifth site is a bug.
 
 ### THE STRUCTURAL HALF (because prose corrections demonstrably do not stick)
 `backfill_aml_decisions` already **refuses to run** (exit 1, naming both commands in order) if the
