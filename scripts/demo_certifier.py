@@ -92,9 +92,38 @@ async def _verify_s3(payload: dict, audit_id) -> dict:
     print(f"[verify] hash matches Lambda's       : {fetched['content_hash'] == payload['content_hash']}")
     print(f"[verify] aost_verification block     : {json.dumps(fetched['aost_verification'])}")
     print(f"[verify] issued_by                   : {fetched['issued_by']}")
-    print(f"[verify] staleness conf {fetched['staleness_evidence'].get('confidence_when_formed')}"
-          f" -> {fetched['staleness_evidence'].get('confidence_now')}, "
-          f"frauds_last={fetched['staleness_evidence'].get('frauds_approved_last_window')}")
+
+    # The staleness evidence, WITH the uncertainty behind it (schema 1.2). Printed as an
+    # interval rather than two bare floats, because two bare floats are exactly what this item
+    # existed to fix: a reader could not tell whether confidence_now summarized 250 samples or 5.
+    se = fetched["staleness_evidence"]
+    if se.get("available"):
+        u = se.get("uncertainty") or {}
+        lo0, hi0 = se.get("confidence_when_formed_ci_low"), se.get("confidence_when_formed_ci_high")
+        lo1, hi1 = se.get("confidence_now_ci_low"), se.get("confidence_now_ci_high")
+        fmt = lambda v: "null" if v is None else f"{v:.3f}"  # noqa: E731
+        print(f"\n[staleness] when formed : {se['confidence_when_formed']:.3f}  "
+              f"95% CI [{fmt(lo0)}, {fmt(hi0)}]  n={se.get('confidence_when_formed_sample_size')}")
+        print(f"[staleness] present day : {se['confidence_now']:.3f}  "
+              f"95% CI [{fmt(lo1)}, {fmt(hi1)}]  n={se.get('confidence_now_sample_size')}")
+        print(f"[staleness] frauds approved, last window: "
+              f"{se.get('frauds_approved_last_window')}")
+        # The SECOND tri-state (distinct from the closure one below): does each persisted
+        # confidence still reproduce from the decisions it claims to summarize?
+        print(f"[staleness] sample_agreement = {u.get('sample_agreement')}  "
+              f"(source: {u.get('sample_source')})")
+        if u.get("sample_agreement") != "agreed":
+            print("[staleness]  -> the intervals are WITHHELD. A fresh denominator on a stale "
+                  "point estimate\n[staleness]     would be a confidently wrong number.")
+        p = u.get("decay_p_value")
+        print(f"[staleness] decay_supported  = {u.get('decay_supported')}"
+              + (f"  (Fisher exact p = {p:.3g})" if p is not None else "")
+              + f"\n[staleness]   criterion: {u.get('decay_support_criterion')}")
+        if u.get("decay_supported") is False:
+            print("[staleness]  -> the certificate does NOT assert a measured decay. The curve is "
+                  "shown;\n[staleness]     the conclusion is not, because the data does not carry it.")
+    else:
+        print("[staleness] no measured windows for this belief (available=false)")
 
     # The Item-6 verdict, stated as a headline rather than left as one key among eight. A
     # 'disagreed' certificate is otherwise easy to miss: the Lambda still stamps
