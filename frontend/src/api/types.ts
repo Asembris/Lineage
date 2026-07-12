@@ -106,6 +106,8 @@ export interface LineageResponse {
  *   amount_currency — null for CARD rows: the Phase-2 simulator never declared a currency.
  *                     AML rows carry their real one (the extract spans 14, not just dollars).
  */
+export type WitnessOutcome = "MATCH" | "CONCLUSIVE_NO" | "INCONCLUSIVE";
+
 export interface Decision {
   id: UUID;
   agent_id: UUID;
@@ -119,6 +121,17 @@ export interface Decision {
   decided_at: ISODateTime;
   is_fraud: boolean;
   aml_transaction_id: UUID | null;
+  /* THE BASIS of an AML decision; null for a card decision.
+   *
+   * READ THIS BEFORE COUNTING AN AML `approve`. Two different witness outcomes both map to
+   * `approve` and `verdict` alone CANNOT tell them apart:
+   *   CONCLUSIVE_NO — the search closed inside the extract; there is no cycle.   (463 edges)
+   *   INCONCLUSIVE  — the search ran off the edge of the 1,500-edge extract and
+   *                   COULD NOT DETERMINE.                (980 edges = 65.3%, 252 laundering)
+   * So 980 of the belief's 1,443 approvals are not "this is clean" — they are "we could not
+   * tell". That is a disclosed modeling choice, not a corner case. A PROJECTION of the persisted
+   * `txn_ref`, i.e. what the agent RECORDED, never a fresh re-run of the witness. */
+  witness_outcome: WitnessOutcome | null;
 }
 
 export interface DecisionListResponse {
@@ -127,6 +140,11 @@ export interface DecisionListResponse {
   limit: number;
   offset: number;
   agent_id: UUID | null;
+  aml_transaction_id: UUID | null;
+  driving_belief_id: UUID | null;
+  kind: "aml" | "card" | null;
+  witness_outcome: WitnessOutcome | null;
+  is_fraud: boolean | null;
 }
 
 /** The self-contained pre-kill record (PreInvalidationState) — captured inside the
