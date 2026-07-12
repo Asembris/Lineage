@@ -478,9 +478,22 @@ internal engineering-log labels; they index into [NOTES.md](NOTES.md) and mean n
 | **The explanation-faithfulness guard** *(E)* | Live, fail-closed check that withholds any rationale asserting more than the rows support |
 | **The hero demo storyboard** *(F)* | Two-act walkthrough, every beat tagged LIVE / FRESH / HISTORICAL — see **[DEMO.md](DEMO.md)** |
 | **Measured uncertainty on the staleness curve** | The numbers justifying the one irreversible write now carry their sample size and 95% Wilson interval — certificate schema 1.2, computed by the endpoint and the certifier Lambda through one shared function |
+| **The grounding seam** *(G)* | **The first time any decision in this system cites real external evidence.** azure-0 forms a laundering belief → inherited down 7 real edges → the *living* azure-7 applies it to **1,500 real IBM money-flow edges** → each decision cites the real row it ruled on through a **database-enforced FK** → `is_fraud` comes from the real `is_laundering`, a label the deciding rule never saw. Every link is a real row, and the chain resolves in **both** directions. Migrations 0006–0008; the label-free decider (`aml_seam.py`); the AST tripwire that pins the oracle boundary in Python *and* in raw SQL. **It earns the *provenance* half of a single causal chain and refuses the *justification* half** — see the limitation below |
 
 Also complete: Phases 1–3 (the belief-inheritance spine, agents, and the money-shots), Phase 4
 hardening, and the full React console (Frontend Phases 1–6).
+
+> **The seam's honest limit, stated where the capability is claimed.** A rot story on this belief
+> would need a measured staleness curve on AML outcomes. **We built the seam, measured for that
+> curve, and refused to ship it.** Windowing these decisions by transaction time produces a
+> spectacular `0.974 → 0.000` decay (Cochran-Armitage z = −24.90) that is **100% an artifact of the
+> ingestion sample** — 91% of the benign rows land on day one. Base-rate-free measures show the
+> belief's discriminative power is **flat** (per-window recall 1.000 throughout). **The belief is
+> imperfect, not stale**, so `belief_performance` is deliberately never computed for it, and every
+> AML decision carries one fixed `decided_at` so the fake curve is *unrepresentable* rather than
+> merely discouraged. Its real failure modes are the **65.3% could-not-determine** coverage gap and a
+> **constant ~25% false-positive rate** — both disclosed in the [ledger](#honesty-ledger), neither
+> improving with time. [NOTES.md](NOTES.md) → *THE BASE-RATE MIRAGE*.
 
 ### Investigated and cut
 
@@ -493,14 +506,8 @@ not a gap.
 | **Confidence propagation through the inheritance chain** *(D)* | **CUT — nothing propagates.** Same conditional gate as C, and it fails for a **different reason, which is the finding.** The belief is **one immutable row**: `belief_inheritance` has no confidence or weight column and `belief_performance` has no `agent_id`, so the only quantity that varies per hop is a **timestamp**. Looking up its window is a *join*, not a propagation — no hop transforms anything, so uncertainty lives on the windows (shared by every holder), never on the edges. **D passes C's generator-lookup test and is still meaningless:** *computable, generator-free, and meaningless.* Proven, not argued — in a world with **zero decay** (every window pinned at 0.924) the compounded number still reports the 7-hop holder as **15% more degraded** than the 5-hop one: it measures **path length, not health**. And the two agents who share window 5 have **identical true reliability by construction**, yet differ by 0.137 at **p = 0.046** — the shipped data realizes the one-in-twenty false positive that any per-holder confidence metric would inherit. The two living holders are **statistically indistinguishable** (0.528 vs 0.459, p = 0.30). Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item D*. |
 
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
-chunking), an AML console surface, the recorded demo video, and the Time-travel sparkline rendering
-the confidence band the API now serves.
-
-*(The `decisions.aml_transaction_id` grounding seam was listed here as future work and is now
-**built** — migration 0006, 1,500 grounded decisions, resolvable in both directions. It earns the
-**provenance** half of a single causal chain and not the **justification** half: the AML staleness
-curve a rot story would need is a base-rate artifact of the ingestion sample and does not exist.
-Measured, and refused rather than shipped — [NOTES.md](NOTES.md) → *THE BASE-RATE MIRAGE*.)*
+chunking), an AML console surface rendering the seam's decisions, the recorded demo video, and the
+Time-travel sparkline rendering the confidence band the API now serves.
 
 ---
 
