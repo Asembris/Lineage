@@ -436,6 +436,7 @@ not a gap.
 | Capability | Verdict |
 |---|---|
 | **Temporal drift / belief-decay detection** *(C)* | **CUT — the data does not support it.** The item was conditional (*"build only if the data supports a real signal — verify first, never decorative"*). It was verified first. **As detection it is a duplicate:** the decay is already computed from real outcomes, rendered as the full 8-window curve, embedded in the certificate, and made actionable by the counterfactual — and an automated "this belief is rotting" verdict over a population of **one** belief would return a constant, with two of its three states structurally unreachable. **As drift *characterization* it is refuted:** the curve's one non-monotonic feature, the gen-6 dip, is **not distinguishable from noise** (p = 0.12 at n=250/window), and the modeled campaign's true effect (+0.0227) is **smaller than the per-window noise SD (0.03)** — so it does not shrink with more data. A detector that named it correctly could only do so by reading the generator's own constants. Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item C*. |
+| **Confidence propagation through the inheritance chain** *(D)* | **CUT — nothing propagates.** Same conditional gate as C, and it fails for a **different reason, which is the finding.** The belief is **one immutable row**: `belief_inheritance` has no confidence or weight column and `belief_performance` has no `agent_id`, so the only quantity that varies per hop is a **timestamp**. Looking up its window is a *join*, not a propagation — no hop transforms anything, so uncertainty lives on the windows (shared by every holder), never on the edges. **D passes C's generator-lookup test and is still meaningless:** *computable, generator-free, and meaningless.* Proven, not argued — in a world with **zero decay** (every window pinned at 0.924) the compounded number still reports the 7-hop holder as **15% more degraded** than the 5-hop one: it measures **path length, not health**. And the two agents who share window 5 have **identical true reliability by construction**, yet differ by 0.137 at **p = 0.046** — the shipped data realizes the one-in-twenty false positive that any per-holder confidence metric would inherit. The two living holders are **statistically indistinguishable** (0.528 vs 0.459, p = 0.30). Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item D*. |
 
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
 chunking), the `decisions.aml_transaction_id` grounding seam that would join the two graphs into one
@@ -443,8 +444,11 @@ causal chain, an AML console surface, the recorded demo video — and **measured
 staleness curve**, the one place this project's own Wilson-CI discipline is not yet applied
 (`belief_performance` persists no sample size, so the certificate's `0.924 → 0.528` carries no
 interval; the real present-day figure is `0.528`, 95% CI `[0.466, 0.589]`). Latent rather than live —
-every window today holds exactly 250 decisions by construction — and scoped as its own plan-gated item
-because closing it moves the certificate schema and the certifier Lambda in lockstep.
+every *window* today holds exactly 250 decisions by construction — but latent by exactly one slice: the
+per-*holder* sample runs **74 to 250**, and the thinnest belongs to a **living** holder whose interval
+is **0.221 wide, more than half the entire decay signal it would be read against**. It is scoped as its
+own plan-gated item because closing it moves the certificate schema and the certifier Lambda in
+lockstep.
 
 ---
 
