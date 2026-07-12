@@ -250,8 +250,9 @@ export function Investigation({
       <section className="inspector__section inv__section">
         <div className="inv__decision">
           <div className="inv__decision-top">
-            <span className="inv__merchant">{d.merchant}</span>
-            <span className="inv__amount">{formatAmount(d.amount)}</span>
+            {/* null for AML decisions — see DecisionFeed. */}
+            <span className="inv__merchant">{d.merchant ?? "—"}</span>
+            <span className="inv__amount">{formatAmount(d.amount, d.amount_currency)}</span>
           </div>
           <div className="inv__decision-tags">
             <span className={`inv__verdict inv__verdict--${d.verdict}`}>{d.verdict}</span>

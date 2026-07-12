@@ -14,9 +14,24 @@ const USD = new Intl.NumberFormat("en-US", {
 
 const COUNT = new Intl.NumberFormat("en-US");
 
-/** "$1,742.05" — merchant amounts, mono, right-aligned in the feed. */
-export function formatAmount(amount: number): string {
-  return USD.format(amount);
+const DECIMAL = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/**
+ * "$1,742.05" for a card decision; "444.20 Euro" for an AML one.
+ *
+ * `currency` is null for Phase-2 card rows (dollars by construction) and carries the real IBM
+ * currency name for AML rows — the extract spans 14 of them, so formatting every amount as USD
+ * would print a Euro transfer with a dollar sign. IBM's names ("Euro", "Yuan", "Saudi Riyal") are
+ * NOT ISO 4217 codes, so they are appended verbatim rather than mapped through a lookup table we
+ * would have to invent.
+ */
+export function formatAmount(amount: number, currency?: string | null): string {
+  if (currency == null) return USD.format(amount);
+  if (currency === "US Dollar") return USD.format(amount);
+  return `${DECIMAL.format(amount)} ${currency}`;
 }
 
 /** "3,842" — thousands-separated counts for the header / fleet summary. */
@@ -24,8 +39,15 @@ export function formatCount(n: number): string {
   return COUNT.format(n);
 }
 
-/** Confidence as a fixed 2-decimal value ("0.95"); the raw model number. */
-export function formatConfidence(confidence: number): string {
+/**
+ * Confidence as a fixed 2-decimal value ("0.95"); the raw model number.
+ *
+ * Null for AML decisions — the structural witness is DETERMINISTIC (a witness either exists or it
+ * does not), so there is no confidence to report and none is invented. Rendered as an em dash so
+ * the absence is visible rather than silently shown as 0.00.
+ */
+export function formatConfidence(confidence: number | null): string {
+  if (confidence == null) return "—";
   return confidence.toFixed(2);
 }
 

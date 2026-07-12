@@ -64,8 +64,8 @@ async def list_decisions(
         page = (
             await conn.execute(
                 text(
-                    "SELECT id, agent_id, txn_ref, merchant, amount, verdict, "
-                    "driving_belief_id, confidence, decided_at, is_fraud "
+                    "SELECT id, agent_id, txn_ref, merchant, amount, amount_currency, verdict, "
+                    "driving_belief_id, confidence, decided_at, is_fraud, aml_transaction_id "
                     "FROM decisions" + where
                     + " ORDER BY decided_at DESC, id DESC LIMIT :limit OFFSET :offset"
                 ),
