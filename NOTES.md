@@ -4237,3 +4237,102 @@ console, the regulatory corpus, a `verdicts` table, any frontend wiring.
 ### write, no AML/corpus touch, no frontend, no LLM call. The seam's BUILD (migration 0006, the
 ### second belief, the grounded backfill) is phased separately and gated — see the G2/G3/G4 sections.
 ### Item 6's step 4 is CUT: do NOT re-propose it from the roadmap line; re-read this entry first.
+
+### G2 — the moat change, AS BUILT (2026-07-12). Migration 0006, applied to the live cluster.
+
+The FIRST five-table schema change since Phase 1. Four changes to `decisions`, and **every one of
+them is a refusal to fabricate**, not a convenience:
+
+| change | why |
+|--------|-----|
+| `aml_transaction_id UUID NULL` -> `aml_transactions(id)` | the seam. THE ONE permitted crossing edge. |
+| `merchant` DROP NOT NULL | a bank-to-bank transfer has no merchant. Item 4's "fake merchant", refused. |
+| `confidence` DROP NOT NULL | the witness is DETERMINISTIC. Item D already proved this column is `rng.uniform(0.80,0.95)` noise ("do not use this column for anything") — fabricating a value would add noise to a condemned column. |
+| `amount_currency TEXT NULL` | the extract spans **14 currencies** (US Dollar only 596/1500). A bare `Numeric` would mean a different thing per row. |
+
+Phase-2 rows are NOT backfilled with a currency. The simulator never declared one, and inferring
+"US Dollar" from the belief text's `$180` would manufacture a fact the data does not contain.
+**NULL means "this world had no currency concept", which is exactly true of the card world.**
+
+### THE FK IS IN THE MIGRATION AND *NOT* IN THE ORM — deliberate, load-bearing, do not "fix" it
+`app/models.py::Decision.aml_transaction_id` is a plain `Uuid` with **no `ForeignKey`**. The real,
+database-enforced FK exists in defaultdb and is created by migration 0006 alone. This buys BOTH
+guarantees at once:
+- defaultdb enforces CLAUDE.md's **"no dangling references"** in the DATABASE, not in the writer;
+- `Base.metadata` stays free of a dangling reference, so `Base.metadata.create_all` still works and
+  **Item 0's `demo` database still provisions.**
+
+Declaring the `ForeignKey` on the Base-mapped `Decision` raises `NoReferencedTableError` at
+`create_all` — the exact call `demo_db.ensure_demo_ready()` makes — which would break the `demo`
+database and the SSE consistency demo at runtime. This is the ONE place in the project where the
+ORM deliberately understates the schema.
+
+### THE THREE GUARDS, AND EACH WAS VERIFIED TO **TRIP** (a guard that cannot fail is theatre)
+`tests/test_grounding_seam.py` (4 tests). Each violation was actually introduced, watched fail, and
+reverted — the Item-E tripwire standard:
+1. **`test_no_base_foreign_key_escapes_base_metadata`** (hermetic). Re-declaring the `ForeignKey`
+   on `Decision` fails it at the assertion, naming `decisions.aml_transaction_id ->
+   aml_transactions.id`; `create_all` then raises `NoReferencedTableError`. **This is the guard that
+   fires when a future session "fixes" the model.**
+2. **`test_defaultdb_has_the_real_foreign_key`** (live). Dropping the constraint fails it — because
+   the ORM omits the FK, the migration is the ONLY thing enforcing it, so its silent absence would
+   convert a database guarantee into a writer's promise.
+3. **`test_database_rejects_a_dangling_aml_transaction_id`** (live). With the FK dropped it fails
+   with **`DID NOT RAISE IntegrityError`** — the FK-less database **accepted** a decision citing a
+   nonexistent AML transaction (1 dangling row, deleted afterwards). That result IS the argument for
+   keeping the constraint in the database rather than trading it for a convention.
+Cluster restored after the exercise: probe row deleted, FK re-added, 4000 rows intact.
+
+### `verify_aml_ingest.py` check #7 — AMENDED, NOT WEAKENED
+Its predicate (`ch.startswith("aml_") != pa.startswith("aml_")`) is SYMMETRIC, so the seam FK trips
+it. It now carries a one-element allowlist `{("decisions","aml_transactions")}` **plus a NEW check
+that the sanctioned edge actually EXISTS** — an allowlist tolerating its absence would quietly
+un-enforce it. Every other crossing, in either direction, still fails. **The asymmetry Item 1
+intended is preserved and now written down: the moat may REFERENCE the evidence layer; the evidence
+layer may NEVER reference the moat.** All checks pass (21 now, was 20).
+
+### FOUND BY RUNNING, NOT BY READING (both would have shipped as false documentation)
+- **`demo.decisions` lacks the seam COLUMNS entirely**, not merely the constraint. `ensure_demo_ready()`
+  calls `create_all(checkfirst=True)`, which SKIPS the already-existing table and **never ALTERs it**
+  — demo's copy is frozen at the pre-0006 schema. The first draft of migration 0006's header claimed
+  "carries the column but not the constraint"; that was FALSE and is corrected in place. **Harmless:**
+  `demo` runs only the genealogy seed (24 agents / 1 belief / 9 edges) and never reads or writes
+  `decisions` beyond `seed.seed()`'s DELETE. A freshly re-provisioned `demo` WOULD get the columns
+  (from the ORM) and still no FK. **A future session that makes the demo actually WRITE decisions must
+  reconcile this first.** (A `DROP TABLE decisions` in `demo` to force re-provisioning was NOT run —
+  it was not authorized, and the honest fix was to correct the documentation, not the database.)
+- **`formatAmount` hardcoded USD.** Left alone, the console would have printed a **Euro** transfer with
+  a **dollar sign** the moment G4 writes AML rows. It now takes the currency. IBM's names ("Euro",
+  "Saudi Riyal", "Yuan") are NOT ISO 4217 codes, so they are appended verbatim rather than mapped
+  through a lookup table we would have to invent.
+
+### The ripple, done deliberately (NOT a drive-by)
+`schemas.py::DecisionOut` (merchant/confidence Optional, + the two new fields), `catalog.py`'s SELECT,
+`frontend/src/api/types.ts`, `lib/format.ts`, and the two components that render a merchant.
+`formatConfidence(null)` renders an **em dash** — the absence of a confidence stays VISIBLE rather
+than silently reading as `0.00`. A consumer distinguishes the two kinds of decision by
+`aml_transaction_id is not None`. **Presenting AML decisions properly is the DEFERRED frontend
+session's job; this ripple only keeps the console type-correct and non-lying.**
+
+### G2 VERIFICATION GATE — all green
+- **122 backend tests pass** (was 118 + the 4 new seam guards).
+- `tsc --noEmit` clean; `npm run build` green.
+- `ensure_demo_ready()` still provisions `demo`; `demo` still has **0** `aml_*` tables.
+- `scripts/verify_aml_ingest.py` — ALL CHECKS PASSED against the live cluster + raw CSV.
+- `GET /decisions` serves the new fields; existing card rows read
+  `amount_currency: null`, `aml_transaction_id: null`.
+- Live cluster: alembic head **0006**, **4000** decisions, **8** belief_performance windows, 1500
+  aml_transactions. **The full test suite reseeds `defaultdb`** (test_atomic_invalidation) and wiped
+  the backfill as always — restored with `python -m seed.backfill_decisions`, curve reproduced.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(schema): migration 0006 — decisions may cite a real aml_transactions row`
+- `test(seam): the three grounding-seam guards, each verified to trip`
+- `chore(verify): check #7 permits exactly the one sanctioned crossing edge`
+- `feat(api): the decision surface carries the AML citation and its honest NULLs`
+- `docs(notes): record G2 — the moat change as built` (this section)
+
+### G2 explicitly NOT done (next: G3 = the second belief on azure; G4 = the grounded backfill):
+### no second belief yet, no AML decision rows yet (the seam columns are live but every row still
+### reads NULL), no belief_performance for any AML belief (step 4 is CUT), NO certificate change,
+### no AML console, no regulatory corpus, no LLM call. Do NOT start G3/G4 without approval.
