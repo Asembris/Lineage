@@ -129,17 +129,17 @@ class ProvenanceAuditResponse(BaseModel):
 
 
 class CounterfactualWindow(BaseModel):
-    """One generation window's slice of the counterfactually-affected set.
+    """One measured window's slice of the counterfactually-affected set.
 
-    Bucketed identically to belief_performance (both use generation_windows()), so this lines
-    up against the staleness curve: the windows where confidence had already rotted are exactly
-    the ones contributing the fraud. `withdrawn_approvals` are belief-driven approvals in this
-    window that fall after T; `frauds_auto_approved` is their real is_fraud subset.
+    Windows are the BELIEF'S OWN `belief_performance` rows — not the crimson generation clock —
+    so this lines up against exactly the staleness curve the belief actually has. A belief with no
+    measured windows gets `windows: null` on the response, never a grid of zeros.
     """
 
     window_start: dt.datetime
     window_end: dt.datetime
     withdrawn_approvals: int
+    withdrawn_blocks: int
     frauds_auto_approved: int
 
 
@@ -147,13 +147,25 @@ class CounterfactualResponse(BaseModel):
     """"If this belief had been invalidated at `at`, which downstream verdicts change?"
 
     Answered against the moat's `decisions` table — the only path carrying a real
-    driving_belief_id link. The belief only ever approves, so invalidation can only WITHDRAW
-    approvals: `withdrawn_approvals` (N) is the affected count, every row an approval, and
-    `frauds_auto_approved` (M) is their real-ground-truth fraud subset — the honest "fraud an
-    earlier invalidation would have stripped the belief's justification from" (never "would have
-    caught"; the fallback verdict is stochastic and not reproduced). `at` is BUSINESS-TIME
-    (a decided_at instant), deliberately not the MVCC `as_of` clock: this is a plain query, no
-    AOST, no content-hash. See app/services/counterfactual.py for the full derivation.
+    driving_belief_id link. `at` is BUSINESS-TIME (a decided_at instant), deliberately not the
+    MVCC `as_of` clock: this is a plain query, no AOST, no content-hash.
+
+    THE COUNTS ARE VERDICT-AWARE, and that is not cosmetic. Item B was built when the fleet's one
+    belief only ever APPROVED, so it reported the affected row count as the withdrawn-approval
+    count. The grounding seam's azure belief BLOCKS (a re-derived laundering cycle -> `blocked`),
+    and under the old aggregate the endpoint reported those blocks as withdrawn approvals and
+    counted correctly-blocked fraud as `frauds_auto_approved` — crediting the belief's catches as
+    its harms, which is the worst possible direction for a forensic tool to be wrong in. So:
+
+      withdrawn_approvals    (N) — affected rows the belief APPROVED; the approval loses its driver
+      withdrawn_blocks           — affected rows the belief BLOCKED; the block loses its driver
+      frauds_auto_approved   (M) — of the APPROVED rows, is_fraud: the real harm. Never "fraud we
+                                   would have caught" — no fallback verdict is reproduced.
+      frauds_caught_by_block     — of the BLOCKED rows, is_fraud: what invalidating would FORFEIT.
+                                   M's counterweight; it exists so a correct block can never again
+                                   be presented as a harm.
+
+    See app/services/counterfactual.py for the full derivation and the measured before/after.
     """
 
     belief_id: uuid.UUID
@@ -163,11 +175,16 @@ class CounterfactualResponse(BaseModel):
     formed_at: dt.datetime
     at: dt.datetime  # the counterfactual instant T (business-time), echoed as parsed
     total_belief_driven: int  # all belief-driven decisions, for context
-    withdrawn_approvals: int  # N — affected belief-driven approvals after T
-    frauds_auto_approved: int  # M — of N, is_fraud = true (real ground truth)
+    affected_decisions: int  # every driven row after T, whatever its verdict
+    withdrawn_approvals: int  # N — of those, the APPROVALS
+    withdrawn_blocks: int  # of those, the blocks/declines
+    frauds_auto_approved: int  # M — of the approvals, is_fraud = true (real ground truth)
+    frauds_caught_by_block: int  # of the blocks, is_fraud = true — the forfeited catches
     affected_holder_count: int
     affected_holders: list[uuid.UUID]  # distinct agents that made an affected decision
-    windows: list[CounterfactualWindow]
+    # None when the belief has no measured belief_performance windows (e.g. the azure laundering
+    # belief, whose decisions all share ONE decided_at by design). Explicitly absent, never zeros.
+    windows: list[CounterfactualWindow] | None
 
 
 # --- Phase 3: atomic invalidation ---------------------------------------------
