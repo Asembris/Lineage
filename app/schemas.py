@@ -257,16 +257,31 @@ class AgentListResponse(BaseModel):
 
 
 class DecisionOut(BaseModel):
+    """A decision is either a Phase-2 CARD authorization or an AML decision grounded in a real
+    IBM money-flow edge (migration 0006, the grounding seam).
+
+    Three fields are nullable BECAUSE of that split, and each null is a refusal to fabricate:
+      * `merchant`   — NULL for AML: a bank-to-bank transfer has no merchant.
+      * `confidence` — NULL for AML: the structural witness is deterministic (and Item D proved
+                       this column is noise anyway — "do not use this column for anything").
+      * `amount_currency` — NULL for Phase-2 card rows: the simulator never declared a currency.
+                       AML rows name their real one; the extract spans 14.
+    A consumer distinguishes the two kinds by `aml_transaction_id is not None`.
+    """
+
     id: uuid.UUID
     agent_id: uuid.UUID
     txn_ref: str
-    merchant: str
+    merchant: str | None
     amount: float
+    amount_currency: str | None
     verdict: str
     driving_belief_id: uuid.UUID | None
-    confidence: float
+    confidence: float | None
     decided_at: dt.datetime
     is_fraud: bool
+    # The grounding seam: the REAL aml_transactions row this decision was made about.
+    aml_transaction_id: uuid.UUID | None
 
 
 class DecisionListResponse(BaseModel):

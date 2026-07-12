@@ -94,17 +94,31 @@ export interface LineageResponse {
   path: LineageNode[];
 }
 
+/**
+ * A decision is either a Phase-2 CARD authorization, or an AML decision grounded in a REAL IBM
+ * money-flow edge (the grounding seam, migration 0006). Distinguish them by
+ * `aml_transaction_id !== null`.
+ *
+ * Three fields are nullable because of that split, and each null is a refusal to fabricate:
+ *   merchant        — null for AML: a bank-to-bank transfer has no merchant.
+ *   confidence      — null for AML: the structural witness is deterministic, so there is no
+ *                     confidence to report.
+ *   amount_currency — null for CARD rows: the Phase-2 simulator never declared a currency.
+ *                     AML rows carry their real one (the extract spans 14, not just dollars).
+ */
 export interface Decision {
   id: UUID;
   agent_id: UUID;
   txn_ref: string;
-  merchant: string;
+  merchant: string | null;
   amount: number;
+  amount_currency: string | null;
   verdict: string; // 'approve' | 'decline' | 'blocked'
   driving_belief_id: UUID | null;
-  confidence: number;
+  confidence: number | null;
   decided_at: ISODateTime;
   is_fraud: boolean;
+  aml_transaction_id: UUID | null;
 }
 
 export interface DecisionListResponse {

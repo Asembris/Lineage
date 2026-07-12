@@ -46,10 +46,13 @@ function DecisionRow({
           <span className="feed__date">{date}</span>
           <span className="feed__clock">{time}</span>
         </span>
-        <span className="feed__amount">{formatAmount(d.amount)}</span>
+        <span className="feed__amount">{formatAmount(d.amount, d.amount_currency)}</span>
 
         <span className="feed__where">
-          <span className="feed__merchant">{d.merchant}</span>
+          {/* merchant is null for AML decisions (a bank-to-bank transfer has no merchant). An em
+              dash keeps the absence visible; presenting AML decisions properly is the deferred
+              frontend session's job, not a drive-by here. */}
+          <span className="feed__merchant">{d.merchant ?? "—"}</span>
           <span className="feed__txn">{d.txn_ref}</span>
         </span>
         <span className="feed__tags">

@@ -31,8 +31,17 @@ Consequences, stated loudly so no future session is surprised by them:
   * MODEL-vs-DATABASE divergence: the ORM understates the schema. This is the ONE place in the
     project where that is true. `tests/test_grounding_seam.py` guards BOTH sides — it asserts the
     FK really exists in defaultdb AND that no ForeignKey in Base.metadata escapes Base.metadata.
-  * DEMO-vs-DEFAULTDB divergence: `demo`'s `decisions` carries the column but not the constraint.
-    Harmless — `demo` only ever runs the genealogy seed and never writes `aml_transaction_id`.
+  * DEMO-vs-DEFAULTDB divergence, stated as MEASURED rather than as intended:
+      - The FK is absent from `demo` BY DESIGN (it is migration-only, and Alembic targets defaultdb).
+      - `demo.decisions` ALSO lacks the seam COLUMNS entirely right now. `ensure_demo_ready()` calls
+        `create_all(checkfirst=True)`, which SKIPS the already-existing `decisions` table and never
+        ALTERs it — so demo's copy is frozen at the pre-0006 schema. Verified live, not assumed.
+      - This is HARMLESS: `demo` runs only the lightweight genealogy seed (24 agents / 1 belief /
+        9 edges) and never reads or writes `decisions` beyond `seed.seed()`'s DELETE. Nothing in the
+        SSE consistency demo selects a decision column.
+      - If `demo` is ever dropped and re-provisioned, `decisions` is created fresh from the ORM and
+        WILL carry the seam columns — still without the FK. Both shapes are fine; a future session
+        that makes the demo actually WRITE decisions must reconcile this first.
   * `scripts/verify_aml_ingest.py` check #7 ("no FK crosses the aml_/moat boundary") is amended to
     permit EXACTLY this one named edge. Every other crossing, in either direction, still fails.
 
