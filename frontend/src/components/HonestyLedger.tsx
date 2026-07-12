@@ -91,9 +91,11 @@ const ROWS: RowSpec[] = [
         the edge of the 1,500-edge slice and <em>could not determine</em>).{" "}
         <code>INCONCLUSIVE → approve</code> is a <b>disclosed modeling choice</b>, not a corner
         case: it is the majority of the extract, and it silently approves most of its laundering
-        rows. The belief's honest failure mode is <b>constant, not stale</b> — its error rate is
-        flat over time, so <code>belief_performance</code> is deliberately <em>not</em> computed
-        for it (an AML rot curve would be a base-rate artifact of the ingestion sample).{" "}
+        rows. <em>(Its share is an unrelated quantity from the structural detector's 65.3%
+        hold-out recall — same number, different thing.)</em> The belief's honest failure mode is{" "}
+        <b>constant, not stale</b> — its error rate is flat over time, so{" "}
+        <code>belief_performance</code> is deliberately <em>not</em> computed for it (an AML rot
+        curve would be a base-rate artifact of the ingestion sample).{" "}
         <b>The numbers to the left are COUNTED from the cluster, not quoted</b> — this census has
         twice been corrupted by prose, once misstated and once falsely sourced, so it is no longer
         entrusted to prose.
