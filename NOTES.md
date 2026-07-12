@@ -4336,3 +4336,68 @@ session's job; this ripple only keeps the console type-correct and non-lying.**
 ### no second belief yet, no AML decision rows yet (the seam columns are live but every row still
 ### reads NULL), no belief_performance for any AML belief (step 4 is CUT), NO certificate change,
 ### no AML console, no regulatory corpus, no LLM call. Do NOT start G3/G4 without approval.
+
+### G2 ADDENDUM — the regression review caught, and the render check "compiles clean" would have missed
+
+Two things surfaced in review AFTER the G2 commits above, both real. Recorded because each is a
+class of mistake this project has made before.
+
+**1. Migration 0006's `DROP NOT NULL` was OVER-BROAD, and the CARD path silently lost a Phase-1
+guarantee.** The NULLability is load-bearing only for AML rows, but it was dropped for EVERY row.
+**MEASURED, not theorised:** after 0006, an INSERT of a card decision (`aml_transaction_id` NULL)
+omitting BOTH `merchant` and `confidence` was **ACCEPTED** by the database. Before 0006 it was
+rejected. A real regression in the moat's integrity, introduced by the seam and unrelated to it.
+
+**Migration 0007 (`ck_decisions_kind`)** closes it by making the two-kinds taxonomy STRUCTURAL:
+```
+   (aml_transaction_id IS NULL     AND merchant IS NOT NULL AND confidence IS NOT NULL)
+OR (aml_transaction_id IS NOT NULL AND merchant IS NULL     AND confidence IS NULL
+                                   AND amount_currency IS NOT NULL)
+```
+- The CARD branch restores **exactly** the guarantee Phase 1 had. The seam no longer weakens it.
+- The AML branch is **STRICTER than merely permitting NULLs, on purpose**: it makes Item 4's "fake
+  merchant" and Item D's fabricated confidence **IMPOSSIBLE TO WRITE**, not merely discouraged in a
+  comment. Third instance of the same move — Item 1's separate metadata, the seam's fixed
+  `decided_at`, and now this. **Make the wrong thing unrepresentable; do not rely on the next
+  session reading the note.**
+- A future THIRD kind of decision fails this loudly. That is a capability change to notice, not a
+  constraint to quietly relax.
+All five branches exercised live: regression rejected; card decision accepted; fabricated merchant
+rejected; fabricated confidence rejected; honest AML shape accepted.
+
+**GOTCHA — CockroachDB reports a CHECK failure by its EXPRESSION, not its NAME.** Asserting
+`"ck_decisions_kind" in str(err)` FAILS. The tests assert the violation CLASS (`CheckViolation`)
+instead, which still distinguishes it from a foreign-key or NOT NULL rejection.
+
+**GOTCHA — 0007 nearly made guard 3 pass for the WRONG REASON.** `test_database_rejects_a_dangling_
+aml_transaction_id` inserted an AML row with no `amount_currency`, which the new CHECK also rejects
+— so the test would have gone green on a `CheckViolation` while proving **nothing about the foreign
+key**. Its probe row now satisfies the CHECK (so only the FK can reject it) and it asserts the error
+is a **foreign key** violation by name. A test that passes for the wrong reason is worse than no test.
+
+**2. "tsc + build pass" is NOT "it renders", and it never was.** Verified by actually driving the
+console (Playwright, chromium, 1440x900, live vite -> uvicorn -> live cluster) with ONE temporary
+honest AML decision inserted so the new NULL path was genuinely exercised, then deleted.
+
+- Decision feed, top row: `16,606.00 Euro` / merchant `—` / `BLOCKED` / conf `—`. **The amount is
+  NOT rendered as `$16,606.00`** — the `formatAmount` currency fix is doing real work. Card rows
+  below are untouched (`$85.44`, `Grocery Mart #453`, `0.87`).
+- Inspector: merchant `—`, `16,606.00 Euro`, `conf —`, `LABELLED FRAUD`, and it honestly reports
+  **"Not belief-driven — this decision cited no belief"** (correct: the azure belief is G3).
+- **ZERO console errors.** 200 rows rendered.
+
+**HARNESS GOTCHA (banked):** `app/main.py` pins CORS to `:5173`, and STALE vite dev servers from
+earlier sessions were holding 5173/5174 (listening on `[::1]` only, so `curl 127.0.0.1` reports the
+port dead while the port is genuinely taken). Vite silently moves to `:5175` and every fetch is then
+CORS-blocked, which looks exactly like a broken console. Do NOT debug the app for this. Either free
+5173 or launch chromium with `--disable-web-security` (a harness concern; the app's CORS policy is
+untouched). Screenshots: `scratchpad/feed.png`, `scratchpad/inspector.png`.
+
+**Cluster after all verification:** head **0007**, **4000** decisions, **0** AML-cited rows, **0**
+probe rows, **8** belief_performance windows. Every probe row this session created (guard-3's
+dangling row, the regression probe, the CHECK probes, the render probe) was deleted and the count
+independently re-confirmed at 4000.
+
+### Additional commits
+- `fix(schema): migration 0007 — restore the guarantee 0006's DROP NOT NULL gave away`
+- `docs(notes): record the 0006 regression, 0007's CHECK, and the render verification` (this section)
