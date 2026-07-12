@@ -3573,6 +3573,25 @@ belief-driven decisions in every window by construction, so every persisted conf
 250-sample estimate (+/- .06 worst case) and **no thin window exists**. There is no live defect — but
 the document cannot say so, and the schema cannot express it.
 
+**[APPENDED by the Item D investigation, 2026-07-12 — the "latent" scope above is correct for WINDOWS,
+and it is exactly ONE SLICE away from being live.** The per-WINDOW n is 250 by construction. The
+**per-HOLDER n is not.** Measured from the real 4,000-row backfill, it ranges **74 to 250**: crimson-0
+through crimson-4 and crimson-6/7 at 250, crimson-5 at 176, and **crimson-5b at 74** — because window 5
+is the one window two agents share (`_agent_for` splits ~30% of it to the branch). So the thinnest
+sample in the entire system belongs to **crimson-5b, a LIVING holder** — one of the two agents the one
+governed invalidation corrects. Its per-holder confidence is **0.459 with a 95% CI of [0.351, 0.572], a
+band 0.221 wide — more than half the entire fleet-wide decay signal the project is built on**
+(0.924 -> 0.528 = 0.396). The sharper, more honest statement is therefore: **the gap is latent only
+because nothing currently slices confidence by holder, and it goes LIVE the instant anything does.**
+Item D proposed exactly that slice — which is one of the four reasons it was cut (see "Roadmap Item D"
+at the bottom of this file; the same-window control there shows two holders with *identical true
+reliability by construction* differing at p = 0.046). Consequences for the follow-on session that
+closes this item: treat the per-holder denominator as IN SCOPE from the start rather than discovering it
+late; the sub-250 denominators are already sitting in `decisions` today, waiting to be exposed by the
+first per-holder read; and the same re-aggregate-from-`decisions` remedy (Item B's precedent — a
+deterministic aggregate over immutable columns, no new state) covers the per-window and per-holder
+denominators alike.]**
+
 **Why it is NOT a drive-by fix (the blast radius, recorded so the follow-on session inherits it):** a
 denominator means either changing `belief_performance` (the **first five-table moat change since
 Phase 1** — CLAUDE.md calls the schema the moat and says treat it with care) or re-aggregating `n` from
