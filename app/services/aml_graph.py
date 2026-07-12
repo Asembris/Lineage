@@ -329,7 +329,12 @@ WITNESS = {
 
 # Which typologies may authorize a FLAG. This is NOT a hand-picked allowlist: the criterion is
 # "the witness never fires on an edge belonging to a DIFFERENT typology", measured across all
-# 1,500 edges and asserted in tests/test_aml_brake.py::test_witness_soundness_against_oracle.
+# 1,500 edges and asserted in
+# tests/test_aml_brake.py::test_witness_soundness_and_benign_false_positive_rates.
+# (This line used to cite `test_witness_soundness_against_oracle`, which has never existed. The
+# test is real and the counts below are really asserted — but the CITATION was false, and a false
+# citation on a load-bearing claim is how the 57/463/980 census ended up defended by a script that
+# was never written. See NOTES "FABRICATED VERIFICATION CITATIONS".)
 # Measured today: CYCLE 0/257 and SCATTER-GATHER 0/204 cross-typology false witnesses, versus
 # GATHER-SCATTER 6/223 and STACK 27/216. If a future ingestion changes graph density those
 # counts move, the test fails, and turning a typology's FLAG capability on becomes a deliberate

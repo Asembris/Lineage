@@ -290,10 +290,22 @@ applies by recomputing structure instead of trusting a label (§5).
 **The canonicalizer is deliberately shared.** `canonical_json` / `canonical_digest` / `closure_world`
 live in `certificate.py` (import-safe, zero app deps — which is exactly why the Lambda can reach
 them) and both sides call them. Two independently-implemented canonicalizers that merely *agree
-today* would make the cross-check a false guarantee waiting to silently diverge. Verified: the async
-and sync halves hash identically at current state *and* at a past HLC via AOST
-(`scripts/probe_closure_hash_parity.py`), and a test asserts the two SELECTs project the same column
-set so a forgotten column fails loudly rather than producing a spurious `disagreed`.
+today* would make the cross-check a false guarantee waiting to silently diverge.
+
+The **durable** guarantee is two things you can run: the canonicalizer is *shared* (one function,
+two callers — they cannot disagree by construction), and
+`tests/test_certifier_closure_verification.py::test_the_lambdas_closure_sql_selects_exactly_what_closure_world_hashes`
+asserts the two halves' SELECTs project the same column set, so a column added to one and forgotten
+in the other fails loudly instead of producing a spurious `disagreed` on an honest invalidation.
+
+> **Provenance note, stated rather than papered over.** That the async and sync halves produce
+> *identical digests* at current state and at a past HLC was measured once, by a one-off probe in the
+> gitignored `scratchpad/` — **not** by a committed script. An earlier version of this paragraph cited
+> it as `scripts/probe_closure_hash_parity.py`, a path that has never existed: a **fabricated
+> verification citation**, produced by promoting an ephemeral probe into a repo path a reader could
+> supposedly run. The measurement was real; the artifact is gone. What survives is the shared
+> canonicalizer and the column-set test above — and those, not a vanished probe, are what the claim
+> now rests on. See [NOTES.md](NOTES.md) → *FABRICATED VERIFICATION CITATIONS*.
 
 **Stated honestly** (from the honesty ledger): the tri-state agreement is *recorded* in the
 hash-covered certificate body but not prominently surfaced (no `audit_log` column yet); `content_hash`
