@@ -101,59 +101,29 @@ base rate is 0.75%). The witness uses **no format field at all**, so it doesn't 
 
 ---
 
-## Judging Criteria Alignment
+## Judging criteria alignment
 
-> Answered against real, file-linked facts. Where the fit is weaker, it says so — an honest "we used
-> X, not Y" is stronger than an overclaim a judge can disprove in one question.
+> Answered against real, file-linked facts. **Every claim carries its own limitation in the same
+> row** — an honest "we used X, not Y" is stronger than an overclaim a judge can disprove in one
+> question. Nothing in the right-hand column is boilerplate; each one is a real thing we checked and
+> could not truthfully claim.
 
-### Agentic Memory Design — *does CockroachDB play a meaningful, production-grade role as the agent's memory layer?*
+| Criterion | What we built | Where it lives | Honest limitation |
+|---|---|---|---|
+| **Agentic Memory Design**<br/><sub>*meaningful, production-grade memory layer?*</sub> | Three deliberately-separated schemas on **one MVCC timeline** — the five-table genealogy moat, a 1,500-edge AML evidence layer, a 1536-dim vector RAG corpus. Memory is queried transactionally (recursive CTE over `belief_inheritance`), aggregated (`belief_performance` windows), embedded (CRDB-native cosine search), and time-travelled (real AOST). | `models.py` · `aml_models.py` · `corpus_models.py` · `lineage.py:19` | The vector index is a **proven mechanism, not indexing at scale**. At 4 corpus rows the planner correctly brute-forces a full scan — `verify_corpus.py` asserts that plainly on every run rather than hiding it. |
+| **Technical Implementation**<br/><sub>*correct, safe use of the CRDB tools?*</sub> | AOST timestamps validated and inlined as literals while the SELECT stays parameterized (they cannot be bind params in CRDB); invalidation is one serializable txn with a set-based closure `UPDATE` + a `FOR UPDATE` idempotency guard, never a per-holder loop; vector DDL uses the `CREATE VECTOR INDEX` (C-SPANN) escape hatch Alembic can't emit. | `time_travel.py:97` · `invalidation.py:88,140` · `migrations/0002:42` | **MCP Server configured, not exercised.** `.mcp.json` declares a CockroachDB Cloud MCP Server and it is available in-session, but every cluster-capability check in this project was done with **direct SQL probe scripts** (`scripts/probe_crdb.py`). The **ccloud CLI was not used at all.** |
+| **Real-World Impact**<br/><sub>*how big an impact on real workflows?*</sub> | Belief inheritance is a real emerging failure mode: a rule formed under one regime outlives its validity and no living agent remembers forming it. Lineage makes it auditable and correctable — trace a bad decision to its origin belief, prove valid-then/rotten-now **from data**, correct the whole fleet in one commit, emit an S3 certificate an independent auditor re-verifies. Scored on **IBM's real 5M-transaction AML dataset**. | `lineage.py` · `counterfactual.py` · `s3_audit.py` | Scored against pattern-typology **ring membership**, not general fraud detection — and against a *deliberately adversarial* benign set (noise anchored to the same accounts as the fraud). Both caveats travel with every number below. |
+| **Production Readiness**<br/><sub>*secure, resilient, access-controlled?*</sub> | Bounded exponential-backoff retry on transient CRDB errors at the two mutating surfaces; concurrency-safe per-IP/route rate limiter; nil-actor rejection on the one governed write; a **physically isolated `demo` database** so the destructive demo cannot touch console state; CORS allow-list; gitignored secrets; CI running the full suite against the real cluster on every push. | `resilience.py` · `ratelimit.py` · `demo_db.py` · [details](#production-readiness--security) | The cluster is **single-region** (`aws-eu-central-1`). What is *demonstrated* is atomic **cross-key / cross-holder** invalidation at one commit, measured against an eventual baseline. Atomic **cross-*region*** is CockroachDB's documented property, **argued here, not measured** — we say so rather than let the distributed-DB framing imply it. |
+| **Creativity & Originality**<br/><sub>*a genuinely new idea about agentic systems?*</sub> | An agent's *inherited memory* is a distinct object from its code or its current state: it has a genealogy, a formation time, a **measured** decay, and a blast radius when wrong. The two-clock staleness model, the witness-required brake, and the cross-machine hash agreement all exist because agentic systems inherit and act on state their authors never inspected. | the two-clock model, throughout | The fleet is **synthetic** — 24 deterministically-seeded agents across 2 bloodlines. The failure mode is modeled, instrumented, and measured here; it is **not** an observation harvested from a production fleet in the wild. |
 
-Yes, and for more than toy queries. One cluster holds three deliberately-separated schemas on the
-**same MVCC timeline**: the five-table genealogy/belief moat, a `1,500`-edge AML evidence layer, and
-a `1536`-dim vector RAG corpus. The agent's memory is **queried transactionally, embedded, and
-time-travelled** — inheritance is a real recursive CTE over `belief_inheritance`; staleness is
-aggregated from `belief_performance` windows; retrieval is CockroachDB-native cosine vector search;
-and any past state is reconstructable with real `AS OF SYSTEM TIME`. That single transactional store
-spanning graph + vectors + time-travel is the whole thesis against a Postgres + Pinecone split.
-
-### Technical Implementation — *is the integration with CockroachDB tools quality software engineering? Does the agent use the tools correctly and safely?*
-
-The primitives are wired correctly and safely (see the [sponsor-tech table](#sponsor-technology-usage)):
-AOST timestamps are validated and inlined as literals with the SELECT staying parameterized (they
-cannot be bind params in CRDB); invalidation is a single serializable transaction with a set-based
-closure update and a `FOR UPDATE` idempotency guard, never a per-holder loop; vector DDL uses the
-`CREATE VECTOR INDEX` (C-SPANN) escape hatch Alembic can't emit. **Honest limitation:** a
-CockroachDB Cloud **MCP Server is configured** (`.mcp.json`) and available in-session, but the
-cluster-capability verification in this project was done through **direct SQL probe scripts**
-(`scripts/probe_crdb.py`), not MCP tool calls — and the **ccloud CLI was not used**. The vector
-index is a *proven mechanism* (column + `<=>` operator + C-SPANN DDL + AOST-over-vector-search all
-wired end to end), not a demonstration of indexing at scale — at 4 corpus rows the planner correctly
-brute-forces a full scan, and `verify_corpus.py` asserts that plain every run.
-
-### Real-World Impact — *how big an impact could this have on real workflows?*
-
-Belief inheritance across agent generations is a real emerging failure mode for long-lived agentic
-systems: a rule formed under one regime silently outlives its validity and no living agent remembers
-forming it. Lineage turns that into an auditable, correctable artifact — trace a bad decision to its
-origin belief, prove valid-then/rotten-now from data, and correct the whole fleet atomically with an
-S3 certificate an independent auditor can re-verify. The detection layer is scored against **IBM's
-real 5M-transaction AML dataset**, not a toy.
-
-### Production Readiness — *secure, observable, scalable? Resilience, access control, failure handling?*
-
-See [Production readiness & security](#production-readiness--security). Real, not aspirational:
-bounded exponential-backoff retry around transient CRDB errors (SQLSTATE `40001` + connection
-families) at the two mutating surfaces; a concurrency-safe per-IP/route rate limiter; nil-actor
-rejection on the one governed write; a **physically isolated `demo` database** so the destructive
-consistency demo cannot wipe console state; explicit CORS allow-list; gitignored secrets; and CI
-that runs the full suite against the real cluster on every push.
-
-### Creativity & Originality — *a genuinely new idea? Insight into what makes agentic systems different?*
-
-The insight is that an agent's *inherited memory* is a distinct object from its code or its current
-state — it has a genealogy, a formation time, a measured decay, and a blast radius when wrong. Most
-of the surface (the two-clock staleness model, the witness-required brake, the cross-machine hash
-agreement) exists because agentic systems inherit and act on state their authors never inspected.
+**The one claim worth reading twice.** One transactional store spanning **graph + vectors +
+time-travel** is the whole competitive thesis. On a Postgres + Pinecone split, a belief's embedding
+lives in one system and its provenance in another, so no single transaction can invalidate both and
+no `AS OF SYSTEM TIME` can reconstruct the pair as they stood together. Here the RAG corpus shares
+`defaultdb` and the same MVCC timeline as the genealogy — which is why a **vector retrieval can be
+time-travelled** with the same `SET TRANSACTION AS OF SYSTEM TIME` the belief trace uses. That is
+the thing that is hard to fake, and it is why the memory layer is CockroachDB rather than a cache in
+front of a vector store.
 
 ---
 
