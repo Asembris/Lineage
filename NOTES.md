@@ -5122,3 +5122,116 @@ unlabeled edge set. If the endpoint served the answer key, the ring would prove 
 - `test(seam): the FK guard's probe row is now checked, not just documented`
 - `docs(demo): the label is the oracle, not something /interrogate returns`
 - `docs(notes): fabricated verification citations are a PATTERN, and the 65.3% attracts them`
+
+## THE LEDGER'S LIVE ROWS SURVIVE SCHEMA CHANGE. ITS STATIC ROWS ROT. (2026-07-12)
+
+**Second time the seam moved the world and the ledger did not follow.** First it rendered
+`2 belief` (a hardcoded singular, caught by the G3/G4 pre-push review). Now: the "Agent genealogy"
+row asserted **"2 bloodlines, 8 inheritance edges"** — the live number is **15** (8 crimson + 7
+azure), and has been since G3 seeded the second belief.
+
+The pattern is not "someone forgot". It is **structural, and the ledger's own design already
+contains the fix**:
+
+> **A LIVE row cannot go stale. A STATIC row is prose, and prose rots at exactly the speed the
+> schema moves.**
+
+`Agent genealogy` is a LIVE row — and its *live value* (`24 agents · 3 alive · 2 beliefs`) was
+**correct the whole time**. It was the STATIC PROSE IN ITS OWN NOTE that lied. The row proves the
+point on itself: the number read from the cluster was right; the number typed next to it was wrong.
+
+**Consequence, and it decided this session's ledger work:** anything that is a *measurable quantity*
+should be a LIVE row. Only claims that no endpoint can or should answer — "the GEval rubric is
+in-sample", "MCP configured, not exercised" — earn STATIC.
+
+### Row A (the grounding seam) is LIVE, and that is the whole argument
+The 65.3% disclosure is the project's most important caveat, and **it has now been corrupted by
+prose in BOTH available ways** — misstated (the phantom "728 / 48.5%") and falsely sourced (the
+phantom `verify_seam` script). Putting it in the ledger as static prose would hand it back to the
+medium that has already failed it twice.
+
+So the console **COUNTS** it: seven `total`s at `limit=1` through the new `?witness_outcome=` and
+`?is_fraud=` filters — the extract size, each outcome, and each outcome's laundering subset. Nothing
+is retyped. The rendered share is arithmetic over live numbers (`inc.n / total`), not a constant, so
+even the *"65.3%"* cannot drift from the counts beside it. **A number read from the cluster cannot
+be wrong about the cluster.** That is the ledger's entire thesis, applied to the one number that
+most needs it.
+
+Rendered live, verified by driving the console:
+```
+Grounding seam — the AML belief's decisions          [LIVE]
+1,500 decisions · 57 MATCH · 463 CONCLUSIVE_NO · 980 INCONCLUSIVE
+  → 65.3% could not determine, silently approving 252 of 300 laundering rows
+```
+
+Row B (the oracle boundary) stays **STATIC** on purpose: it is an integrity claim about code
+STRUCTURE, not a measurable quantity. Its enforcement is the AST tripwire and the label-free `Edge`
+type — there is no number to read, and inventing one would be theatre.
+
+### Two new filters, and why they are not scope creep
+`?witness_outcome=` + `?is_fraud=` exist to make the census **countable**, not merely readable.
+Without them the ledger would have to pull 1,500 rows and aggregate client-side, or (the real
+danger) a human would retype the numbers into prose — which is precisely how this census got
+corrupted twice. `witness_outcome` matches on the PERSISTED basis tag through `aml_seam`'s own
+`txn_ref_for`, so the filter can never disagree with the field the surface serves. A typo'd outcome
+is a **422**, never a silent empty page — a silent empty page here would read as *"there are no
+INCONCLUSIVE decisions"*, i.e. it would silently REFUTE the disclosure the surface exists to carry.
+
+### `scratchpad/` WAS NOT ACTUALLY GITIGNORED. The claim was false — so the claim was made true.
+NOTES said it. ARCHITECTURE said it. **My own new `tests/test_citations.py` said it, in the very
+docstring explaining why citing `scratchpad/` is forbidden.** All of them were wrong:
+`git check-ignore scratchpad/` returned NOTHING. It was merely *untracked*, and deleted between
+sessions by habit.
+
+The effect was identical (probes never survive), so nothing downstream was harmed — but **the claim
+was false, and it is the exact disease `test_citations.py` was written to kill, sitting inside
+`test_citations.py`.** Found by running `git check-ignore` instead of believing four documents that
+all agreed with each other.
+
+**Fixed by making the claim TRUE, not by rewording it** (`scratchpad/` + `**/scratchpad/` in
+`.gitignore`) — the same posture as every other guard here: make the wrong thing unrepresentable.
+
+### HARNESS: the stale-server trap fired AGAIN, and then a SECOND one behind it
+The `/openapi.json` pre-check earned its place immediately. `127.0.0.1:8000` was held by an orphaned
+uvicorn serving **pre-G5 code** (`/decisions` params: only `agent_id, limit, offset`). A green
+console against it would have looked perfect and proven nothing. It is a **zombie socket** — its PID
+resolves to no live process, `Stop-Process` reports it gone, and the socket keeps answering. It
+cannot be killed; use another port.
+
+**Then a second, subtler one.** A fresh uvicorn on another port passed the `/openapi.json` check —
+**and every DB-backed route still 500'd.** Cause:
+
+> **`uvicorn app.main:app` RE-SETS the event loop policy to Proactor on Windows, AFTER
+> `app/main.py` sets `WindowsSelectorEventLoopPolicy`.** uvicorn creates its loop before importing
+> the app, so main.py's policy call is too late, and psycopg raises `InterfaceError` on every query.
+
+**And a 500 carries no CORS header — so the browser reports "blocked by CORS policy", which sends
+you hunting a CORS bug that does not exist.** The fix is a launcher that sets the policy and then
+runs uvicorn with `loop="none"` so uvicorn leaves the loop alone. (In-process `httpx.ASGITransport`
+never hits this, which is why the whole test suite is green and only the live console broke.)
+
+**BANKED, because it cost real time twice over:** if a live-HTTP check must be trusted, verify BOTH
+that `/openapi.json` carries the field you are testing **and that a DB-backed route returns 200** —
+"current" and "working" are different failures and this session hit both in one afternoon.
+
+### VERIFIED BY DRIVING, NOT BY BUILDING (Playwright @1440, chromium, live vite → uvicorn → cluster)
+- **PASS 1 — real cluster:** the seam row renders the LIVE census above; `marked LIVE: YES`;
+  genealogy reads `24 agents · 3 alive · 2 beliefs`; **0 page errors**.
+- **PASS 2 — `/decisions` forced to 500:** the seam row degrades to **`—`**, matching the
+  Inspector's per-slot idiom, with **0 uncaught page errors**. It degrades as ONE unit on purpose:
+  a PARTIAL census would be worse than none, because a missing denominator turns a disclosure into
+  a boast.
+
+### G5 (ledger) VERIFICATION GATE — all green
+- **150 backend tests pass** (149 + the countable-census test), ~3m13s.
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green.
+- Cluster restored + independently re-verified with real SELECTs: head **0008**, 5,500 decisions
+  (4,000 card / 1,500 AML), 8 perf windows, 15 edges, 2 beliefs.
+- README and `HonestyLedger.tsx` moved in LOCKSTEP (the component's docstring makes README the
+  row-for-row source of truth — it is both or neither).
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(api): the seam's census is COUNTABLE — witness_outcome + is_fraud filters`
+- `feat(ledger): the 65.3% is read LIVE from the cluster, never quoted`
+- `fix(gitignore): scratchpad/ was never actually ignored — make the claim true`
+- `docs(notes): the ledger's LIVE rows survive schema change; its STATIC rows rot`
