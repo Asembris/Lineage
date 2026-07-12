@@ -290,6 +290,16 @@ class BeliefPerformanceWindow(BaseModel):
 
     No synthetic 'generation' field: the table stores none. Windows are generation-ordered
     by window_start, so a window's ordinal position in the list IS its generation.
+
+    `sample_size` is the number of belief-driven decisions the window's confidence was
+    aggregated over. belief_performance persists NO denominator, so it is re-aggregated from
+    `decisions` at read time (a deterministic aggregate over immutable columns — no migration,
+    no change to the five-table moat). The Wilson bounds are null whenever the sample cannot be
+    trusted (see StalenessUncertainty.sample_agreement) — withheld, never faked.
+
+    NOTE `false_positive_rate` deliberately has NO interval: it is structurally 0 for a belief
+    that only ever approves, and an interval there would dress a structural impossibility as an
+    uncertain estimate.
     """
 
     window_start: dt.datetime
@@ -297,15 +307,50 @@ class BeliefPerformanceWindow(BaseModel):
     confidence: float
     false_positive_rate: float
     frauds_approved: int
+    sample_size: int
+    confidence_ci_low: float | None = None
+    confidence_ci_high: float | None = None
+
+
+class StalenessUncertainty(BaseModel):
+    """How much to trust the curve above — the house's honest "cannot determine" state.
+
+    `sample_agreement`:
+      * `agreed`      — every window's persisted confidence reproduces from the decisions it
+                        summarizes; the intervals are real and are emitted.
+      * `disagreed`   — a persisted confidence does NOT reproduce, so belief_performance is
+                        stale w.r.t. `decisions`. Intervals withheld: a fresh denominator paired
+                        with a stale point estimate is exactly the confidently-wrong number.
+      * `unavailable` — a window has no decisions to aggregate. No interval is derivable.
+
+    `decay_supported` — whether the "valid then / rotten now" claim survives its own uncertainty:
+    a two-sided FISHER EXACT test on the first vs. last window rejects "same rate" at 95%, AND
+    the movement is downward. There is no minimum-sample-size gate (that would repeat the
+    rejected MARGIN_FLOOR); Fisher is exact at every n, so a thin window disqualifies itself.
+    Comparing the intervals for overlap would NOT have done this — it calls a single wrongly-
+    decided decision a supported decay. See certificate.staleness_evidence.
+    """
+
+    method: str
+    confidence_level: float
+    sample_source: str
+    sample_agreement: str
+    decay_supported: bool | None = None
+    decay_p_value: float | None = None
+    decay_support_criterion: str
 
 
 class BeliefPerformanceResponse(BaseModel):
     # The ordered staleness curve for one belief — the "valid then / rotten now" signal,
-    # MEASURED from belief_performance (never asserted). An empty `windows` for a real belief
-    # means it has no measured windows yet (not an error); an unknown belief is a 404.
+    # MEASURED from belief_performance (never asserted), now carrying the sample sizes and
+    # intervals behind each point estimate. An empty `windows` for a real belief means it has no
+    # measured windows yet (not an error), and `uncertainty` is then null; an unknown belief is
+    # a 404. Same block the certificate embeds — one instrument, so the console and the
+    # hash-covered document can never state different intervals for the same belief.
     belief_id: uuid.UUID
     windows: list[BeliefPerformanceWindow]
     count: int
+    uncertainty: StalenessUncertainty | None = None
 
 
 # --- AML evidence layer — read-only interrogation surface (Roadmap Item 5) ------------------
