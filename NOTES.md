@@ -4401,3 +4401,234 @@ independently re-confirmed at 4000.
 ### Additional commits
 - `fix(schema): migration 0007 — restore the guarantee 0006's DROP NOT NULL gave away`
 - `docs(notes): record the 0006 regression, 0007's CHECK, and the render verification` (this section)
+
+### G3 + G4 — THE SEAM, AS BUILT (2026-07-12). The second belief, and the grounded backfill.
+
+The first time any decision in this system cites REAL EXTERNAL EVIDENCE. A real causal chain of
+real rows: **azure-0 forms a laundering belief -> inherited down 7 real edges -> the LIVING
+azure-7 applies it to a REAL IBM `aml_transactions` row -> the decision cites that row through a
+real database-enforced FK -> `is_fraud` comes from the real `is_laundering`.** A living agent
+acting on a belief formed by an ancestor it never met, on real labeled data.
+
+**130 backend tests pass** (124 prior + 5 oracle-boundary + 1 counterfactual regression). Migration
+head unchanged at **0007** — the seam needed NO new migration. No certificate change. No LLM on the
+deciding path (marginal cost $0; the embedding is 1 call).
+
+### THE 728 FIGURE HAS NOW BEEN REINTRODUCED TWICE. It is designed out, not documented away.
+The `INCONCLUSIVE -> approve` weight is **980/1500 = 65.3%**, silently approving **252 of the 300
+laundering rows**. It is NOT "728 / 48.5%" — 728 is the BENIGN-ONLY inconclusive subset. That
+understated figure was written into the seam investigation, corrected in place, and then **written
+back into the G3/G4 session brief**. Two independent reintroductions of the same wrong number is a
+signal, not a coincidence: prose corrections do not stick. So the real number now lives in three
+places that are hard to get wrong, and the wrong one is named and refuted next to each:
+- `app/services/aml_seam.py`'s module docstring — the decider itself, where the mapping is defined.
+- `seed/backfill_aml_decisions.py` PRINTS the census + the disclosure on every run.
+- **The DATA.** See `txn_ref` below — it is one `GROUP BY` away, forever.
+
+### `txn_ref` CARRIES THE WITNESS OUTCOME — the disclosure made reachable from the DATA
+For an AML decision the real transaction reference is the `aml_transaction_id` FK, so `txn_ref`
+(NOT NULL, free-form) is redundant as a reference and free to carry the decision's **BASIS**:
+`aml:MATCH` | `aml:CONCLUSIVE_NO` | `aml:INCONCLUSIVE`. This matters because **TWO OUTCOMES MAP TO
+`approve`**, so the verdict alone cannot distinguish "we searched and there is no cycle" (463) from
+"we could not tell" (980). Without it the split is recoverable only by re-running the witness — i.e.
+only by someone who already knows to look. With it, the single most important caveat about this
+belief is a query, and it is already served by `GET /decisions` and rendered in the console feed:
+
+```
+SELECT txn_ref, verdict, count(*), sum(CASE WHEN is_fraud THEN 1 ELSE 0 END) FROM decisions
+WHERE driving_belief_id = <azure> GROUP BY 1,2;
+    aml:INCONCLUSIVE   approve   980   laundering=252
+    aml:CONCLUSIVE_NO  approve   463   laundering=5
+    aml:MATCH          blocked    57   laundering=43
+```
+No schema change. No new column. The census reproduces Item 4's frozen constants exactly.
+
+### THE ORACLE BOUNDARY — and the guard that a Name/Attribute walk would have PASSED
+`app/services/aml_seam.py` is the decider, and it is label-free **BY TYPE, not by convention**: its
+entire input is `aml_graph.Graph`, built from a SELECT that projects no label, whose `Edge` has no
+label field. It was split OUT of the backfill for exactly this reason — the backfill MUST read
+`is_laundering` (it writes `is_fraud`), so leaving the decision logic there would have made
+"the decider cannot see a label" a claim about reviewer attention.
+
+**THE TRAP, AND IT IS THE ONE THIS PROJECT KEEPS WALKING INTO.** The obvious tripwire — the one
+already shipped in `test_aml_routes.py` for the paid LLM path — walks `ast.Name` / `ast.Attribute` /
+`ast.Import`. **Applied here it PASSES WHILE PROVING NOTHING**, because the deciding path reads the
+database through RAW SQL: adding `is_laundering` to `aml_graph._LOAD_SQL` creates no Name node and
+no Attribute node. It edits a STRING. Guard green, witness reading the answer key, central claim
+silently false. So `tests/test_oracle_boundary.py` also walks **`ast.Constant` string values**, with
+docstrings excluded STRUCTURALLY (first stmt of Module/Class/Function) — because five modules
+discuss the oracle in prose precisely in order to refuse it, and banning the WORDS would force them
+to stop explaining themselves.
+
+**BOTH SHAPES WERE MADE TO TRIP, AND THE REAL OUTPUT CAPTURED:**
+- SQL string: added `is_laundering` to `aml_graph._LOAD_SQL` ->
+  `app/services/aml_graph.py:121 reads the ORACLE 'is_laundering' [string-literal (SQL?)]`, and the
+  independent projection assertion ALSO fired (`the witness's projection moved`). Two guards, one
+  violation.
+- Python attribute: added `if e.is_laundering:` to `aml_seam.decide` ->
+  `app/services/aml_seam.py:94 reads the ORACLE 'is_laundering' [python-attribute]`.
+
+Both reverted. **The guard also caught ME**, before either deliberate trip: my own
+`print("... is_fraud <- is_laundering ...")` and an `r["is_laundering"]` dict key. Fixed at the
+SOURCE rather than by widening the guard — `_LABELS_SQL` now ALIASES the column (`AS ground_truth`),
+so the answer key's name appears **exactly once in the whole module**, inside the one named constant
+the tripwire pins.
+
+`ALLOWLIST` is two files, each with a stated reason and each pinned by its own test:
+`app/aml_models.py` (the ORM DEFINES the columns; a definition is not a read) and
+`seed/backfill_aml_decisions.py` (guarded instead by
+`test_the_backfill_reads_the_label_only_to_attach_ground_truth`, which asserts every oracle
+reference in the module is the value assigned to `_LABELS_SQL`).
+
+### THE TWO-PHASE BACKFILL — the order IS the integrity argument
+Phase 1: every one of the 1,500 verdicts is computed from the unlabeled graph. The label query has
+not run; it CANNOT have influenced anything. Phase 2: only then is the label read and attached as
+`is_fraud`. This is `backfill_decisions.py`'s exact discipline (`_decision_from` computes the verdict
+from `txn.on_pattern` before the row is stamped with `is_fraud=txn.is_fraud`). Verified live: all
+1,500 rows' `is_fraud` equals `aml_transactions.is_laundering`.
+
+### THE BASE-RATE MIRAGE IS DESIGNED OUT, NOT WARNED ABOUT
+Every AML decision carries a **SINGLE FIXED `decided_at`** (2026-07-12T12:00Z) — NOT the
+transaction's own `ts`. **Verified live: `count(DISTINCT decided_at) = 1`.** With every decision at
+one instant there are **no time windows to draw a curve from**, so the mirage is not discouraged, it
+is UNREPRESENTABLE. `recompute_belief_performance` is NEVER called for this belief (step 4 stays
+CUT); the azure belief has **0 belief_performance rows**, verified. Fourth instance of the same move
+(AmlBase metadata; 0007's CHECK; the FK-less ORM; and now the fixed `decided_at`). Do not "improve"
+this by using the real transaction timestamp.
+
+### =========== THE TWO-BACKFILL LANDMINE — READ BEFORE RESTORING THE CLUSTER ===========
+`seed/backfill_decisions.py` OPENS with `await run_seed()`, and `seed.seed()` **DELETEs every row of
+`decisions`**. So the card backfill DESTROYS the AML decisions, and an AML backfill that reseeded
+would destroy the card ones. They are not interchangeable and their order is not free.
+
+**RESTORE PROCEDURE — TWO ORDERED COMMANDS:**
+```
+python -m seed.backfill_decisions           # reseeds, then 4,000 card decisions + 8 perf windows
+python -m seed.backfill_aml_decisions       # APPENDS 1,500 AML decisions. NEVER reseeds.
+python -m scripts.embed_beliefs aml-cycle   # optional: a real vector for the azure belief
+```
+`backfill_aml_decisions` **REFUSES TO RUN** (loudly, **exit code 1**, verified) if the card backfill
+has not run — rather than silently producing a half-populated world, the failure mode hardest to
+notice and easiest to demo by accident.
+
+**THE PRECHECK'S FIRST DESIGN WAS TOO LOOSE, AND REAL STATE CAUGHT IT.** It counted "any driven
+decision with no `aml_transaction_id`" as evidence the card backfill had run. **8 leftover rows from
+an interrupted test run satisfied that count**, and the backfill happily proceeded into a world with
+zero card decisions. It now checks the CRIMSON belief's decisions AND its `belief_performance`
+windows specifically — i.e. `backfill_decisions`' actual OUTPUT. Found by running, not by reading.
+
+### ITEM B's "THE BELIEF ONLY EVER APPROVES" INVARIANT IS **DEAD**. Its death is a real finding.
+Item B was built when one belief existed, and that belief's whole behaviour was one branch of
+`_decision_from` (on-pattern -> approve). It asserted `withdrawn_approvals == approvals` against real
+data. **The azure belief BLOCKS** (`aml_seam.VERDICT_FOR`: MATCH -> `blocked`, 57 of 1,500).
+
+**The old aggregate did not merely fabricate — it INVERTED.** `withdrawn_approvals` was `count(*)`,
+and `frauds_auto_approved` was `count(*) FILTER (is_fraud)`. Against the azure belief that reports
+**1,500 withdrawn approvals** (true: 1,443) and **300 auto-approved frauds** (true: 257) —
+**crediting the 43 laundering rows the belief CORRECTLY BLOCKED as 43 fraud approvals.** A forensic
+tool stating the exact opposite of what happened, in the most damaging possible direction. Measured
+on a live probe BEFORE the fix (30 rows, 6 blocked / 24 approved): the endpoint returned
+`withdrawn_approvals: 30, frauds_auto_approved: 6` — and all 6 of those frauds had been BLOCKED.
+
+The aggregates are now VERDICT-AWARE, and the vocabulary is split rather than conflated:
+`withdrawn_approvals` (approvals only) / `withdrawn_blocks` / `frauds_auto_approved` (of the
+APPROVALS — the real harm) / **`frauds_caught_by_block`** (of the BLOCKS — what invalidation would
+FORFEIT; M's counterweight, so a correct block can never again be presented as a harm).
+`test_a_blocking_belief_is_not_reported_as_approving` is the regression, and it was **verified to
+FAIL against the old aggregate** (`assert 8 == 5`). Live: azure now reports 1,443 approvals / 57
+blocks / M=257 / 43 caught. Crimson is unchanged (N=1000, M=392 at the window-4 T).
+
+### The per-window breakdown was EIGHT SILENT ZEROS. Now it is `null`.
+`_WINDOW_SQL` bucketed by `generation_windows()` — the **CRIMSON generation clock** (window 0 opens
+2024-05-12; window 7 closes **2026-06-30**). The azure belief's single fixed `decided_at`
+(2026-07-12) falls OUTSIDE all eight. Measured before the fix: `[0,0,0,0,0,0,0,0]` (sum 0) against a
+non-zero headline — the breakdown silently contradicting itself. Windows now come from the belief's
+OWN `belief_performance` rows, and a belief with none gets **`windows: null`** — an explicit "this
+belief has no measured time structure", never a fabricated grid. Same honest-absence the staleness
+block already emits. `generation_windows` is no longer imported by `counterfactual.py`; do not
+reintroduce it there.
+
+### EVERY READ SURFACE, FOR A PERFORMANCE-LESS BELIEF — RUN, NOT REASONED
+The feared silent `confidence: 0.0` **does not happen anywhere**. `staleness_evidence([])`
+short-circuits on `if not rows` before any arithmetic, so the empty case can never reach `wilson_ci`
+or Fisher. Measured against the real azure belief through the real HTTP surface:
+
+| surface | actual | honest? |
+|---|---|---|
+| `GET /beliefs/{id}/performance` | 200 / `windows: []` / `count: 0` / `uncertainty: null` | yes |
+| `certificate.gather_staleness_evidence` | `{"available": false, "window_count": 0, "windows": []}` | yes — NOT 0.0 |
+| certifier Lambda | same shared pure builder -> `available:false`, `staleness_sample_agreement: null` | yes |
+| frontend `TimeTravel.tsx:186` | `windows.length === 0` -> "No measured performance windows for this belief yet" | yes |
+| `GET /beliefs/{id}/provenance-audit` | 200 / **CLEAN** / 7 edges / 0 anomalies | yes |
+| `GET /beliefs/{id}/lineage` | 200 / 8 nodes | yes |
+| `GET /beliefs/{id}/counterfactual-invalidation` | **was INVERTED — fixed above** | now yes |
+
+So invalidating the azure belief degrades HONESTLY: a valid, hash-covered certificate carrying
+`staleness_evidence: {available: false}`. Nothing crashes; no fabricated rot.
+
+### THE SECOND BELIEF TOUCHES NOTHING CRIMSON — verified against the real tests, not asserted
+Azure was a complete, belief-FREE 8-generation spine, so the two closures are DISJOINT (no shared
+agent, no shared edge, no shared decision). Verified live after the build: crimson's 8 edges, 2
+living holders, 2,000 belief-driven decisions, 8 perf windows and its curve
+**`.924 .952 .876 .852 .724 .556 .624 .528` reproduce byte-for-byte**. The azure belief has 7 edges
+and exactly ONE living holder (azure-7) — every azure sibling is dead by construction
+(`live = alive and bl == "crimson"`), so azure carries no fork. Crimson already carries the fork the
+lineage CTE and the atomic closure exist to exercise; azure's job is grounding, not a second topology.
+
+**THE ONE SURFACE THAT HAD TO MOVE** is the belief CATALOG count. `test_read_endpoints.py` asserted
+`count == 1` from Phase 1 through G2. The fleet genuinely holds two beliefs now, so it asserts
+**2** — a STATED re-baseline, changed because the world moved, not relaxed to make a test pass.
+Every other belief test is scoped to `bid("origin")` explicitly and is untouched.
+
+### VECTOR SEARCH: a second belief changes NO existing retrieval (verified with both beliefs live)
+`agent_brain._retrieve_beliefs` scopes candidates to `b.originating_agent_id = :agent OR
+bi.to_agent_id = :agent`. Ran the real SQL with both beliefs present: **crimson-7 -> 1 candidate**
+(the crimson belief only); **azure-7 -> 1 candidate** (the azure belief only). Zero cross-talk.
+`score_transaction` has exactly ONE caller in the whole repo (`scripts/demo_agent.py`) — no test, no
+route. `typology_corpus` is separate metadata and is untouched.
+
+### FINDING (separate, real, NOT fixed here): the crimson belief's embedding is STILL THE PLACEHOLDER
+Measured on the live cluster: cosine distance **0.000000000** between the stored vector and
+`seed.placeholder_embedding(1536)`. The honesty ledger's "placeholder -> real" row therefore
+describes a transition that **has not actually happened on the live cluster** for crimson. Root
+cause: `seed.seed()` RE-PLANTS the placeholder on every run, and `scripts/embed_beliefs.py` was never
+re-run after the last reseed. **Deliberately NOT fixed inside this phase** — this phase's guarantee
+is that it touches nothing crimson, and quietly re-embedding it would break that. Flagged for the
+ledger; it is its own decision.
+
+Consequently `embed_beliefs.py` is now **TARGETED**: `python -m scripts.embed_beliefs aml-cycle`. It
+used to embed EVERY active belief (`WHERE status='active'`), which — with a second belief in the
+fleet — would have silently rewritten crimson's vector as a side effect of embedding azure. It now
+REFUSES to guess (`--all` is opt-in and never implicit; verified it exits with the refusal). Azure's
+vector is real (cosine distance 1.01 from the placeholder — verified).
+
+### G3/G4 VERIFICATION GATE — all green
+- **130 backend tests pass** (124 prior + 5 oracle-boundary + 1 counterfactual regression), ~2m38s.
+- `scripts/verify_aml_ingest.py` — **ALL CHECKS PASSED** (21) against the live cluster + raw CSV.
+  `aml_transactions` still 1,500: **NOT re-ingested, NOT re-sampled** — Item 4's asserted constants
+  and Item 7's eval inputs are untouched, and the seam's census (57/463/980, 43/5/252) reproduces
+  them exactly.
+- `ensure_demo_ready()` still provisions `demo` (2 beliefs, 15 edges, **0** `aml_*` tables) — the
+  FK-in-migration-only design still holds.
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk).
+- **Cluster restored and INDEPENDENTLY re-verified with real SELECTs** (not the script's echo):
+  head 0007, 24 agents, 2 beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500 AML), 8 crimson
+  perf windows, 0 azure perf windows, 1,500 aml_transactions, crimson curve byte-identical.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(seed): a second founding belief — azure-0's laundering typology, inherited to azure-7 (G3)`
+- `refactor(scripts): embed_beliefs targets a belief; never re-embeds a bloodline as a side effect`
+- `test(read): the belief catalog carries two beliefs — a stated re-baseline (G3)`
+- `feat(seam): the label-free decider — a verdict is a pure function of the unlabeled graph (G4)`
+- `test(oracle): the deciding path cannot see a label, in Python OR in SQL — both trips demonstrated`
+- `feat(seam): the grounded backfill — the living azure-7 decides on 1,500 real IBM edges (G4)`
+- `fix(counterfactual): verdict-aware counts — a blocked fraud is a CATCH, not an auto-approval`
+- `docs(notes): record G3 + G4 — the seam, the oracle tripwire, and Item B's dead invariant`
+
+### G3/G4 explicitly NOT done (still gated): `belief_performance` for the azure belief (step 4 is
+### CUT — re-read "THE BASE-RATE MIRAGE" before re-proposing it); any certificate schema change; the
+### AML console; the regulatory corpus; a `verdicts` table; the frontend RENDERING of AML decisions
+### (the G2 ripple keeps the console type-correct and non-lying; presenting them properly is the
+### deferred frontend session's job); any re-ingestion or re-sampling of `aml_*`; any LLM on the
+### deciding path; re-embedding the crimson belief. Do NOT push without explicit approval — held for
+### review of the result.
