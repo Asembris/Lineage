@@ -7,6 +7,7 @@ evaluation numbers, see [README.md](README.md).
 ## Contents
 
 1. [Three deliberately-separated schemas](#1--three-deliberately-separated-schemas)
+   — and [1.1 the grounding seam, as built](#11--the-grounding-seam-as-built--and-the-trap-designed-out-of-it)
 2. [The atomic invalidation transaction](#2--the-atomic-invalidation-transaction)
 3. [AS OF SYSTEM TIME and deterministic replay](#3--as-of-system-time-and-deterministic-replay)
    — including [when *not* to use it](#when-not-to-use-as-of-system-time--the-counterfactual-and-the-two-clocks)
@@ -14,10 +15,13 @@ evaluation numbers, see [README.md](README.md).
 5. [The witness-construction brake](#5--the-witness-construction-brake)
    — and [5.1 the explanation-faithfulness guard](#51--the-same-discipline-applied-to-prose-the-explanation-faithfulness-guard)
 6. [Verifying the provenance graph itself (A1–A4)](#6--verifying-the-provenance-graph-itself-a1a4)
+7. [The design principle: make the wrong thing unrepresentable](#7--the-design-principle-make-the-wrong-thing-unrepresentable)
 
-Seven diagrams, each over real code. The two newest — the faithfulness guard (§5.1) and the
-provenance audit (§6) — are the system's two answers to *"who checks the checker?"*: one guards the
-model's **prose** against the evidence, the other guards the **evidence** against tampering.
+Eight diagrams, each over real code. §5.1 (the faithfulness guard) and §6 (the provenance audit) are
+the system's two answers to *"who checks the checker?"* — one guards the model's **prose** against the
+evidence, the other guards the **evidence** against tampering. **§7 is the answer to a harder version
+of that question: who checks the humans?** It is the method behind every mechanism here, and the one
+section to read if you only read one.
 
 ---
 
@@ -110,6 +114,133 @@ spanning graph + vectors + time-travel is the competitive thesis.
 > (14 of the 57 edges it fires on are benign) is only *meaningful* because the witness never saw the
 > label — print the label beside the witness's own work and a reader can no longer tell detection
 > from lookup.
+
+### 1.1 · The grounding seam, as built — and the trap designed out of it
+
+The seam is the only crossing, so it carries the whole weight of "the moat may reference the evidence
+layer." Four migrations' worth of mechanism sits behind that one FK, and **the most important part of
+it is a curve we refused to draw.**
+
+```mermaid
+flowchart TD
+    subgraph P1["PHASE 1 — DECIDE. The label query has not run. It <i>cannot</i> have influenced anything."]
+        G["aml_graph.load_graph()<br/>SELECT projects NO label<br/>Edge has nowhere to put one"] --> DEC["aml_seam.decide(graph, edge)<br/><i>pure · label-free BY TYPE</i>"]
+        DEC --> OUT{"cycle_witness"}
+        OUT -->|"MATCH · 57"| B["blocked<br/>txn_ref = aml:MATCH"]
+        OUT -->|"CONCLUSIVE_NO · 463"| A1["approve<br/>txn_ref = aml:CONCLUSIVE_NO"]
+        OUT -->|"INCONCLUSIVE · 980"| A2["approve<br/>txn_ref = aml:INCONCLUSIVE<br/><b>65.3% — COULD NOT DETERMINE</b>"]
+    end
+
+    B --> BAR["all 1,500 verdicts now exist"]
+    A1 --> BAR
+    A2 --> BAR
+
+    subgraph P2["PHASE 2 — SCORE. Only now is the oracle opened."]
+        L["_LABELS_SQL<br/>is_laundering AS ground_truth"] --> W["INSERT decisions<br/>is_fraud ← the real label<br/>aml_transaction_id → the real row (FK)<br/>decided_at = ONE FIXED INSTANT"]
+    end
+
+    BAR --> W
+
+    style P1 fill:#1e2a44,stroke:#6b8cae,color:#e8eef7
+    style P2 fill:#2a2440,stroke:#8c7bae,color:#e8eef7
+    style A2 fill:#3a2a1e,stroke:#ae8c6b,color:#f7eee8
+```
+
+**The order is the integrity argument.** Every verdict exists before the label query runs at all, so
+"the decider never saw the label" is not a promise about reviewer attention — it is a property of the
+control flow, pinned by `tests/test_oracle_boundary.py`.
+
+**Two kinds of decision, made structural rather than conventional.** Migration **0006** added the FK,
+and — to let an AML row honestly carry no merchant and no confidence — dropped `NOT NULL` on both.
+That silently handed the *card* path away too: a card decision missing both columns was suddenly
+accepted, a real regression in the moat. Migration **0007**'s `ck_decisions_kind` closes it by making
+the taxonomy a CHECK:
+
+```
+   (aml_transaction_id IS NULL     AND merchant IS NOT NULL AND confidence IS NOT NULL)
+OR (aml_transaction_id IS NOT NULL AND merchant IS NULL     AND confidence IS NULL
+                                   AND amount_currency IS NOT NULL
+                                   AND txn_ref IN ('aml:MATCH','aml:CONCLUSIVE_NO','aml:INCONCLUSIVE'))
+```
+
+The card branch restores *exactly* the guarantee Phase 1 had. The AML branch is **stricter than
+merely permitting NULLs, on purpose**: it makes a fabricated merchant and a fabricated confidence
+**impossible to write**, rather than discouraged in a comment.
+
+**The basis tag, and why the database defends it** (`txn_ref IN (...)`, added by **0008**). Two
+witness outcomes — `CONCLUSIVE_NO` and `INCONCLUSIVE` — both map to `approve`, so **the verdict alone
+cannot distinguish *"we searched and there is no cycle"* from *"we could not tell"*.* For an AML row
+the real reference is the FK, which frees `txn_ref` to carry the decision's **basis** instead. Nothing
+stopped a future backfill writing `txn_ref = str(txn_id)` — the obvious thing to write — silently
+destroying the only in-data carrier of the coverage split with no test failing. So 0008 pins the three
+legal strings in the database. `witness_outcome` on `DecisionOut` is then a **projection of that
+persisted tag, never a re-derivation** — the recorded outcome is what the agent decided *then*;
+re-running the witness would answer a different question (what the graph says *now*), and serving both
+side by side would quietly assert they are the same object.
+
+> **THE DISCLOSURE THIS ALL EXISTS TO PROTECT.** `INCONCLUSIVE → approve` is **65.3% of the extract
+> (980 / 1,500)** and it silently approves **252 of the 300 laundering rows**. Letting a payment
+> through absent evidence is what a real system does; the price is most of the fraud. **This
+> proportion must travel with every quote of the seam's decisions.** It has been corrupted by prose
+> twice — once misstated as "728 / 48.5%", once sourced to a `scripts/verify_seam.py` that never
+> existed — which is exactly why it is now defended by a CHECK constraint, a test that runs the real
+> decider over the real extract, and a console row that **counts** it from the cluster instead of
+> quoting it. *(Do not confuse this **coverage** figure with the structural detector's **65.3%
+> hold-out recall** in [README](README.md) — unrelated quantities that happen to share a number.)*
+
+**The reverse lookup, and a partial index that had to be proven usable.** The FK runs
+decision → transaction; nothing resolved the other way, so from a flagged transaction there was no way
+to ask *"did any agent act on this?"* The query was a declared **`FULL SCAN`** of `decisions` — the
+one genuinely growing table in the schema — and CockroachDB's optimizer emitted the index
+recommendation unprompted. 0008 adds it **partial** (`WHERE aml_transaction_id IS NOT NULL`), which
+indexes the 1,500 seam rows and none of the 4,000 card NULLs — but that is only usable if the planner
+*proves* `col = $1` implies `col IS NOT NULL`. That is CockroachDB's inference to make, not ours to
+assume, so it was checked against the real planner before the design was trusted:
+
+```
+                                   -- BEFORE 0008              -- AFTER 0008
+scan decisions@decisions_pkey      FULL SCAN                   scan decisions@ix_decisions_aml_txn
+estimated row count                5,500 (100% of table)       1 (0.02% of table)   [partial index]
+median latency                     89.4 ms                     51.0 ms  (≈ the Cloud round-trip floor)
+```
+
+It is deliberately **not** `STORING (...)` — the index join for a single row is one extra KV read, we
+are already at the floor, and a `STORING` index must be kept in sync with every future `DecisionOut`
+field for no measured gain. The route mounts on **`/decisions`, not `/aml`**: *"did any agent act on
+this?"* is a question about the **moat**, and a decision carries `is_fraud` — hanging it off `/aml`
+would put the answer key one hop from the witness's own work, under the prefix whose entire discipline
+is that it does not go there.
+
+> ### The trap: a rot curve that would have been spectacular, reproducible, and false
+>
+> The seam's original design called for recomputing `belief_performance` from these real outcomes —
+> which would have given the project its best-looking result and its worst dishonesty. Window these
+> decisions by transaction time and the confidence curve reads **0.974 → 0.000**, a Cochran-Armitage
+> trend of **z = −24.90 (p ≈ 1e-143)**, first-vs-last CIs disjoint. Every field in the resulting
+> certificate would have been **individually true**.
+>
+> **It is 100% an artifact of the ingestion sample.** The benign negatives were drawn in CSV order
+> until a 4:1 cap filled, so **1,092 of the 1,200 benign rows (91%) land on the extract's first day**,
+> and the last two windows contain **zero benign transactions** — a "confidence" of 0.000 there
+> measures the *sample*, not the belief. Base-rate-free measures settle it: per-window **recall is
+> exactly 1.000 in every window** (a cycle is a cycle on day 1 and on day 9 — the witness is a
+> structural definition, not a fitted threshold, so it has nothing to decay *with*), per-window
+> precision shows **no significant trend** (z = −0.60, p = 0.55), and holding composition still
+> collapses the decay from **−0.974 to −0.056**. **The belief is imperfect, not stale** — its error
+> rate is *constant*.
+>
+> **So the trap is designed out of the schema, not warned about in a comment.** Every AML decision
+> carries **one fixed `decided_at`** and deliberately *not* the transaction's own timestamp. With
+> every decision at a single instant there are **no time windows to draw a curve from at all** — the
+> mirage is not discouraged, it is **unrepresentable**. `belief_performance` is never computed for
+> this belief, and a belief with no windows honestly returns `windows: null` rather than a grid of
+> zeros. Using the real transaction timestamp would look like a fidelity improvement and would hand
+> the next session a beautiful fake decay curve. **Do not "improve" it.**
+>
+> This is why the seam earns the **provenance** half of a causal chain and never the
+> **justification** half — and why the staleness story stays where it is honestly measured, on the
+> simulated world that has real hidden drift by construction. Full numbers:
+> [NOTES.md](NOTES.md) → *THE BASE-RATE MIRAGE*.
 
 ---
 
@@ -477,6 +608,56 @@ what A1–A4 check. MITRE ATLAS **AML.T0080** is labeled **secondary-sourced**: 
 SPA that could not be rendered, so the ID is corroborated across independent secondary sources rather
 than confirmed on the authoritative page. It is labeled that way rather than asserted as primary —
 the same standard as the MCP disclosure. → `app/services/provenance_audit.py`
+
+---
+
+## 7 · The design principle: make the wrong thing unrepresentable
+
+Everything above is a mechanism. **This is the method that produced them**, and it is the single most
+transferable thing in this repository.
+
+Every rule in a codebase is enforced one of two ways: by a **person remembering it**, or by the
+system **making its violation impossible**. A comment, a docstring, a NOTES entry and a code review
+are all the first kind. They work exactly as long as the next person reads them — and this project
+has now watched that fail enough times to stop trusting it. The phantom "728 / 48.5%" figure was
+introduced and corrected **twice**. A warning about a fragile test probe was written down, read, and
+then **violated by the very session that had just read it**. Four separate documents asserted that
+`scratchpad/` was gitignored — including the guard written to stop unchecked claims — and
+`git check-ignore` returned nothing.
+
+> **The rule that emerged: when a constraint matters, do not document it. Make it unrepresentable —
+> in a type, a metadata boundary, a database constraint, or a test that fails loudly.** Documentation
+> is how you explain a guard. It is not a guard.
+
+There are **eight** instances, each shipped for its own reason and each independently verified to
+**trip** — a guard that cannot fail is theatre, so every one of these had its violation deliberately
+introduced, watched fail with real output, and reverted.
+
+| # | The wrong thing | Why a comment was not enough | What makes it impossible | Enforced in |
+|---|---|---|---|---|
+| **1** | The demo database silently gains empty `aml_*` / corpus tables, or the "five-table moat" quietly becomes seven | `create_all` reaches whatever is on its metadata; a reviewer cannot see what a metadata *contains* | `aml_*` and `typology_corpus` live on **separate `DeclarativeBase` metadata**, so `Base.metadata.create_all` **physically cannot** reach them. Isolation by Python object identity, not discipline | `app/aml_models.py` · `app/corpus_models.py` |
+| **2** | A future session "fixes" the ORM by declaring the seam's `ForeignKey` on the `Base`-mapped `Decision` — and breaks the demo database at runtime | It looks exactly like a bug. The model *understates* the schema, which is otherwise always wrong | The real FK lives in **migration 0006 only**; the ORM declares a plain `Uuid`. `defaultdb` enforces "no dangling references" in the **database**; `Base.metadata` stays clean so `create_all` still works. Re-declaring it raises `NoReferencedTableError` — and a test fails *first*, naming the edge | `migrations/0006` · `app/models.py` · `tests/test_grounding_seam.py` |
+| **3** | An AML decision fabricates a merchant or a confidence — the two values it has no honest way to produce | Item 4 proposed a "fake merchant"; Item D proved `confidence` is pure noise. Both were *refused in prose*, and prose does not execute | **0007's `ck_decisions_kind`** — the AML branch requires merchant and confidence to be **NULL**. The database rejects the fabrication. (It also restores the card branch's Phase-1 `NOT NULL` guarantee, which 0006's `DROP NOT NULL` had silently given away) | `migrations/0007` |
+| **4** | A future backfill writes `txn_ref = str(txn_id)` — the obvious thing — silently destroying the only in-data carrier of the 65.3% coverage split, **with no test failing** | Not hypothetical: this project has corrupted that census in prose **twice** | **0008 extends `ck_decisions_kind`** to pin `txn_ref IN ('aml:MATCH','aml:CONCLUSIVE_NO','aml:INCONCLUSIVE')`. The vocabulary has one home (`aml_seam.TXN_REF_TAGS`), and a test asserts the migration's three SQL literals **are** that tuple | `migrations/0008` · `app/services/aml_seam.py` |
+| **5** | A future session "improves fidelity" by stamping AML decisions with the transaction's real timestamp — and reintroduces the base-rate mirage, producing a **spectacular, reproducible, false** rot curve | The improvement is *plausible* and the resulting artifact is the best-looking result the project could ship. A warning is exactly what a tired session skips | Every AML decision carries **one fixed `decided_at`**. With every decision at a single instant, **there are no time windows to draw a curve from**. The mirage is not discouraged — it is **structurally unavailable** | `seed/backfill_aml_decisions.py:112` |
+| **6** | The ground-truth label reaches the decider — turning detection into lookup, and making CYCLE's honest 75.4% precision meaningless | **The obvious tripwire passes while proving nothing.** The deciding path reads the DB through **raw SQL**, so adding `is_laundering` to a query string creates no `ast.Name` and no `ast.Attribute` node. It edits a *string*. Guard green, witness reading the answer key, central claim silently false | `tests/test_oracle_boundary.py` walks **`ast.Constant` string values** as well as Name/Attribute/Import — with docstrings excluded *structurally*, because five modules discuss the oracle in prose precisely in order to refuse it. Both shapes were made to trip | `tests/test_oracle_boundary.py` |
+| **7** | Shipped code cites a probe or a test that **does not exist** — converting "unverified" into "verified" in the reader's mind at zero cost, and reading like diligence | Four such citations sat in the repo through multiple sessions, two documentation passes, and a review explicitly hunting for lying documents. **Nobody follows a citation — that is what a citation is for** | `tests/test_citations.py`: every cited repo path must **exist**; every `module::test` must **resolve to a real test function**; and **`scratchpad/` may be cited only from NOTES.md** — anywhere else it promises a runnable artifact and delivers a deleted file | `tests/test_citations.py` |
+| **8** | An ephemeral probe leaks into the repo — or, worse, the *premise* of guard 7 turns out to be false, and a skeptical reader deletes a guard that was doing real work | `scratchpad/` was asserted to be gitignored by NOTES, by ARCHITECTURE, **and by `test_citations.py`'s own docstring**. `git check-ignore` returned **nothing**. It was merely *untracked* | `scratchpad/` + `**/scratchpad/` in `.gitignore`. **The premise was made TRUE rather than reworded away** — a true rule resting on a false premise is one skeptical reader away from deletion | `.gitignore:37-38` |
+
+**Read the middle column, not the last one.** The mechanisms are ordinary — a metadata boundary, a
+CHECK constraint, an AST walk, a `.gitignore` line. What is not ordinary is *why each one exists*:
+every row is a place where this project wrote the rule down, watched a human violate it anyway, and
+then removed the human from the loop. Guards 4, 5, 6 and 8 in particular were each written **after**
+the corresponding prose warning had already failed at least once — and guard 8 was found inside the
+guard written to prevent it.
+
+> **The generalization, and the reason this section is here rather than buried in the engineering
+> log:** an agentic system's memory is exactly the kind of state nobody re-reads. That is the
+> project's whole thesis about *beliefs* — a rule formed under one regime outlives its validity
+> because no living agent remembers forming it. **The same failure mode governs the codebase that
+> models it.** A convention is an inherited belief, and it goes stale the same way. So the honest
+> response is the same one Lineage prescribes for its agents: do not trust the inherited rule to be
+> remembered — make the world one in which acting against it is not possible.
 
 ---
 
