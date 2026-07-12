@@ -120,46 +120,95 @@ def test_defaultdb_has_the_real_foreign_key():
     )
 
 
+# ============================ THE FK GUARD'S PROBE ROW, SHARED ============================
+# ONE definition, used by BOTH tests below, so they CANNOT drift apart. The FK guard needs a row
+# that is valid in every way EXCEPT its aml_transaction_id — otherwise some other constraint rejects
+# it first and the foreign key is never exercised at all.
+#
+# THIS HAS BEEN SPRUNG TWICE, and a docstring did not stop either one:
+#   * 0007 made the probe CHECK-invalid (it omitted `amount_currency`);
+#   * 0008 did it again (it required the txn_ref basis tag; the probe said 'seam-guard-probe').
+# Both times the FK guard went red on a CheckViolation while proving NOTHING about the foreign key.
+#
+# So the warning is now a GUARD, not a comment: `test_the_fk_guards_probe_row_is_still_a_valid_row`
+# inserts EXACTLY this shape with a REAL transaction and asserts the database ACCEPTS it. Tighten
+# ck_decisions_kind without updating this dict and that test fails, and its message tells you to fix
+# the PROBE — not to relax the FK assertion, which is the tempting wrong move that would silently
+# retire the foreign-key check.
+_FK_PROBE_SQL = (
+    "INSERT INTO decisions (id, agent_id, txn_ref, amount, verdict, decided_at, "
+    "is_fraud, aml_transaction_id, amount_currency) "
+    "VALUES (:i, :a, :r, 1, 'approve', now(), false, :t, 'US Dollar')"
+)
+_FK_PROBE_TXN_REF = "aml:INCONCLUSIVE"  # a real basis tag (0008); merchant/confidence omitted (0007)
+
+
+async def _insert_fk_probe(txn_id: uuid.UUID) -> uuid.UUID:
+    """The FK guard's exact row, citing `txn_id`. Real -> must be accepted; bogus -> FK must reject."""
+    probe_id = uuid.uuid4()
+    async with engine.connect() as c:
+        agent_id = (await c.execute(text("SELECT id FROM agents LIMIT 1"))).scalar_one()
+        await c.execute(
+            text(_FK_PROBE_SQL),
+            {"i": probe_id, "a": agent_id, "r": _FK_PROBE_TXN_REF, "t": txn_id},
+        )
+        await c.commit()
+    return probe_id
+
+
+def test_the_fk_guards_probe_row_is_still_a_valid_row():
+    """THE GUARD THAT KEEPS THE FK GUARD HONEST. Not a docstring — a test.
+
+    The FK guard below can only prove anything if its probe row is rejected by the FOREIGN KEY and
+    by nothing else. That is a property of the probe versus EVERY OTHER CONSTRAINT ON `decisions`,
+    and it has silently broken twice (0007, then 0008), each time converting the FK guard into a
+    test that proved nothing while still looking like it did.
+
+    So: insert the FK guard's EXACT row shape, citing a REAL transaction. The database must ACCEPT
+    it. If a future migration tightens `ck_decisions_kind` (or adds any other constraint) such that
+    this shape is no longer valid, THIS test fails first — and the fix is to update `_FK_PROBE_SQL`
+    / `_FK_PROBE_TXN_REF`, never to weaken the FK guard's assertion.
+    """
+
+    async def _run():
+        async with engine.connect() as c:
+            real = (await c.execute(text("SELECT id FROM aml_transactions LIMIT 1"))).scalar_one()
+        try:
+            pid = await _insert_fk_probe(real)
+        except IntegrityError as e:
+            raise AssertionError(
+                "THE FK GUARD'S PROBE ROW IS NO LONGER A VALID DECISION. Some constraint on "
+                "`decisions` now rejects it even with a REAL aml_transaction_id — so "
+                "test_database_rejects_a_dangling_aml_transaction_id is no longer testing the "
+                "FOREIGN KEY at all; it is being rejected by something else.\n\n"
+                "FIX THE PROBE (_FK_PROBE_SQL / _FK_PROBE_TXN_REF above), do NOT relax the FK "
+                "guard's assertion. This has happened twice already (migrations 0007 and 0008).\n\n"
+                f"The database said: {e.orig}"
+            ) from e
+        async with engine.begin() as c:  # clean up: it is a real, valid row
+            await c.execute(text("DELETE FROM decisions WHERE id = :i"), {"i": pid})
+
+    asyncio.run(_run())
+
+
 def test_database_rejects_a_dangling_aml_transaction_id():
     """CockroachDB — not the writer — must refuse a decision citing a nonexistent AML transaction.
 
     This is the whole reason the FK was kept as a real database constraint rather than traded for a
     writer-enforced convention.
 
-    NOTE the row below is otherwise a PERFECTLY VALID AML decision (merchant/confidence NULL, a real
-    currency, AND a real basis tag), so it satisfies migration 0007/0008's `ck_decisions_kind` CHECK
-    and the ONLY thing that can reject it is the foreign key. Without that care this test would pass
-    on a CheckViolation and prove nothing about the FK — so the failure is asserted to be a FOREIGN
-    KEY violation by name.
-
-    THIS HAS NOW BEEN SPRUNG TWICE. 0007 first made the probe row CHECK-invalid (it omitted
-    `amount_currency`); 0008 did it again by requiring the txn_ref basis tag, which this probe used
-    to spell 'seam-guard-probe'. Both times the test went red on a CheckViolation while proving
-    nothing about the foreign key. **Any migration that tightens ck_decisions_kind must re-check
-    that this row still satisfies it** — otherwise the FK stops being tested at all.
+    The row is otherwise a PERFECTLY VALID AML decision (see `_FK_PROBE_SQL` above), so the ONLY
+    thing that can reject it is the foreign key — and the failure is asserted to be a FOREIGN KEY
+    violation BY NAME. Without both of those, this test would go green on a CheckViolation and prove
+    nothing. `test_the_fk_guards_probe_row_is_still_a_valid_row` is what keeps the first half true.
     """
-
-    async def _run():
-        async with engine.connect() as c:
-            agent_id = (
-                await c.execute(text("SELECT id FROM agents LIMIT 1"))
-            ).scalar_one()
-            bogus = uuid.uuid4()  # certainly not in aml_transactions
-            await c.execute(
-                text(
-                    "INSERT INTO decisions (agent_id, txn_ref, amount, verdict, decided_at, "
-                    "is_fraud, aml_transaction_id, amount_currency) "
-                    "VALUES (:a, 'aml:INCONCLUSIVE', 1, 'approve', now(), false, :t, 'US Dollar')"
-                ),
-                {"a": agent_id, "t": bogus},
-            )
-            await c.commit()  # must never be reached
-
     with pytest.raises(IntegrityError) as exc:
-        asyncio.run(_run())
+        asyncio.run(_insert_fk_probe(uuid.uuid4()))  # certainly not in aml_transactions
+
     assert "foreign key" in str(exc.value).lower(), (
         "The insert was rejected, but NOT by the foreign key — so this test is not proving what it "
-        f"claims. Got: {exc.value}"
+        "claims. If ck_decisions_kind was just tightened, the fix is the PROBE (see _FK_PROBE_SQL), "
+        f"not this assertion. Got: {exc.value}"
     )
 
 
