@@ -4029,3 +4029,211 @@ break `verify()` — which is exactly why `test_confidence_now_is_still_a_bare_f
 ### corpus; the AML console; the recorded video; the decisions.aml_transaction_id seam; a second
 ### belief; a `verdicts` table; any change to the five tables / aml_* / typology_corpus.
 ### Do NOT push without explicit approval — held for review of the result.
+
+## The grounding seam (Item 6's five-step path) — INVESTIGATION: STEP 4 IS CUT (2026-07-12)
+
+The seam — a `decisions` row citing a REAL `aml_transactions` row — is GO, and it is being built.
+But **Item 6's step 4 (`belief_performance` recomputed from real AML outcomes) is CUT**, and step 5
+as Item 6 wrote it is rewritten. The reason is the most dangerous finding in this project so far,
+and this entry exists to preempt a future session from walking into it. NOTHING here was assumed;
+every number is from the live cluster / the real CSV.
+
+Probes (READ-ONLY, wrote nothing): `scratchpad/probe_aml_staleness.py`, `probe_aml_staleness2.py`,
+`probe_fk_isolation.py`.
+
+### THE BASE-RATE MIRAGE — a THIRD failure mode, distinct from C's and D's
+
+The prior two cut items each died of a nameable disease, and **this one is neither of them**:
+- **Item C** — a signal **too weak to see** (campaign effect 0.0227, under a 0.03 noise floor).
+- **Item D** — **computable, generator-free, and meaningless** (path length wearing a health hat).
+- **THIS — the base-rate mirage — is OVERWHELMING, SIGNIFICANT, AND FALSE.**
+
+Seed the laundering belief, have an agent apply it to the real 1,500-edge extract, window the
+resulting decisions by transaction time, and aggregate with `performance.py`'s exact formula. The
+curve that comes out is the most spectacular result the project has ever produced:
+
+```
+window                0      1      2      3      4      5      6      7
+confidence          .974   .316   .389   .456   .246   .250   .000   .000
+n                   1130     79     95    103     57     20      9      7
+```
+**Cochran-Armitage trend: z = -24.90, p ~ 1e-143.** First-vs-last 0.974 -> 0.000, DISJOINT 95% CIs.
+
+**It is 100% an artifact of Item 1's benign sampling. The belief is not rotting; the BASE RATE is
+moving.** Same window index:
+
+```
+window                0      1      2      3      4      5      6      7
+benign             1092     22     33     36     12      5      0      0
+laundering           38     57     62     67     45     15      9      7
+fraud rate          .034   .722   .653   .650   .789   .750  1.000  1.000
+```
+**Trend in the FRAUD RATE: z = +25.49, p = 2.5e-143.** Windows 6 and 7 contain **ZERO benign
+transactions** — a "confidence" of 0.000 there is not a measurement of the belief at all, it is a
+measurement of the sample.
+
+**ROOT CAUSE, named so it is never rediscovered:** `scripts/ingest_aml.py::stream_csv` walks the CSV
+in **file order** (which is ~chronological) and stops taking benign rows the moment the global 4:1
+cap (1200) fills. The laundering rows are exact-key matched wherever they occur. Result: **1092 of
+1200 benign rows (91.0%) land on 2022-09-01**, the first of the extract's 8.35 days.
+Edges/day: `09-01: 1128`, then `76, 90, 108, 59, 22, 8, 7, 2`. This was the right call for Item 1
+(adversarial negatives anchored to the fraud accounts) and it is **fatal to any time-series read of
+this extract.**
+
+### THE DECISIVE TEST — base-rate-FREE measures, which cannot be faked by composition
+
+If the belief were genuinely rotting, its discriminative power would have to fall. It does not:
+
+- **PRECISION per window** (of the edges the belief FIRES on, how many are truly laundering):
+  `.846 (11/13)`, `.800 (4/5)`, `.643 (9/14)`, `.762 (16/21)`, `.750 (3/4)`, then no fires.
+  **Trend: z = -0.60, p = 0.550 — NOT significant.**
+- **RECALL per window** (of the true CYCLE edges present, how many are caught): `11/11`, `4/4`,
+  `9/9`, `16/16`, `3/3` — **exactly 1.000 in every window. z = 0.00, p = 1.000.**
+  A cycle is a cycle on day 1 and on day 9. The witness is a STRUCTURAL DEFINITION, not a fitted
+  threshold, so it has nothing to decay *with*.
+- **BASE-RATE-MATCHED confidence** (every window re-weighted to the same 4:1 mix):
+  `.856 .778 .708 .737 .747 .800` — **first-to-last delta -0.056, total spread 0.149**, against the
+  raw **-0.974**. The decay evaporates the instant composition is held still.
+
+### THE COUNTERFACTUAL, STATED BLUNTLY (this is why the entry exists)
+
+Had the seam been built to Item 6's spec and the resulting curve simply READ, `belief_performance`
+would carry a textbook 0.97 -> 0.00 rot curve; the certificate would **hash-cover it as real
+staleness evidence measured against a real, externally-labeled dataset**; and every field in that
+document would be **individually true**. It is the exact "every field individually true, the
+juxtaposition fabricated" failure Item 6 rejected reading (b) to avoid — except this version
+arrives wearing the costume of the project's best result. A judge who checked the numbers would
+find them reproducible. Only a judge who checked the **denominators** would find the fraud.
+
+**A FUTURE SESSION WILL BE TEMPTED TO READ THAT CURVE. Do not.** It is not a bug to be fixed by
+better windowing, and it is NOT repairable by re-sampling the benign noise uniformly — that would
+only make the curve honestly FLAT (see the base-rate-matched row above), and it would move Item 4's
+asserted constants and Item 7's eval inputs, which is a separate prohibition.
+
+### THE BELIEF'S HONEST FAILURE MODE: constant, not stale
+
+CYCLE fires on **57/1500 edges, 43 of them truly laundering** — a precision of **75.4%**, i.e. it
+flags a benign transaction roughly **one time in four**, and that rate is **flat over time**.
+**A belief whose error rate is constant is IMPERFECT, NOT STALE.** That is the honest description
+and it is what the seam may claim.
+
+**We did NOT go looking for some other belief whose numbers happen to slope downward.** The IBM
+extract is a static synthetic world with fixed generator parameters over ten days
+(`2022/09/01 00:20` .. `2022/09/10 23:46` in the full CSV) — no hidden trend, no regime shock, no
+adapting adversary. Searching it until something decayed would be p-hacking, i.e. Item C's "coin
+flip dressed as an inference" with extra steps. **The staleness story stays where it is honestly
+measured: the Phase-2 simulated world, which has real hidden drift BY CONSTRUCTION and 250 samples
+per window.**
+
+### THE TRAP IS DESIGNED OUT OF THE SCHEMA, NOT DOCUMENTED IN A COMMENT
+
+**Every AML decision carries a SINGLE FIXED `decided_at`** — the agent evaluated the whole extract
+at one instant. **It deliberately does NOT carry the transaction's own `ts`.**
+
+**WHY (do not "improve" this):** with all decisions at one instant there are **no time windows to
+draw a curve from**, so the base-rate mirage is not merely warned about — it is **structurally
+unavailable**. Using the real transaction timestamp would look like a fidelity improvement and
+would silently REINTRODUCE the trap above, handing the next session a beautiful fake decay curve.
+Same class of move as Item 1 putting `aml_*` on a separate `AmlBase` metadata so `create_all`
+*physically cannot* reach it: make the wrong thing impossible, not merely discouraged.
+
+### STEP-BY-STEP STATUS of Item 6's five-step mechanism (NOTES ~L2074), verified against code
+
+1. **Add the nullable `decisions.aml_transaction_id` FK** — HOLDS in intent, but is UNDERSPECIFIED
+   and, as literally written, BREAKS THINGS. See the FK section below. It is also **not sufficient**:
+   Item 6 warned about `verdict` and `agent_id`, and **both turn out to be non-problems** (`verdict`
+   is a free `Text` column with no CHECK, so FLAG->`blocked` / NO_FLAG->`approve` maps cleanly onto
+   `performance.py`'s existing vocabulary; `agent_id` stops mattering the moment step 2 gives the
+   belief a real bloodline). It **missed the two that are real**: `merchant` is NOT NULL with no AML
+   meaning, and `amount` is a bare `Numeric` with no currency across a **14-currency** extract.
+2. **Seed a SECOND belief, inherit it down a bloodline** — HOLDS, and is **EASIER than anticipated**:
+   `azure` is a complete, belief-free 8-generation spine (gen 0-7, azure-7 alive) with ZERO
+   inheritance edges. A belief formed by azure-0 touches **nothing crimson**, so every existing
+   closure test / certificate / counterfactual / consistency proof is structurally untouched.
+3. **An agent applies it to real `aml_transactions`, `is_fraud` from `is_laundering`** — HOLDS, and
+   needs **NO LLM** (Item 6's own conclusion: "it must be the DETERMINISTIC witness, never the LLM
+   verdict"). One wrinkle Item 6 did not see: the brake's third state has no home in the verdict
+   vocabulary — see the INSUFFICIENT_COVERAGE disclosure below.
+4. **Recompute `belief_performance` from those outcomes** — **CUT. REFUTED BY DATA.** See above.
+5. **A FLAG then constitutes grounded justification a certificate may cite** — **REWRITTEN.** As
+   worded it does not even parse: a FLAG on a cycle **CONFIRMS** a cycle-belief, it does not
+   contradict it. And the justification Item 6 imagined **was step 4's curve**, which is the
+   artifact. **The certificate is NOT touched by this seam and its schema does NOT move.**
+
+Ordering (1 -> 2 -> 3) is still right. Steps 4 and 5 are not.
+
+### INSUFFICIENT_COVERAGE -> `approve` is a DISCLOSED MODELING CHOICE, with its real weight attached
+
+The CYCLE search over all 1,500 edges (measured live; matches Item C's cited 57/463/980 split):
+
+| outcome         | edges | share     | laundering | benign |
+|-----------------|-------|-----------|------------|--------|
+| MATCH           |    57 |      3.8% |         43 |     14 |
+| CONCLUSIVE_NO   |   463 |     30.9% |          5 |    458 |
+| INCONCLUSIVE    |   980 | **65.3%** |    **252** |    728 |
+
+Mapping "cannot corroborate" -> `approve` is defensible (a real system lets a payment through absent
+evidence) but it is **NOT free, and it is NOT a corner case: it is 65.3% of the extract, and it
+silently approves 252 of the 300 laundering rows.** The seam's decision population is therefore
+dominated by an honest "we could not tell" that is recorded as an approval. **Quote this proportion
+wherever the seam's decisions are quoted.** (An earlier draft of this analysis said "728/1500" —
+that is the BENIGN-ONLY inconclusive count from Item 4 and it UNDERSTATES the real figure. 980/1500.)
+
+### THE FK FINDING: Item 6's step 1, as literally written, BREAKS ITEM 0's DEMO DATABASE
+
+Verified by RUNNING it (`scratchpad/probe_fk_isolation.py`), not by reasoning:
+
+- Item 1's **prose** forbids a FK "from the evidence layer INTO the moat" — one direction, so a
+  `decisions -> aml_transactions` FK survives the SENTENCE. But its **mechanism** and its
+  **verification** are both **SYMMETRIC**, and they are the things that actually hold:
+  `verify_aml_ingest.py` check #7's predicate is `ch.startswith("aml_") != pa.startswith("aml_")`,
+  which trips on the moat->aml direction **exactly as on the reverse**.
+- **The real damage:** a `ForeignKey("aml_transactions.id")` declared on the `Base`-mapped
+  `Decision` makes **`Base.metadata.create_all` raise `NoReferencedTableError`** (target table lives
+  on `AmlBase`). `app/demo_db.py::ensure_demo_ready()` calls exactly that — so **the `demo` database
+  can no longer be provisioned and the SSE consistency demo breaks at runtime.** Item 1's separate
+  metadata, designed to make the isolation structural, is the very thing that bites.
+
+**RESOLUTION (approved): the real FK lives in the MIGRATION; the ORM model declares a plain `Uuid`.**
+`defaultdb` gets a genuine database-enforced FK, so CLAUDE.md's "no dangling references"
+non-negotiable stays **literally true and enforced by CockroachDB, not by the writer**; `demo` still
+provisions because `Base.metadata` carries no dangling reference. Check #7 is **consciously amended
+to permit exactly ONE named edge** (`decisions -> aml_transactions`); every other crossing still
+fails. The deliberate **model-vs-database** and **demo-vs-defaultdb** divergences are documented in
+`app/models.py` and guarded by a test — see the G2 section.
+
+### CONTAMINATION: the seam CANNOT disturb Item 7's numbers. The hold-out stays a hold-out.
+
+- **`scripts/eval_detection.py` touches the database ZERO times** — no engine, no session, no SELECT
+  (verified by grep, not by trusting its docstring). It reconstructs BOTH the development and
+  hold-out extracts **in memory from the CSV** and scores them with the frozen witnesses.
+- The seam writes **only** to moat tables (`decisions`, `beliefs`, `belief_inheritance`) and
+  **nothing** to `aml_*`. The eval's inputs are structurally unreachable from it. **No re-run needed.**
+- **The caveat that must travel:** the seam's decisions are made against the **1,500-edge DEVELOPMENT
+  extract** — the same in-sample set `FLAG_CAPABLE` was chosen on. Any number derived from them is a
+  **development-set number** and inherits Item 4's disclosure verbatim. Not new contamination; the
+  existing one, restated so it is not rediscovered as a surprise.
+- **DO NOT re-ingest or re-sample `aml_*`.** That WOULD move Item 4's asserted constants — the
+  soundness test would fail loudly, which is the tripwire working as designed.
+
+### WHAT THE SEAM DOES AND DOES NOT UNLOCK (so it is not oversold)
+
+**Does:** the first time any decision in this system cites **real external evidence**. A real causal
+chain of real rows — azure-0 forms a laundering belief -> inherited down the azure spine -> the
+LIVING azure-7 applies it to a REAL IBM transaction -> the decision cites that real row ->
+`is_fraud` comes from the real `is_laundering`. A living agent acting on a belief formed by an
+ancestor it never met, on real labeled data.
+
+**Does NOT:** supply a staleness narrative on AML data (measured: it does not exist). It earns the
+**provenance** half of Item 6's reading (b), NOT the **justification** half — because that
+justification was step 4's curve. **DEMO.md keeps its TWO-ACT structure** (Item F's call stands) and
+must not be rewritten to imply a rot story the data cannot supply. Still missing afterwards: the AML
+console, the regulatory corpus, a `verdicts` table, any frontend wiring.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(notes): record the base-rate mirage — Item 6's step 4 is cut` (this entry)
+
+### Explicitly NOT done in this investigation: no code, no migration, no schema change, no cluster
+### write, no AML/corpus touch, no frontend, no LLM call. The seam's BUILD (migration 0006, the
+### second belief, the grounded backfill) is phased separately and gated — see the G2/G3/G4 sections.
+### Item 6's step 4 is CUT: do NOT re-propose it from the roadmap line; re-read this entry first.
