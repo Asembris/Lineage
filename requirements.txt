@@ -53,3 +53,9 @@ deepeval==4.0.9
 # DeepEval constructs its own HTTP client we can't hand a scoped verify= to — unlike the app's
 # openai_client.py / aws_client.py, which scope the same fix to the client they own.
 truststore==0.10.4
+
+# Roadmap: the regulatory corpus. Used ONLY by scripts/verify_regulatory.py, to re-extract the
+# source PDF text INDEPENDENTLY of LlamaParse and prove every stored red flag traces back to it.
+# Pure Python, zero transitive dependencies — it cannot move any pin. NOT the parser: LlamaParse
+# stays out of this file entirely (it would upgrade SQLAlchemy and numpy). See scripts/parse_regulatory.py.
+pypdf==6.14.2
