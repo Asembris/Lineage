@@ -114,7 +114,25 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
 - **Emergent curve (4000 rows, computed from raw decisions, matches the intent):**
   conf g0..g7 = .924 .952 .876 .852 .724 .556 **.624** .528 ; fraud% 7.6->47.2 ;
   frauds_approved 19->118. The gen-6 bump (.556->.624->.528) is the campaign recession dip —
-  a monotone sigmoid could never produce it. fp_rate == 0 across all windows and is HONEST:
+  a monotone sigmoid could never produce it.
+  **[CORRECTED by Item C, 2026-07-12 — that last clause is true of the generator's HIDDEN MEAN and
+  FALSE of the OBSERVED curve, and the distinction is load-bearing because the observed curve is the
+  only thing a detector, a judge, or the sparkline ever sees. Measured, not argued (20,000 simulated
+  worlds per arm, scratchpad/monotone_test.py): the campaign IS real in the process — it lifts the
+  rate of a visible gen-6 recovery from 9.2% to 63.3% — but its entire w5->w6 signature is only
+  +0.0227 in the fraud mean, SMALLER than the per-window regime-shock SD (_WINDOW_JITTER_SD = 0.03)
+  the generator adds to every window independently. So a strictly MONOTONE world (campaign amplitude
+  zeroed, all else identical) still produces a visible gen-6 confidence recovery in **9.2%** of
+  worlds, and one at least as large as this world's in 0.8%. In THIS world the observed +0.068 bump
+  is **3.0x the true effect — ~67% of what you see is noise** — and a two-proportion test on it gives
+  **p = 0.12, not significant** at n=250/window. WHAT SURVIVES: the dip is still real evidence the
+  curve is EMERGENT rather than hardcoded (it is aggregated from raw Bernoulli labels and reproduces
+  byte-for-byte; a stored constant could not do that). WHAT DOES NOT: nobody may be invited to read
+  the bump as visible evidence of the CAMPAIGN specifically. That inference is reachable only by
+  reading _CAMPAIGN_AMP in app/sim/transactions.py — the generator's answer key — which is the exact
+  move aml_graph.py refuses when it declines to read aml_pattern_members. Full numbers and the
+  refutation of Item C's characterization reading: "Roadmap Item C" at the bottom of this file.]**
+  fp_rate == 0 across all windows and is HONEST:
   this belief only ever approves, so its failure mode is approving fraud (false negatives),
   never false positives. Baseline off-pattern fraud wobbles 1.2%-6.4%, no trend.
 
