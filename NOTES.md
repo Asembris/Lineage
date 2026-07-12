@@ -3225,3 +3225,68 @@ failed to bind — no orphan created). aml_* / typology_corpus untouched through
 ### laundering belief + agent runs + backfill — Item 6's five-step path, gated); Item C/D; the
 ### regulatory corpus; a `verdicts` table; any change to the five tables / aml_* / typology_corpus.
 ### Do NOT push without explicit approval — held for review of the result.
+
+## Roadmap Item 9 — the honesty ledger as a console surface (2026-07-11)
+
+**Entry written retroactively during Item 10 (2026-07-12).** Item 9 shipped as commits `4082170`
+(README ledger reconciled with Items A/B/E + the dangling endpoints) and `a130cc4` (the console
+view), but — alone among Items 0 through F — it never got a NOTES section. The gap was found by
+Item 10's audit and is closed here from the commits and the source, not from memory. Recording it
+because an engineering log with a hole in it is exactly the kind of quiet drift this project's whole
+thesis is about.
+
+### The idea: the honesty ledger is a FEATURE, not a disclaimer at the bottom of a README
+Every prior item ended by writing its caveats into the README's ledger. Item 9's move is to promote
+that table into a **first-class, fleet-level credibility surface in the running console** — a judge
+can click "Ledger" and read, in the product, exactly what is real / synthetic / measured / assumed.
+The claim being made is not "we have a caveats section"; it is "the system knows and reports its own
+provenance". `app/services/…` unchanged: NO new backend, no new route, no migration.
+
+### Header-mode, not a panel — the same call Phase 4 made for the consistency demo
+The ledger describes the WHOLE system's provenance, not one decision or one agent, so it is
+**fleet-scoped** and therefore takes over the whole body as a third header-mode view (`View =
+"console" | "consistency" | "ledger"`, App.tsx:94) rather than hanging off a selected row like the
+four supervisor interactions (Investigate / Trace / Time-travel / Invalidate). This is the identical
+"fleet-scoped ⇒ header mode" reasoning Frontend Phase 4 used for the consistency demo, applied
+consistently rather than re-derived. A plain view flag — no router, no new dependency.
+
+### THE LOAD-BEARING DESIGN CALL: the ledger is MIXED-MODE (LIVE vs STATIC), and says which is which
+A ledger of hardcoded prose would be the one surface in the product that could silently go stale —
+which would be a self-refuting credibility surface. So every row carries a provenance marker:
+- **LIVE (3 rows)** — read from the cluster at render time: the genealogy counts (agents / alive /
+  beliefs); whether `decisions` / `belief_performance` are **populated-or-empty** (the row that
+  matters most, because the destructive Invalidate demo consumes them and a backfill restores them);
+  and the top-line `provenance-audit` verdict. Reuses `GET /agents` + `/beliefs` (already loaded by
+  the console) plus `GET /beliefs/{id}/performance` and the zero-argument
+  `GET /beliefs/{id}/provenance-audit`. The audit is consumed as a **data-point, not a per-edge UI**
+  — the full per-edge audit surface is still deferred to its own plan-gated session.
+- **STATIC (the rest)** — permanent methodological facts that no endpoint can or should "answer":
+  the GEval rubric is partly in-sample; MCP configured-not-exercised; the certificate proves
+  integrity, not authorship; SUPPORTED ≠ proven faithful.
+
+This LIVE/STATIC distinction is the direct ancestor of Item F's ⬤LIVE / ✔FRESH / ◐HISTORICAL beat
+tagging — F says so explicitly ("mirrors exactly the distinction Item 9's honesty ledger made a
+first-class UI concept").
+
+### Visual discipline (FRONTEND.md tokens, no new vocabulary invented)
+Clinical, cold, calm — a credibility surface, not a dashboard. The LIVE/STATIC marker is a cold
+provenance tag (`--bone` / `--ash`), deliberately NOT the `--alive`/`--alert` vocabulary the feed and
+closure-state use, so it can never read as a second alert system. `--alert` appears on **exactly one
+value, and only when earned**: a genuinely `ANOMALOUS` provenance verdict (a real tamper signal).
+Every live number degrades to `—` on a not-ready/error slot — the Inspector's existing per-slot
+idiom — never blank, never a crash.
+
+### The invariant that makes it work: README is the source of truth, row for row
+`HonestyLedger.tsx`'s module docstring states it outright ("Content mirrors README.md's honesty
+ledger (the source of truth), row for row, so the doc and the console cannot diverge"). Item 10 then
+had to honor this in the opposite direction: renaming the ledger's Item-labelled rows in the README
+FORCED the same rename in the component (commit `3783c78`), because leaving them mismatched would
+have produced exactly the drift the ledger exists to prevent.
+
+### Commits
+- `docs(readme): reconcile honesty ledger with Items A/B/E + dangling endpoints (Item 9)` — `4082170`
+- `feat(frontend): honesty ledger as a third header-mode view (Item 9)` — `a130cc4`
+- `docs(notes): record Item 9 (retroactive, during Item 10)` — this entry
+
+### Explicitly NOT done: a per-edge provenance-audit UI (data-point only here; its own plan-gated
+### session); any new backend route; persistence of the ledger; an AML console.
