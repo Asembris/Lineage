@@ -14,30 +14,60 @@ two verdict-producing paths in this system, and only one can answer it honestly:
 So "which verdicts change" is answerable ONLY against `decisions`, the sole place a real
 `driving_belief_id -> beliefs.id` link exists. This service reads that table.
 
-THE SUBSTITUTION RULE (sourced from _decision_from, not invented)
------------------------------------------------------------------
-The belief's entire behaviour is one branch of the backfill policy: an on-pattern txn
-(mcc 5411, <$180, age>6mo) gets `verdict='approve'` AND is the SOLE driver
-(`driving_belief_id = origin`). Every other txn takes the generic path with
-`driving_belief_id = NULL`. Two consequences decide the whole design:
-
-  1. The belief ONLY EVER APPROVES. It never declines or blocks. So invalidating it can only
-     REMOVE approvals; it can never create a decline and can never flip a NULL-driver decision.
-     The counterfactually-affected set is therefore exactly, and unambiguously,
+THE SUBSTITUTION RULE (sourced from the backfills, not invented)
+----------------------------------------------------------------
+  1. There is NO faithful per-row "what would have been decided instead". For the crimson belief
+     the generic branch is stochastic AND its RNG draw-count is branch-dependent, so re-deriving
+     one row's fallback verdict would require re-running the whole seeded world with a restructured
+     branch, which shifts every downstream draw. For the azure belief there is no fallback rule at
+     all. We therefore do NOT fabricate a replacement verdict: an affected decision simply loses
+     its justification.
+  2. The affected set is exactly, and unambiguously,
          { decisions : driving_belief_id = X AND decided_at > T }
-     — every row of which is an approval.
-  2. There is NO faithful per-row "what the generic path would have said instead". The generic
-     branch is stochastic AND its RNG draw-count is branch-dependent, so re-deriving one row's
-     fallback verdict would require re-running the whole seeded world with a restructured branch,
-     which shifts every downstream draw. We therefore do NOT fabricate a replacement verdict.
-     Each affected verdict changes from `approve (belief-driven)` to `approval withdrawn`.
 
-The two quantities that ARE fully deterministic and forensically load-bearing:
-    withdrawn_approvals (N) = |affected set|
-    frauds_auto_approved (M) = of those, is_fraud = true  (real ground truth; the SAME
-                               frauds_approved discipline belief_performance already holds).
+====================================================================================
+THE "BELIEF ONLY EVER APPROVES" INVARIANT IS DEAD. It was true of the crimson belief and
+it is FALSE of the fleet. Read this before touching the aggregates.
+====================================================================================
+Item B was built when exactly one belief existed, and that belief's entire behaviour was one
+branch of `seed/backfill_decisions.py::_decision_from`: an on-pattern txn -> `verdict='approve'`,
+and nothing else was ever belief-driven. So the service (correctly, then) treated the affected
+COUNT as the withdrawn-APPROVAL count, and `test_counterfactual` asserted
+`withdrawn_approvals == approvals` against real data.
+
+The grounding seam's azure belief **BLOCKS** (`aml_seam.VERDICT_FOR`: a re-derived cycle ->
+`blocked`; 57 of its 1,500 decisions). Under the old aggregate the endpoint reported those blocks
+as withdrawn approvals, and — far worse — counted the 43 laundering rows the belief CORRECTLY
+BLOCKED as `frauds_auto_approved`. **It credited the belief's 43 correct catches as 43 fraud
+approvals: a forensic tool stating the exact opposite of what happened, in the most damaging
+possible direction.** Measured on a live probe before the fix (30 rows: 6 blocked / 24 approved)
+the endpoint returned `withdrawn_approvals: 30, frauds_auto_approved: 6` — where all 6 of those
+frauds had been blocked.
+
+So the aggregates are now VERDICT-AWARE, and the vocabulary is split rather than conflated:
+    withdrawn_approvals  (N) = affected rows the belief APPROVED  -> the approval loses its driver
+    withdrawn_blocks         = affected rows the belief BLOCKED   -> the block loses its driver
+    frauds_auto_approved (M) = of the APPROVED rows, is_fraud     -> the real harm
+    frauds_caught_by_block   = of the BLOCKED rows, is_fraud      -> what invalidation would forfeit
 M is the honest, non-inflated "how much fraud an earlier invalidation would have stripped the
-belief's justification from" — never "how much we would have caught" (the fallback is stochastic).
+belief's justification from" — never "how much we would have caught" (no fallback is reproduced).
+`frauds_caught_by_block` is its counterweight and exists so the counterfactual can never again
+present a correct block as a harm.
+
+THE PER-WINDOW BREAKDOWN IS BELIEF-SCOPED, AND IS NULL WHEN THE BELIEF HAS NO WINDOWS
+-------------------------------------------------------------------------------------
+The breakdown used to bucket by `generation_windows()` — the CRIMSON generation clock (window 0
+opens 2024-05-12; window 7 closes 2026-06-30). The azure belief's decisions all carry ONE fixed
+`decided_at` (2026-07-12, deliberately — it is what makes the base-rate mirage structurally
+unavailable; see `seed/backfill_aml_decisions.py`), which falls OUTSIDE all eight. Measured: the
+breakdown came back `[0,0,0,0,0,0,0,0]` while `withdrawn_approvals` was non-zero — eight zeros
+silently contradicting the headline.
+
+Windows are therefore taken from the belief's OWN `belief_performance` rows, and a belief with no
+measured windows gets `windows: null` — an explicit "this belief has no measured time structure",
+never a fabricated grid of zeros. This is the same honest-absence the staleness block already
+emits (`certificate.staleness_evidence` -> `available: false`) and the same reason the azure
+belief has no `belief_performance` at all.
 
 WHY THIS IS A PLAIN QUERY, NOT AOST / replay.closure_snapshot() (a deliberate rejection)
 ----------------------------------------------------------------------------------------
@@ -66,7 +96,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.db import engine as _DEFAULT_ENGINE
-from app.sim.transactions import generation_windows
+
+# NOTE: `app.sim.transactions.generation_windows()` is deliberately NO LONGER imported. It is the
+# CRIMSON generation clock, and bucketing every belief by it produced eight silent zeros for a
+# belief whose decisions fall outside those windows. Windows now come from the belief's own
+# `belief_performance` rows. Do not reintroduce it here.
 
 
 def parse_at(at: str) -> dt.datetime:
@@ -92,17 +126,22 @@ _BELIEF_SQL = text(
     "FROM beliefs WHERE id = :id"
 )
 
-# The affected set: this belief's driven decisions strictly after T. Every such row is an
-# approval (the belief only ever approves), so withdrawn_approvals == the row count; the
-# approvals tally is selected too, purely so the caller/test can assert that invariant holds
-# in the real data rather than trust the prose.
+# The affected set: this belief's driven decisions strictly after T, SPLIT BY VERDICT.
+#
+# Every count here is FILTERED on the verdict, and that is the whole point of the fix. A bare
+# `count(*)` labelled `withdrawn_approvals` was true only while the one belief never blocked
+# anything; against the azure belief it reported blocks as approvals and, worse, reported
+# correctly-blocked fraud as auto-approved fraud. See the module docstring.
 _AFFECTED_SQL = text(
     """
     SELECT
-      count(*)                                    AS withdrawn_approvals,
-      count(*) FILTER (WHERE is_fraud)            AS frauds_auto_approved,
-      count(*) FILTER (WHERE verdict = 'approve') AS approvals,
-      count(DISTINCT agent_id)                    AS holder_count
+      count(*)                                                     AS affected,
+      count(*) FILTER (WHERE verdict = 'approve')                  AS withdrawn_approvals,
+      count(*) FILTER (WHERE verdict IN ('decline', 'blocked'))    AS withdrawn_blocks,
+      count(*) FILTER (WHERE is_fraud AND verdict = 'approve')     AS frauds_auto_approved,
+      count(*) FILTER (WHERE is_fraud
+                         AND verdict IN ('decline', 'blocked'))    AS frauds_caught_by_block,
+      count(DISTINCT agent_id)                                     AS holder_count
     FROM decisions
     WHERE driving_belief_id = :b AND decided_at > :t
     """
@@ -113,20 +152,28 @@ _HOLDERS_SQL = text(
     "WHERE driving_belief_id = :b AND decided_at > :t ORDER BY agent_id"
 )
 
-# Per-window slice of the affected set — each generation window intersected with decided_at > T.
-# Buckets identically to belief_performance (both use generation_windows()), so the counterfactual
-# lines up against the staleness curve: the windows where confidence had already rotted are exactly
-# the ones contributing the fraud.
+# Per-window slice of the affected set. The windows come from the belief's OWN belief_performance
+# rows (NOT generation_windows(), which is the crimson generation clock — see the module
+# docstring), so the breakdown lines up against exactly the staleness curve this belief actually
+# has. A belief with no measured windows gets no breakdown at all, rather than a grid of zeros.
 _WINDOW_SQL = text(
     """
     SELECT
-      count(*)                         AS withdrawn_approvals,
-      count(*) FILTER (WHERE is_fraud) AS frauds_auto_approved
+      count(*) FILTER (WHERE verdict = 'approve')               AS withdrawn_approvals,
+      count(*) FILTER (WHERE verdict IN ('decline', 'blocked')) AS withdrawn_blocks,
+      count(*) FILTER (WHERE is_fraud AND verdict = 'approve')  AS frauds_auto_approved
     FROM decisions
     WHERE driving_belief_id = :b
       AND decided_at > :t
       AND decided_at >= :start AND decided_at < :end
     """
+)
+
+# The belief's own measured windows. Empty => this belief has no measured time structure, and the
+# counterfactual says so (windows: null) instead of inventing one.
+_PERF_WINDOWS_SQL = text(
+    "SELECT window_start, window_end FROM belief_performance "
+    "WHERE belief_id = :b ORDER BY window_start"
 )
 
 _TOTAL_SQL = text("SELECT count(*) FROM decisions WHERE driving_belief_id = :b")
@@ -170,22 +217,35 @@ async def what_if_invalidated_at(
                 ).mappings().all()
             ]
 
-            windows: list[dict] = []
-            for start, end in generation_windows():
-                w = (
-                    await conn.execute(
-                        _WINDOW_SQL,
-                        {"b": belief_id, "t": at, "start": start, "end": end},
+            # The belief's OWN windows. No measured windows => no breakdown (None, not zeros).
+            perf = (
+                await conn.execute(_PERF_WINDOWS_SQL, {"b": belief_id})
+            ).mappings().all()
+
+            windows: list[dict] | None = None
+            if perf:
+                windows = []
+                for p in perf:
+                    w = (
+                        await conn.execute(
+                            _WINDOW_SQL,
+                            {
+                                "b": belief_id,
+                                "t": at,
+                                "start": p["window_start"],
+                                "end": p["window_end"],
+                            },
+                        )
+                    ).mappings().one()
+                    windows.append(
+                        {
+                            "window_start": p["window_start"],
+                            "window_end": p["window_end"],
+                            "withdrawn_approvals": int(w["withdrawn_approvals"]),
+                            "withdrawn_blocks": int(w["withdrawn_blocks"]),
+                            "frauds_auto_approved": int(w["frauds_auto_approved"]),
+                        }
                     )
-                ).mappings().one()
-                windows.append(
-                    {
-                        "window_start": start,
-                        "window_end": end,
-                        "withdrawn_approvals": int(w["withdrawn_approvals"]),
-                        "frauds_auto_approved": int(w["frauds_auto_approved"]),
-                    }
-                )
 
     return {
         "belief_id": belief["id"],
@@ -195,10 +255,14 @@ async def what_if_invalidated_at(
         "formed_at": belief["formed_at"],
         "at": at,
         "total_belief_driven": int(total_driven),
+        "affected_decisions": int(summary["affected"]),
         "withdrawn_approvals": int(summary["withdrawn_approvals"]),
+        "withdrawn_blocks": int(summary["withdrawn_blocks"]),
         "frauds_auto_approved": int(summary["frauds_auto_approved"]),
-        "approvals": int(summary["approvals"]),
+        "frauds_caught_by_block": int(summary["frauds_caught_by_block"]),
         "affected_holder_count": int(summary["holder_count"]),
         "affected_holders": holders,
+        # None (not []) when the belief has no measured windows — an explicit "no time structure",
+        # never a fabricated grid of zeros. See the module docstring.
         "windows": windows,
     }
