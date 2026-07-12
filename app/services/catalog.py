@@ -18,6 +18,7 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.services import certificate
+from app.services.aml_seam import witness_outcome_of
 
 
 async def list_agents(
@@ -43,17 +44,53 @@ async def list_agents(
 
 
 async def list_decisions(
-    agent_id: uuid.UUID | None = None, *, limit: int = 50, offset: int = 0
+    agent_id: uuid.UUID | None = None,
+    *,
+    aml_transaction_id: uuid.UUID | None = None,
+    driving_belief_id: uuid.UUID | None = None,
+    kind: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> tuple[list[dict], int]:
-    """A page of the decision feed + the total row count (for pagination).
+    """A page of the decision feed + the total row count (for pagination). Filters AND together.
 
-    No `agent_id` => the fleet-wide feed across all agents (the frontend's decision panel).
-    With `agent_id` => that one agent's history (the investigate flow). Newest first.
+    `agent_id`           — one agent's history (the investigate flow). Omit for the fleet-wide feed.
+    `aml_transaction_id` — THE REVERSE LOOKUP. See below.
+    `driving_belief_id`  — every decision one belief drove.
+    `kind`               — 'aml' | 'card'. The two kinds `ck_decisions_kind` makes structural.
+
+    THE REVERSE LOOKUP is the one direction the seam did not resolve. The FK runs
+    decisions -> aml_transactions, so a decision resolves its money-flow edge in one hop; the
+    reverse ("I am looking at a flagged AML transaction — did any agent act on it, and what did it
+    decide?") had no access path and no route. Migration 0008 adds the partial index that makes it
+    a point lookup instead of the FULL SCAN it was (verified with EXPLAIN, not assumed).
+
+    `driving_belief_id` and `kind` exist because the AML decisions were previously discoverable only
+    by ACCIDENT, and neither accident is a guarantee (both are facts about this seed):
+      (a) they all share one fixed `decided_at` NEWER than every card decision, so the newest-first
+          feed happens to put them on page 1;
+      (b) azure-7 happens to make ONLY AML decisions, so `?agent_id=azure-7` happens to isolate them.
+    A future session that moves the seam's `decided_at` or gives azure-7 a card decision would break
+    discoverability silently. These filters are what make that survivable. See NOTES "G5".
+
+    Newest first. Every filter is a bind parameter; nothing is interpolated into SQL text.
     """
-    where = " WHERE agent_id = :agent_id" if agent_id is not None else ""
+    clauses: list[str] = []
     params: dict = {}
     if agent_id is not None:
+        clauses.append("agent_id = :agent_id")
         params["agent_id"] = agent_id
+    if aml_transaction_id is not None:
+        clauses.append("aml_transaction_id = :aml_txn")
+        params["aml_txn"] = aml_transaction_id
+    if driving_belief_id is not None:
+        clauses.append("driving_belief_id = :belief_id")
+        params["belief_id"] = driving_belief_id
+    if kind == "aml":
+        clauses.append("aml_transaction_id IS NOT NULL")
+    elif kind == "card":
+        clauses.append("aml_transaction_id IS NULL")
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
 
     async with engine.connect() as conn:
         total = (
@@ -72,7 +109,15 @@ async def list_decisions(
                 {**params, "limit": limit, "offset": offset},
             )
         ).mappings().all()
-    return [dict(r) for r in page], int(total)
+
+    # The BASIS, promoted from a string prefix to a first-class field. `txn_ref` already carried the
+    # witness outcome (`aml:INCONCLUSIVE`), but only as an undocumented convention inside a column
+    # named "the transaction reference" — so an API caller saw 1,443 approvals and could not tell
+    # that 980 of them are "we could not tell", not "we checked and it is clean". That is the single
+    # most important caveat about this belief and it was reachable only by someone who already knew
+    # to look. Now it is a field. It is PROJECTED from the persisted txn_ref (never re-derived from
+    # the graph), so it reports what the agent RECORDED, not what the graph would say today.
+    return [dict(r) | {"witness_outcome": witness_outcome_of(r["txn_ref"])} for r in page], int(total)
 
 
 async def list_belief_performance(belief_id: uuid.UUID) -> dict | None:
