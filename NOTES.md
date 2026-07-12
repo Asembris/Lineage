@@ -5812,3 +5812,122 @@ it. A direct `NOT_A_SECTION` assertion was added. *The first version of that gua
 ### again); any HTTP route for `retrieve_regulation` (none exists, deliberately); the AML console; the
 ### recorded video; re-embedding the crimson belief; `belief_performance` for the azure belief (step 4
 ### stays CUT — re-read THE BASE-RATE MIRAGE before re-proposing it).
+
+## THE OPCLASS FIX: THE NAMED TRIGGER, AND THE TRAP THAT MAKES IT DANGEROUS (2026-07-13)
+
+The two dead indexes are PINNED as `vector_l2_ops` by `verify_corpus.py` and by
+`tests/test_regulatory_corpus.py::test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_l2`.
+That stops the change happening SILENTLY. It does not tell the session that makes it what to measure.
+This does.
+
+### ============ THE TRAP: THE ENTIRE SUITE STAYS GREEN WHILE THE BRAKE'S INPUT CHANGES ============
+**A future session must NOT flip the opclass, run the tests, see 162 green, and ship.** The tests
+would pass while `evaluate_claim()`'s input silently changed. Precisely why, so it cannot be waved off:
+
+- **A selected C-SPANN index is an APPROXIMATE (ANN) search. The full scan it replaces is EXACT.**
+  So the top-3 of a `k=3` retrieval MAY DIFFER. That is the whole point of an ANN index.
+- **Item 4's Gate 0 is a set-membership test on exactly that top-3.** `_doc_for(retrieved, claimed)`
+  returns None if the claimed typology is not among the 3 returned -> the verdict becomes
+  `INSUFFICIENT_COVERAGE / typology_not_retrieved`. **One document swapping out of the top-3 flips a
+  verdict from FLAG to INSUFFICIENT_COVERAGE.** k=3 against a 4-document corpus is the tightest
+  possible margin: there is exactly ONE excluded document, and ANN decides which.
+- **NO TEST WOULD CATCH IT.** `tests/test_aml_brake.py` and `tests/test_aml_interrogate.py` retrieve
+  using a document's OWN STORED EMBEDDING (the test_corpus trick) — self-retrieval at distance 0.000,
+  which ANN returns correctly essentially always. The tests never issue the query the AGENT issues:
+  a NEUTRAL structural summary whose top-2 documents are separated by only **0.0005-0.02** (Item 4's
+  measurement). **That is exactly the regime where an approximate index reorders results** — and it is
+  the regime no test exercises.
+- **Item 8's golden set was generated against EXACT retrieval.** Its 40 cached tuples carry the
+  `retrieved` context each rationale was scored against. If live retrieval changes, the golden set no
+  longer reproduces from the live system: the eval's grounding context becomes a historical artifact
+  rather than a re-derivable one, and re-generating it costs real OpenAI calls.
+
+### WHAT THAT SESSION MUST MEASURE — before/after, not tests-still-pass
+1. **The top-3 set, over the queries the AGENT actually issues.** For every subject in Item 8's golden
+   set (and ideally a wide sample of the 1,500 edges), embed `structure_text(g, subject)` — the real
+   neutral summary, NOT a document's own embedding — and record the ordered top-3 + distances under
+   the CURRENT exact plan. Then flip the opclass and re-record. **Report the set-difference count and
+   every subject whose top-3 membership changed.** Zero changes is the only result that permits the
+   flip to be called behaviour-preserving; anything else is a decision.
+2. **Gate 0's outcome, per subject.** For each golden-set subject, does `_doc_for()` go non-None ->
+   None (or the reverse)? Each such flip is a CHANGED VERDICT. Count them and name them.
+3. **Item 8's reproducibility.** If (1) is non-zero, the golden set's cached `retrieved` no longer
+   matches live retrieval. Either re-generate it (a real OpenAI cost, needing approval) or disclose
+   that its grounding context is pinned to the pre-flip exact plan. Do not leave it ambiguous.
+4. **The FLAG_CAPABLE / precision-recall table (Item 4) is NOT at risk** and should be stated as such
+   rather than re-run out of caution: those numbers come from `aml_graph`'s structural witnesses over
+   `aml_transactions`, which never touch the corpus or any embedding.
+
+### ============ THE TWO DEAD INDEXES ARE NOT THE SAME PROBLEM. DO NOT FIX THEM TOGETHER. ============
+This was nearly recorded as one deferred item. It is two, and the `beliefs` half is the surprising one.
+
+**`typology_corpus` (0005): the opclass change WOULD work — and that is exactly why it is dangerous.**
+Its query has no WHERE and no JOIN, so flipping to `vector_cosine_ops` genuinely activates the index
+(measured: selected at 1,000 rows and at 4). Everything in the trap above applies to it.
+
+**`beliefs` (0002): the opclass change ALONE WOULD ACHIEVE NOTHING. Measured, not assumed.**
+`agent_brain._retrieve_beliefs` is a different SHAPE:
+
+    SELECT ... FROM beliefs b
+    LEFT JOIN belief_inheritance bi ON bi.belief_id = b.id AND bi.to_agent_id = :agent
+    WHERE b.status = 'active' AND (b.originating_agent_id = :agent OR bi.to_agent_id = :agent)
+    ORDER BY b.embedding <=> :qvec LIMIT :k
+
+Probed on the live cluster with a `vector_cosine_ops` table of 400 rows and this exact shape:
+
+| query | vector index used? |
+|---|---|
+| `ORDER BY embedding <=> q LIMIT 3` (no filter — the corpus shape) | **YES** |
+| `WHERE status = 'active' ORDER BY embedding <=> q LIMIT 3` (the beliefs shape) | **NO — FULL SCAN + filter** |
+
+CRDB requires each of a vector index's PREFIX columns to be constrained to a specific value. The index
+is on `(embedding)` alone — no prefix columns — so **any** WHERE clause forces the scan. CRDB even
+volunteers the fix in the plan: `CREATE INDEX ON ... (status) STORING (embedding)` — i.e. it suggests
+a NON-vector index, because it cannot use the vector one here at all.
+
+So `beliefs` needs `(status, embedding vector_cosine_ops)` — status as a PREFIX column — and even then
+the agent-ownership predicate is an **OR across a LEFT JOIN to `belief_inheritance`**, which cannot be
+a prefix constraint under any index definition. **And there is a correctness hazard beyond the plan:**
+a C-SPANN search returns the k nearest rows and the filter runs AFTER. If the k nearest are not held by
+this agent, the post-filter drops them and the agent silently receives FEWER beliefs than it actually
+holds — a living agent acting on an incomplete inheritance. That is a correctness regression, not a
+performance one, and it is the opposite of this project's entire thesis.
+
+**Consequence, stated so it is not rediscovered:** at 2 beliefs, `beliefs`' full scan is not merely
+acceptable — it is *correct*, and it is very likely the RIGHT plan for this query shape at any
+realistic fleet size. The honest fix for `beliefs` may well be to **DROP `ix_beliefs_embedding`
+entirely** and stop claiming an index that its own query can never use, rather than to "repair" it.
+That is a real option and should be weighed, not skipped.
+
+## THE FIDELITY FLOOR (0.95) WAS CHOSEN, NOT DERIVED — and its margin is ASYMMETRIC (2026-07-13)
+
+This project rejected `MARGIN_FLOOR` for being a hand-picked constant that gated a verdict. So the
+regulatory corpus's `FLOOR = 0.95` gets stated the same way, plainly, rather than dressed up.
+
+**PROVENANCE, honestly:** 0.95 is a **round number I chose a priori**, before any coverage was
+measured. It was NOT derived from the corpus, and it was NOT re-tuned after seeing the results (it was
+written in the first, word-shingle version of the check, survived the rewrite to character shingles,
+and was never moved). But "not tuned to fit" is not the same as "principled" — nothing about these five
+documents implies 0.95. **It is a chosen threshold, and it is recorded as one.**
+
+**THE REAL MARGIN, measured, and it is NOT symmetric:**
+
+| | coverage | distance from the 0.95 floor |
+|---|---|---|
+| worst REAL red-flag line (of 247 lines) | **0.973** | **+0.023** — thin |
+| a plausible FABRICATED red flag | **0.189** | −0.761 — enormous |
+
+So the gate sits **2.3 points** above the worst true positive and **76 points** above a fabrication.
+**It is far likelier to false-alarm on a legitimate re-parse than to miss invented text** — and that
+asymmetry is the right bias for THIS gate: a false alarm sends a human to look at a diff, while a miss
+ships fabricated regulatory language that reads as authoritative. But a future session must know the
+headroom is thin on the true side: **a re-parse that drifts slightly WILL trip this**, and that is a
+signal to investigate the drift, not a licence to lower the floor.
+
+**WHY THIS IS NOT MARGIN_FLOOR, and the distinction is the whole point.** `MARGIN_FLOOR` gated a
+**verdict** on a quantity (retrieval distance) that was MEASURED to have no bearing on whether the
+structure existed — it made the brake a wall. This floor gates **whether a corpus may ship**, offline,
+at ingest time, over a bounded and curated five-document set, on a quantity (does this text exist in
+the source PDF?) that is *directly* the thing being asserted. It authorizes nothing at runtime and
+touches no verdict. Different class entirely — but it is still a chosen number, and if it is ever moved
+the move must be recorded with its new margin, not quietly edited.

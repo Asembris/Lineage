@@ -212,26 +212,62 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Vector indexes — two of the three have never been used",
-    label: "shipped defect, half-fixed by decision",
+    item: "Vector indexes — 2 of the 3 have NEVER been used, and 2 of the 3 are STILL DEAD",
+    label: "shipped defect · 1 fixed · 2 deferred by decision, not repaired",
     mode: "static",
     note: (
       <>
         The most damaging thing this project got wrong, and it survived every review because
         four documents agreed with each other and nobody ran the check.{" "}
-        <code>beliefs</code> and <code>typology_corpus</code> declare{" "}
-        <code>CREATE VECTOR INDEX … (embedding)</code> — and CockroachDB's default opclass is{" "}
-        <code>vector_l2_ops</code>, which accelerates <code>&lt;-&gt;</code> <em>only</em>. Both
-        of their queries rank with cosine <code>&lt;=&gt;</code>. An L2 index cannot serve a
-        cosine query <em>at any row count</em>, so neither has ever appeared in a plan. The true
-        observation ("the plan is a full scan") had been recorded with a <b>false cause</b> ("only
-        4 rows"). Measured: a <code>vector_cosine_ops</code> index <em>is</em> selected at 1,000
-        rows <em>and at 4</em> — row count was never the variable.{" "}
-        <code>regulatory_corpus</code> is built <code>vector_cosine_ops</code> and its index{" "}
-        <b>is genuinely selected</b> (<code>EXPLAIN</code> shows a real <code>vector search</code>{" "}
-        node). The older two are <b>deliberately left broken</b>: fixing them switches retrieval
-        from exact to approximate and would move Item 4's brake, so it needs its own before/after
-        measurement — and a test now pins them as L2 so it cannot happen silently.
+        <b>
+          <code>beliefs</code> (migration 0002)
+        </b>{" "}
+        and{" "}
+        <b>
+          <code>typology_corpus</code> (migration 0005)
+        </b>{" "}
+        both declare a bare <code>CREATE VECTOR INDEX … (embedding)</code> — and CockroachDB's
+        default opclass is <code>vector_l2_ops</code>, which accelerates <code>&lt;-&gt;</code>{" "}
+        <em>only</em>. Both of their queries rank with cosine <code>&lt;=&gt;</code>. An L2 index
+        cannot serve a cosine query <em>at any row count</em>, so <b>neither has ever appeared in
+        a query plan, and neither does today</b>. The true observation ("the plan is a full scan")
+        had been recorded with a <b>false cause</b> ("only 4 rows") — in NOTES, in README, in
+        ARCHITECTURE, and in a <em>passing verification script</em>. Measured: a{" "}
+        <code>vector_cosine_ops</code> index <em>is</em> selected at 1,000 rows <em>and at 4</em>.
+        Row count was never the variable. Only{" "}
+        <b>
+          <code>regulatory_corpus</code> (migration 0009)
+        </b>{" "}
+        is built <code>vector_cosine_ops</code>, and its index <b>is genuinely selected</b> (
+        <code>EXPLAIN</code> emits a real <code>vector search</code> node).{" "}
+        <b>Do not read this row as "fixed".</b> The other two are <b>deliberately still dead</b>:
+        switching them turns retrieval from <em>exact</em> into <em>approximate</em>, and Item 4's
+        Gate 0 depends on which three of four documents come back — a live change to the brake's
+        input and to Item 8's golden set, <b>which the whole test suite would stay green through</b>.
+        It gets its own gated session with a real before/after. Until then a test pins both as L2,
+        so it cannot happen by accident. Correctness is unaffected: every retrieval still returns
+        the right nearest neighbours, by full scan.
+      </>
+    ),
+  },
+  {
+    item: "Regulatory-corpus fidelity gate — the 0.95 floor",
+    label: "chosen threshold, not derived",
+    mode: "static",
+    note: (
+      <>
+        Declared, because this project <b>rejected MARGIN_FLOOR</b> for being exactly this: a
+        hand-picked constant. <code>0.95</code> is a round number chosen <em>a priori</em>, before
+        any coverage was measured — not derived from the corpus, not re-tuned to fit the results,
+        but not implied by anything about these five documents either. The measured margin is real
+        and <b>asymmetric</b>: the worst <em>real</em> red-flag line scores <b>0.973</b> (only{" "}
+        <b>+0.023</b> of headroom) while a plausible <em>fabricated</em> red flag scores{" "}
+        <b>0.189</b>. So the gate is far likelier to <b>false-alarm on a legitimate re-parse</b>{" "}
+        than to miss invented text — the right bias, since a false alarm sends a human to read a
+        diff and a miss ships fabricated regulatory language that reads as authoritative. Unlike
+        MARGIN_FLOOR it <b>authorizes nothing at runtime</b>: it gates whether a corpus may{" "}
+        <em>ship</em>, on a quantity that <em>is</em> the thing being asserted — not a verdict, on
+        a quantity measured to be irrelevant to it.
       </>
     ),
   },
