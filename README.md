@@ -29,18 +29,33 @@ it never met**. A belief that was correct when a founding ancestor formed it can
 **stale** across generations, until a living agent approves fraud because of a rule a long-dead
 agent created under conditions that no longer hold.
 
-```
-  gen0            gen1            gen2     ...      gen7  (alive)
- ┌──────┐        ┌──────┐        ┌──────┐         ┌──────┐
- │crimson│──────▶│crimson│──────▶│crimson│──····──▶│crimson│   acts NOW on
- │  -0   │ forms │  -1  │inherit│  -2  │         │  -7  │   an inherited rule
- └──────┘  rule  └──────┘        └──────┘         └──────┘
-     │                                                 ▲
-     │   belief valid THEN  ───────────────────────▶   │  world drifted; belief ROTTED
-     └──────────────────────  same immutable row  ─────┘
+```mermaid
+graph LR
+    G0["crimson-0<br/>gen 0 · DEAD<br/><i>forms the rule</i>"]
+    G1["crimson-1<br/>gen 1 · DEAD"]
+    G2["crimson-2<br/>gen 2 · DEAD"]
+    DOTS["…<br/>gen 3–6 · DEAD"]
+    G7["crimson-7<br/>gen 7 · <b>ALIVE</b><br/><i>acts NOW on a rule<br/>it never formed</i>"]
+
+    G0 -->|inherits| G1 -->|inherits| G2 -->|inherits| DOTS -->|inherits| G7
+
+    subgraph clocks["TWO CLOCKS — Lineage never conflates them"]
+        MVCC["<b>MVCC time</b><br/>one immutable row<br/>AS OF SYSTEM TIME proves<br/>it NEVER changed"]
+        MEAS["<b>Measured staleness</b><br/>confidence 0.92 → 0.53<br/>aggregated from belief_performance<br/>QUERIED from data, never hardcoded"]
+    end
+
+    G0 -.->|"the belief:<br/>valid THEN"| MVCC
+    G7 -.->|"the same belief:<br/>rotten NOW"| MEAS
+
+    style G0 fill:#3a2a1e,stroke:#ae8c6b,color:#f7eee8
+    style G7 fill:#1e3a2e,stroke:#3FE0A8,color:#e8eef7
+    style G1 fill:#121821,stroke:#243040,color:#5A6678
+    style G2 fill:#121821,stroke:#243040,color:#5A6678
+    style DOTS fill:#121821,stroke:#243040,color:#5A6678
+    style clocks fill:#1e2a44,stroke:#6b8cae,color:#e8eef7
 ```
 
-Two clocks run, and Lineage keeps them separate:
+The row never changes; only the world does. That gap is the entire product:
 
 - **MVCC time** — the belief is one immutable row. `AS OF SYSTEM TIME` proves it *never changed*.
 - **Measured staleness** — the belief's real performance is aggregated from outcome data over time
