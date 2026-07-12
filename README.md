@@ -191,6 +191,32 @@ The two "no UI yet" routes are real, tested, and verified against live cluster d
 have no console surface, and the [honesty ledger](#honesty-ledger) says so rather than leaving them
 undiscoverable.
 
+### `GET /decisions` — the seam's read surface
+
+The grounding seam added no new route. It added **filters**, and they exist to make the seam's central
+disclosure *countable rather than merely readable* — pair any of them with `limit=1` and read `total`.
+
+| Filter | What it answers |
+|---|---|
+| `?aml_transaction_id=` | **THE REVERSE LOOKUP.** The FK runs decision → transaction; this resolves the other way — *"did any agent act on this money-flow edge?"* `total: 0` means nobody ever ruled on it. Backed by a **partial index** (migration 0008); it was a declared `FULL SCAN` before |
+| `?driving_belief_id=` | every decision one belief drove |
+| `?kind=aml\|card` | the two structural kinds of decision (`ck_decisions_kind` makes the taxonomy a database constraint, not a convention). Anything else → **422**, never a silent empty page |
+| `?witness_outcome=` | `MATCH` \| `CONCLUSIVE_NO` \| `INCONCLUSIVE` — the **basis** of an AML decision |
+| `?is_fraud=` | the recorded ground truth — an **audit fact**, attached after the decision was made, never readable by the decider |
+| `?agent_id=` · `?limit=` · `?offset=` | the original feed controls |
+
+Every AML row also carries **`witness_outcome`** as a first-class response field, and it is not
+decoration. **Two different witness outcomes both map to `approve`**, so the verdict alone cannot
+distinguish *"we searched and there is no cycle"* (463) from *"we could not tell"* (980). Reading an
+AML `approve` without its basis will mislead you — which is exactly why the field, the filters, and
+migration 0008's CHECK all exist. The [honesty ledger](#honesty-ledger) **counts** this census live
+from the cluster rather than quoting it:
+
+```
+GET /decisions?driving_belief_id=<azure>&witness_outcome=INCONCLUSIVE&limit=1   → total: 980
+                                        &is_fraud=true                          → total: 252
+```
+
 ---
 
 ## Evaluation results
