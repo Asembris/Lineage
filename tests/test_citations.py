@@ -31,6 +31,26 @@ So citations are checked, not trusted. Three properties:
      engineering log where "I ran this once" is the honest record. Never from application code,
      never from a judge-facing document, where it reads as a runnable artifact and is not one.
 
+=============================== READ THIS. IT IS ABOUT THIS FILE. ===============================
+When rule (C) was FIRST WRITTEN, the sentence above was FALSE. `scratchpad/` was **not** gitignored
+— it was merely untracked, and deleted between sessions by habit. NOTES said it was ignored.
+ARCHITECTURE said it. This docstring said it. `git check-ignore -v scratchpad/` printed NOTHING.
+
+**FOUR documents agreed with each other and all four were wrong — and one of them was THIS GUARD,
+in the very sentence explaining what it enforces.** The file written to kill "confident provenance
+that nobody followed" contained confident provenance that nobody had followed.
+
+The rule was never VACUOUS: its mechanism is a source scan and never read `.gitignore`, so it caught
+migration 0006's citation for real. What was false was its JUSTIFICATION — and that is the hazard,
+not a technicality: **a true rule resting on a false premise is one skeptical reader away from
+deletion.** A future session reads "forbidden because it is gitignored", runs the command, sees
+nothing, and reasonably deletes a guard that was doing real work.
+
+So the premise was made TRUE (`scratchpad/` + `**/scratchpad/` are now in `.gitignore`) rather than
+reworded away. **Consensus among documents is not evidence — it is copying. Only running the check
+is evidence.** See NOTES → "CONSENSUS AMONG DOCUMENTS IS NOT EVIDENCE".
+================================================================================================
+
 Bare filenames (`aml_graph.py`, "see catalog.py") are deliberately NOT checked: they are prose
 pointers, not promises of a runnable artifact, and checking them drowns the real signal in noise.
 The dangerous citation is the one that looks like something you could go and execute.
