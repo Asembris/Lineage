@@ -5,7 +5,7 @@
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
 [![CI](https://github.com/Asembris/Lineage/actions/workflows/ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/ci.yml)
-&nbsp;![tests](https://img.shields.io/badge/tests-99%20passing-brightgreen)
+&nbsp;![tests](https://img.shields.io/badge/tests-118%20passing-brightgreen)
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -177,7 +177,7 @@ configured in `.mcp.json`; see the Technical Implementation note above for its h
 | `GET /agents/{id}/beliefs?as_of=` | **the deposition** — one agent's beliefs at a past instant, real `AS OF SYSTEM TIME` | time-travel |
 | `GET /beliefs` | belief catalog | inspector |
 | `GET /beliefs/{id}/lineage` | **the trace** — recursive CTE back through `belief_inheritance` to the origin ancestor | trace |
-| `GET /beliefs/{id}/performance` | measured staleness windows — the real 0.924 → 0.528 curve | time-travel |
+| `GET /beliefs/{id}/performance` | measured staleness windows — the real 0.924 → 0.528 curve, each point with its sample size and 95% Wilson interval | time-travel |
 | `GET /beliefs/{id}/replay` | content-hashed closure snapshot, AOST-reproducible | — |
 | `GET /beliefs/{id}/provenance-audit` | **A1–A4 provenance-integrity verdict** — CLEAN / ANOMALOUS / INCONCLUSIVE | ledger *(top-line verdict only)* |
 | `GET /beliefs/{id}/counterfactual-invalidation?at=T` | **"what if we'd killed it at T?"** — N approvals withdrawn, M of them real fraud. `at` is **business time, not the MVCC clock** | no UI yet |
@@ -297,6 +297,8 @@ cluster, so the document and the running system cannot quietly disagree.
 | MCP Server / ccloud CLI | **configured, not exercised** | MCP Server declared in `.mcp.json`; verification done via direct SQL probes; ccloud CLI not used |
 | Regulatory corpus (FATF/FFIEC/FinCEN) | **not built** | Gated on a `data/raw/` drop (sources block automated fetch); `typology_corpus` holds the 4 IBM typology definitions only |
 | Certificate authorship | **integrity, not authorship** | `content_hash` is an unkeyed sha256 — it proves integrity + (within the GC window) AOST-reproducibility, not authorship; asymmetric signing is documented, not built |
+| Staleness curve — uncertainty | **measured, with its interval** | The certificate's `0.924 → 0.528` is no longer a bare point estimate: every window carries the sample size behind it and a 95% Wilson interval (present day is `0.528`, CI `[0.466, 0.589]`). `n` is **re-aggregated from `decisions`**, not persisted — `belief_performance` still has no denominator column, and the five-table schema is unchanged. If a persisted confidence stops reproducing from the decisions it summarizes, the intervals are **withheld** (`sample_agreement: disagreed`) rather than pairing a fresh denominator with a stale estimate. The document asserts a measured decay only when a Fisher exact test supports it — there is **no minimum-sample gate**, so a one-decision window disqualifies itself on the evidence |
+| Staleness uncertainty — **not** cross-checked | **shared computation, not an independent check** | The certifier Lambda computes the intervals with the *same shared function*, but it does **not** re-derive and compare them the way it does the closure hash — and that is deliberate. A confidence interval is arithmetic over `(k, n)`, not a claim about the world, so there is no independent oracle to check it against; both halves read `belief_performance` at current committed state, so neither is a check on the other. A `staleness_verification: agreed` block would fabricate the *appearance* of the closure hash's guarantee while proving nothing |
 | Provenance-integrity audit | **verification, not a patch** | The two legitimate `belief_inheritance` writers preserve the A1–A4 invariants by construction, so **no live vulnerability exists**; `GET /beliefs/{id}/provenance-audit` is verification + out-of-band tamper detection. OWASP `ASI06` primary-verified; MITRE ATLAS `AML.T0080` **secondary-sourced**, not confirmed on the authoritative page |
 | Counterfactual invalidation query | **measured, exact** | `GET /beliefs/{id}/counterfactual-invalidation?at=T` returns **exact** counts (each generation window is exactly 250 rows, not estimated): N = belief-driven approvals withdrawn, M = their real `is_fraud` subset — reported as approvals-withdrawn, never a fabricated "fraud we'd have caught" (the belief only ever approves; no faithful per-row fallback verdict exists, so none is invented) |
 | Explanation-faithfulness guard | **probabilistic guard** | Scores the agent's `rationale` against the exact evidence it saw; `SUPPORTED` means "passed the check", **not "proven faithful"** (documented false-negatives — the faithfulness eval's fabricated-hop 0.50, faithful SG anchor 0.40). Cites OWASP `LLM09:2025 Misinformation`; **explicitly not** a retrieval/memory-poisoning defense (`LLM08`/`ASI06`) — it checks prose against retrieved rows, not whether those rows are poisoned |
@@ -346,7 +348,7 @@ run on 5173.
 ### Tests & evals
 
 ```bash
-pytest                                          # 99 tests against the real cluster (~2m20s)
+pytest                                          # 118 tests against the real cluster (~2m30s)
 PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
 ```
 
@@ -365,7 +367,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # struct
 | AWS | S3 (certificates) + Lambda (certifier) |
 | Eval judge | NVIDIA NIM (nemotron) / Ollama (gemma) via DeepEval — never OpenAI |
 | Frontend | React 19 + Vite + TypeScript, framer-motion, react-three-fiber, oxlint |
-| Tests | pytest (99, live-cluster) |
+| Tests | pytest (118, live-cluster) |
 
 ---
 
@@ -394,7 +396,7 @@ CockroachDB/
 ├── scripts/                 probes · ingest · verify · demos · evals
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
-├── tests/                   24 files, 99 tests (all live-cluster)
+├── tests/                   25 files, 118 tests (all live-cluster)
 ├── frontend/                React 19 + Vite console — three views:
 │                            console (tree · feed · inspector) · consistency demo (2D + 3D)
 │                            · honesty ledger
@@ -424,6 +426,7 @@ internal engineering-log labels; they index into [NOTES.md](NOTES.md) and mean n
 | **The counterfactual invalidation query** *(B)* | "Had we killed this belief at T, what changes?" — exact N approvals withdrawn, M of them real fraud |
 | **The explanation-faithfulness guard** *(E)* | Live, fail-closed check that withholds any rationale asserting more than the rows support |
 | **The hero demo storyboard** *(F)* | Two-act walkthrough, every beat tagged LIVE / FRESH / HISTORICAL — see **[DEMO.md](DEMO.md)** |
+| **Measured uncertainty on the staleness curve** | The numbers justifying the one irreversible write now carry their sample size and 95% Wilson interval — certificate schema 1.2, computed by the endpoint and the certifier Lambda through one shared function |
 
 Also complete: Phases 1–3 (the belief-inheritance spine, agents, and the money-shots), Phase 4
 hardening, and the full React console (Frontend Phases 1–6).
@@ -440,15 +443,8 @@ not a gap.
 
 **Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
 chunking), the `decisions.aml_transaction_id` grounding seam that would join the two graphs into one
-causal chain, an AML console surface, the recorded demo video — and **measured uncertainty on the
-staleness curve**, the one place this project's own Wilson-CI discipline is not yet applied
-(`belief_performance` persists no sample size, so the certificate's `0.924 → 0.528` carries no
-interval; the real present-day figure is `0.528`, 95% CI `[0.466, 0.589]`). Latent rather than live —
-every *window* today holds exactly 250 decisions by construction — but latent by exactly one slice: the
-per-*holder* sample runs **74 to 250**, and the thinnest belongs to a **living** holder whose interval
-is **0.221 wide, more than half the entire decay signal it would be read against**. It is scoped as its
-own plan-gated item because closing it moves the certificate schema and the certifier Lambda in
-lockstep.
+causal chain, an AML console surface, the recorded demo video, and the Time-travel sparkline rendering
+the confidence band the API now serves.
 
 ---
 
