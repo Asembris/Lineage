@@ -90,13 +90,19 @@ Lambda    (sync psycopg, Linux)        ┘     SAME hash, different machines, di
 Hash-coverage proves a document has not *changed*; the AOST replay against CockroachDB's own MVCC
 history is what proves it was *true*. → `lambda/certifier/handler.py`, `app/services/certificate.py`
 
-### 3 · Structural detection wins on precision, and says so honestly
+### 3 · Structural detection wins on precision — and loses on F1, which we print anyway
 
 On a **genuinely fresh, account-disjoint hold-out no design decision ever saw**, the frozen
 structural detector reaches **CYCLE recall 100% (38/38), precision 100% (38/38) — Wilson 95% CI
-lower bound 90.8%**, and SCATTER-GATHER precision 89.6%. An oracle-fit logistic-regression baseline
-only ties on F1 by riding a synthetic ACH generation artifact (positives are 100% ACH; the real ACH
-base rate is 0.75%). The witness uses **no format field at all**, so it doesn't ride the leak.
+lower bound 90.8%**, and SCATTER-GATHER precision 89.6%.
+
+It does **not** beat the baselines on F1, and we will not pretend otherwise: an oracle-fit logistic
+regression **out-scores it on the hold-out** (F1 78.7 vs 77.1), and a one-line `payment_format ==
+ACH` rule catches **every ring member there is** (100% recall). Both do it by riding a synthetic
+generation artifact — the selected positives are 100% ACH, while on the real population "flag all
+ACH" has **0.75% precision**. The structural witness uses **no format field at all**, so its
+advantage — precision, and an auditable path you can re-derive — is the leak-independent one.
+[The full three-way comparison is below](#the-baseline-is-not-a-strawman), printed every run.
 → `scripts/eval_detection.py`
 
 ---
@@ -167,13 +173,26 @@ labeled as such. The full honest picture — including SCATTER-GATHER's weaker, 
 - **SCATTER-GATHER misses over half of real edges** (recall 40.6% dev / 50% hold-out). When it fires
   it is nearly always right, but that is a false-negative profile, not a precision success.
 
-**The baseline is not a strawman.** An oracle-advantaged logistic regression on raw fields matches
-(dev F1 68.6 vs 68.9) or beats (hold-out 78.7 vs 77.1) the frozen structural detector — but only by
-exploiting a synthetic-generation artifact: the selected ring positives are 100% ACH while benign
-noise spans six formats, so `format == ACH` alone gives 100% recall. On the real population "flag all
-ACH" has **0.75% precision**. The structural witness uses no format field, so its advantage —
-precision and an auditable cited path — is leak-independent. The eval prints the `payment_format ×
-label` crosstab every run so anyone can check it.
+#### The baseline is not a strawman
+
+The honest comparison, printed by `eval_detection.py` on every run. **The structural detector does
+not win on F1** — read the bolded cells:
+
+| Detector (CYCLE ∪ SCATTER-GATHER members vs benign) | Dev P / R / F1 | Hold-out P / R / F1 |
+|---|---|---|
+| **Structural witness** (no format field) | **82.8** / 59.0 / 68.9 | **94.2** / 65.3 / 77.1 |
+| Logistic regression (all raw fields, oracle-fit) | 62.4 / 76.3 / 68.6 | 76.9 / **80.6** / **78.7** |
+| Best single raw feature — `payment_format == ACH` | 38.7 / **100.0** / 55.8 | 50.4 / **100.0** / 67.0 |
+
+The logistic regression **ties on dev and beats us on the hold-out**, and the one-line ACH rule
+**misses nothing at all**. Both do it by exploiting a synthetic-generation artifact: the selected
+ring positives are **100% ACH** while benign noise spans six formats, so `format == ACH` alone gives
+perfect recall. On the **real** population, "flag all ACH" has **0.75% precision** (4,483 of
+600,797) — the leak does not survive contact with reality.
+
+The structural witness reads **no format field**, so the thing it is actually better at — precision,
+and a cited path re-derivable from the rows — is the part that transfers. The eval prints the
+`payment_format × label` crosstab every run so anyone can check the artifact for themselves.
 
 **Scope:** scored against pattern-typology **membership** (ring detection), not general fraud
 detection; measured against the AML evidence layer's *deliberately adversarial* benign set (noise
@@ -183,21 +202,25 @@ anchored to the same accounts). Both caveats travel with every quote.
 
 Scores the only LLM-generated prose in the pipeline — the agent's `rationale` — for faithfulness to
 the evidence it actually saw. Judge is **Ollama gemma (free, primary) + NVIDIA nemotron
-(cross-check)** — a parameter, **never OpenAI**. **Two denominators, kept apart:**
+(cross-check)** — a parameter, **never OpenAI**.
 
-- **Headline accuracy: 8/10** on the 10 tuples with independently-verified per-tuple ground truth
-  (2 manually-confirmed faithful FLAG anchors + 8 hand-authored adversarial negatives). Misses:
-  fabricated-hop (0.50) and one faithful SCATTER-GATHER anchor (0.40) — both disclosed, not smoothed.
-- **Metric delta on the 8 authored hallucinations:** the custom GEval rubric scores them **0.287**
-  (catches 7/8 below threshold); DeepEval's built-in Faithfulness scores **0.771** (misses them —
-  it's contradiction-only and rates 4/8 additive hallucinations as "fully faithful"). The built-in
-  metric is kept alongside as the honest un-tuned control.
-- The **"full 40" category means** (32 real + 8 authored) are descriptive distribution over tuples
-  with **no per-tuple label** — not an accuracy figure. 8/10 must not be read as over 40.
+**Three numbers over three different denominators. They are not interchangeable, and the last
+column is why:**
 
-The faithfulness eval is a credible *secondary* result — "a judge that catches the prose-entailment
-hallucinations the deterministic guard structurally cannot, with its own instrument limits
-disclosed" — not a number to rival the detection eval's precision.
+| Denominator | What it measures | Result | What it is **not** |
+|---|---|---|---|
+| **10 labeled tuples**<br/><sub>2 verified-faithful anchors + 8 authored adversarial negatives</sub> | per-tuple accuracy against independently-verified ground truth | **8/10** | **not** a score over the 40-tuple set |
+| **8 authored hallucinations** | instrument delta: our GEval rubric vs DeepEval's built-in Faithfulness | GEval **0.287** — catches 7/8<br/>Built-in **0.771** — misses them | **not** an accuracy figure — it compares two *instruments*, and the built-in is kept as the honest un-tuned control |
+| **40 tuples**<br/><sub>32 real + 8 authored</sub> | descriptive category means over tuples with **no per-tuple label** | descriptive distribution only | **not** an accuracy figure. **8/10 must never be read as "over 40."** |
+
+**The two misses, disclosed rather than smoothed:** a fabricated-hop negative scored 0.50 and one
+genuinely faithful SCATTER-GATHER anchor scored 0.40. DeepEval's built-in metric is contradiction-only
+and rates **4 of the 8 additive hallucinations as "fully faithful"** — which is the entire reason the
+custom rubric exists.
+
+This is a credible *secondary* result — "a judge that catches the prose-entailment hallucinations the
+deterministic guard structurally cannot, with its own instrument limits disclosed" — **not** a number
+to rival the detection eval's precision.
 
 ---
 
