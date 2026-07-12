@@ -213,9 +213,16 @@ the roadmap's premise does not survive contact with the data.
   ```bash
   curl -s "http://localhost:8000/beliefs/898ad0e5-b4f8-5863-abe3-4145c9b5af68/performance"
   ```
-  8 measured windows: confidence `0.924 → 0.528`, frauds_approved `19 → 118`, with the real gen-6
-  recession dip (`0.556 → 0.624 → 0.528`) a monotone curve could never fake. **Measured from
-  `belief_performance`, never hardcoded.**
+  8 measured windows: confidence `0.924 → 0.528`, frauds_approved `19 → 118`, including the
+  non-monotone gen-6 bump (`0.556 → 0.624 → 0.528`). **Measured from `belief_performance`, never
+  hardcoded** — every number aggregated from raw decision labels, which is what makes the curve
+  emergent rather than a stored constant.
+  > ⚠️ **Do NOT narrate the bump as visible proof of the modeled fraud campaign.** At n=250/window it
+  > is **not** statistically distinguishable from noise (p = 0.12), and a strictly *monotone* world
+  > produces a bump like it 9.2% of the time — the campaign's true effect is smaller than the
+  > per-window noise SD, so it does not shrink with more data. The bump evidences an **emergent
+  > curve**, not an identifiable campaign. Safe line: *"aggregated from raw outcomes — it wobbles
+  > because real data wobbles."* See NOTES "Roadmap Item C".
 - **Narration:** *"The row never changed — time-travel proves that. But its measured performance
   rotted: 92% confidence when formed, 53% today. Same rule, drifting world."*
 
