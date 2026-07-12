@@ -3440,3 +3440,169 @@ exists to prevent, in the one surface whose entire job is to be trustworthy. `ts
 ### regulatory corpus (untouched, per instruction); Items C/D; the AML console; the
 ### decisions.aml_transaction_id seam; any change to the five tables / aml_* / typology_corpus; any
 ### new feature. Do NOT push without explicit approval — held for review of the result.
+
+## Roadmap Item C — temporal drift / belief-decay detection: **INVESTIGATED AND CUT** (2026-07-12)
+
+Item C was explicitly CONDITIONAL in the roadmap — *"build only if the data supports a real signal —
+verify first, never decorative."* It was verified first, and **the data does not support it.** Nothing
+was built. This entry records WHY, with the real numbers, so the decision is auditable and a later
+session does not re-propose it from the roadmap line alone. Same class of outcome as Item 6's
+"not-a-hardcoded-secret HMAC is a stale concern, not a gap" and Item A's "no live vuln exists" — an
+honest negative that strengthens the project instead of manufacturing work.
+
+NO code, NO migration, NO new table, NO cluster write, NO AML/corpus touch, NO frontend, NO LLM call.
+The whole investigation ran OFFLINE against the seeded generator (`app/sim/transactions.py` is a pure
+function of SEED, so the 4,000-row world and its 8-window curve reproduce exactly without the DB) plus
+one read-only cluster count. Probes: `scratchpad/drift_stats.py`, `scratchpad/monotone_test.py`.
+
+### The two candidate readings, and how each died
+
+**Reading (a) — DETECTION vs DISPLAY** ("turn the passive curve into an active 'this belief is rotting'
+alert"). The gap technically exists: nothing in the system emits a staleness VERDICT; a human eyeballs
+the sparkline. It does not earn a session, for four reasons, and the last two are structural:
+- **The population is ONE belief.** A triage detector that scans the fleet and flags the rotting ones
+  has a fleet of one. "A second belief" is in the explicitly-gated NOT-DONE list of every recent item.
+- **Its output would be a CONSTANT.** The world is deterministic and seeded; `belief_performance` is
+  byte-identical on every backfill. `detect_drift(belief)` returns `DRIFTING, z=15.59, p=8.6e-55` —
+  always, forever, with no other reachable value.
+- **Two of the three house-style states would be STRUCTURALLY UNREACHABLE.** `STABLE` can never fire
+  (the decay is significant in **400/400** re-seeded worlds). `INSUFFICIENT_DATA` can never fire (every
+  window holds exactly 250 belief-driven decisions by construction). Contrast the three-state surfaces
+  this project actually shipped, where the states are earned on real data: the brake fires all three
+  (57 MATCH / 463 CONCLUSIVE_NO / 980 INCONCLUSIVE over 1,500 edges); the certifier demonstrated both
+  `agreed` and `unavailable` end-to-end on real AWS; the provenance audit fires CLEAN live and
+  ANOMALOUS on three constructed edges (and honestly FLAGS its INCONCLUSIVE as unreachable-live). A
+  drift detector would be the weakest such surface in the project by a wide margin.
+- **The decay is already computed, already shown, already certified, already actionable.** The curve is
+  aggregated from real outcomes (`performance.py`, never hardcoded — the CLAUDE.md non-negotiable), the
+  Time-travel panel renders all 8 windows, the certificate embeds first-vs-last as its staleness
+  evidence, and the counterfactual already answers *"what would earlier action have changed"*
+  (N=1000 approvals withdrawn / M=392 real fraud at the window-4 boundary).
+
+**Reading (b) — DRIFT CHARACTERIZATION** ("distinguish genuine secular decay from a transient regime
+shock; the curve is NOT monotonic — it has the gen-6 recession dip"). This was the promising reading.
+**It is refuted by the data**, and the refutation is the load-bearing finding of this session.
+
+### THE NUMBERS (n = 250 belief-driven decisions/window, 8 windows; curve reproduced byte-for-byte)
+
+```
+gen                   0      1      2      3      4      5      6      7
+confidence          .924   .952   .876   .852   .724   .556   .624   .528
+frauds_approved       19     12     31     37     69    111     94    118
+Wilson 95% CI width  .066   .054   .082   .088   .110   .122   .119   .123
+```
+(Wilson intervals are asymmetric, so the widths are given rather than a misleading `±`. The
+present-day headline number is **0.528 with a 95% CI of [0.466, 0.589]**.)
+
+- **The SECULAR DECAY is real and enormous.** w0 vs w7: **z = -9.93, p = 3.2e-23**. Cochran-Armitage
+  trend test across all 8 windows: **z = 15.59, p = 8.6e-55**. Significant in **400/400** re-seeded
+  worlds. Nobody needs a detector to find this, which is exactly the point of reading (a) above.
+- **The GEN-6 DIP is NOT distinguishable from noise.** w5 `.556` -> w6 `.624` is a +0.068 recovery;
+  two-proportion test **z = 1.55, p = 0.12 — NOT significant** at alpha=.05. Across 400 re-seeded
+  worlds a *significant* gen-6 recovery appears in only **14%** (you would expect ~2.5% by chance with
+  no campaign at all — so there is a faint real effect, far below detectability).
+- **The generator's TRUE campaign effect is +0.0227** in the hidden fraud mean (w5 .443 -> w6 .420).
+  The observed dip is **3.0x that — ~67% of the visible bump is noise, not campaign.**
+- **The effect is SMALLER THAN THE NOISE FLOOR, so more data does not help.** `_WINDOW_JITTER_SD = 0.03`
+  is added independently to every window and does NOT shrink with n. The campaign's whole signature
+  (0.0227) sits *below* it. Detecting the dip at 80% power would need **~7,487 decisions/window (30x
+  more)** — and even that would not fix it, because the regime shock is a fixed-size floor, not a
+  sampling error. The dip is not under-sampled; it is **structurally unidentifiable from 8 windows.**
+
+### THE DECISIVE TEST: a MONOTONE world produces the gen-6 bump too
+
+The claim in this file's Phase-2 entry — *"a monotone sigmoid could never produce it"* — was tested
+directly rather than trusted (`scratchpad/monotone_test.py`, 20,000 worlds per arm). Campaign amplitude
+zeroed, hidden mean a strictly monotone logistic ramp, every other noise layer identical:
+
+```
+                                        MONOTONE (no campaign)   REAL (trend + campaign)
+visible gen-6 recovery (conf6 > conf5)          9.2%                    63.3%
+significant gen-6 recovery (p < .05)            0.3%                    15.3%
+recovery >= the shipped world's +0.068          0.8%                    22.7%
+```
+
+So the clause is **true of the hidden mean and false of the observed curve.** A strictly monotone
+process — nothing receding, no regime change, no campaign — still shows a visible gen-6 confidence
+recovery ~1 world in 11, purely from the regime shock plus Bernoulli sampling at n=250. The Phase-2
+entry is annotated in place accordingly (not overwritten — Item-2/Item-6 precedent).
+
+**What survives, stated precisely, because the distinction is easy to blur:**
+- The dip **IS** real evidence that the curve is **EMERGENT rather than hardcoded** — it is aggregated
+  from raw Bernoulli labels via `performance.py` and reproduces byte-for-byte, which a stored constant
+  could never do. The CLAUDE.md non-negotiable is untouched and fully intact.
+- The dip is **NOT** readable evidence of the **CAMPAIGN specifically**. Presenting the bump as "look,
+  a fraud ring receding" invites an inference the data cannot support (p = 0.12).
+
+### WHY A "CORRECT" CHARACTERIZER WOULD BE DECORATION WITH AN ANSWER KEY
+
+A detector *could* be made to name the gen-6 dip a campaign recession — by importing `_CAMPAIGN_AMP` /
+`_CAMPAIGN_CENTER` from `app/sim/transactions.py`, or by model-selecting between the two candidate
+shapes the generator defines. That is a **ground-truth lookup wearing a detector's clothes**, and it is
+the precise move `aml_graph.py` refuses when it recomputes structure from the unlabeled edge set and
+**selects no label column at all** (Item 4: *"a structural check that consults `aml_pattern_members` is
+a ground-truth lookup wearing a graph's clothes — the reasoning becomes decorative"*). From
+`belief_performance` alone the shape is underdetermined: ~7 free parameters (logistic floor/ceiling/
+center/scale + campaign amplitude/center/width) against **8 noisy points**, with a per-window noise
+floor larger than the effect being characterized. Any shape it "recovered" would be a coin flip
+dressed as an inference. Cut on exactly the grounds the roadmap's own gate specifies.
+
+### THE ONE REAL GAP THE INVESTIGATION FOUND — and it is NOT Item C (scoped as its own follow-on)
+
+Calling this "temporal drift detection" would be the forced fit this project keeps refusing, so it is
+recorded here and **deferred to its own plan-gated item**, not folded into a cut:
+
+**The staleness numbers are the only quantitative claims in Lineage that carry no uncertainty — and
+they are the ones justifying the single irreversible governed write.** The detection eval prints Wilson
+95% CIs and explicitly refuses to trumpet "100%" because the floor is 90.8%; the faithfulness eval keeps
+three denominators apart; the brake, the certifier, the provenance audit and the faithfulness guard all
+carry an honest can't-say state. Yet:
+- **`belief_performance` persists NO sample size.** Its columns are `confidence`,
+  `false_positive_rate`, `frauds_approved` — no denominator. So `GET /beliefs/{id}/performance` cannot
+  expose one and **no uncertainty is derivable from the persisted curve at all.**
+- The certificate carries `confidence_when_formed: 0.924` / `confidence_now: 0.528` as **bare point
+  estimates**. The real present-day figure is **0.528, 95% CI [0.466, 0.589]** — a band 12 points wide —
+  and nothing in the hash-covered document, the API, or the UI says so. A reader cannot tell whether
+  0.528 is over 250 samples or 5.
+- **`performance.py` writes a row for any n >= 1** (`if n == 0: continue`), so a one-decision window
+  would emit `confidence: 0.0` and the certificate would carry it as `confidence_now` with exactly the
+  same authority as a 250-sample window.
+
+**Honest scope, Item-A style: this is LATENT, not live.** Today the backfill puts exactly 250
+belief-driven decisions in every window by construction, so every persisted confidence really is a
+250-sample estimate (+/- .06 worst case) and **no thin window exists**. There is no live defect — but
+the document cannot say so, and the schema cannot express it.
+
+**Why it is NOT a drive-by fix (the blast radius, recorded so the follow-on session inherits it):** a
+denominator means either changing `belief_performance` (the **first five-table moat change since
+Phase 1** — CLAUDE.md calls the schema the moat and says treat it with care) or re-aggregating `n` from
+`decisions` at read time (Item B's precedent: a plain deterministic aggregate over immutable columns, no
+new state — likely the right call). And attaching a CI to `staleness_evidence` moves the certificate
+schema **1.1 -> 1.2**, while the certifier Lambda runs **its own independent sync staleness query**
+(`certificate.py`'s docstring: the Lambda "does its own sync staleness query and never calls it"), which
+Item 6 explicitly flagged as **NOT cross-checked** between the two halves. Both would have to move in
+lockstep or they would silently diverge — the exact false guarantee Item 6 forced the shared
+canonicalizer to prevent.
+
+### Also corrected this session: the same overclaim had leaked into DEMO.md
+
+Grepped every doc. The inferential claim ("a monotone curve could never fake it") appeared in **two**
+places, both fixed: NOTES Phase 2 (annotated in place) and **DEMO.md Beat 7** — the judge-facing hero
+storyboard, where a narrator would have been reading it aloud on camera. README and ARCHITECTURE were
+clean (no mention). The remaining NOTES hits (lines ~492 / ~736 / ~3201) and DEMO's verification-log
+line say only that the dip **reproduced byte-for-byte** across backfills — a claim about determinism,
+not about the campaign — and are correct as written; they were deliberately left alone. AUDIT.md already
+called the drift *"authored ... not observed real-world drift"*, which this session's numbers confirm
+rather than contradict.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `docs(notes): correct the gen-6 dip claim — true of the hidden mean, not of the observed curve`
+- `docs(notes): record Item C — cut (duplicate detection, noise-indistinguishable characterization)` (this entry)
+- `docs(demo): fix the "a monotone curve could never fake" overclaim in Beat 7`
+- `docs(readme): record Item C as investigated-and-cut in roadmap status`
+
+### Explicitly NOT done: Item C itself (CUT — do not re-propose from the roadmap line; re-read this
+### entry first). The staleness-uncertainty item (REAL, deferred, own plan-gate — see above). Item D
+### (confidence propagation, still gated). The regulatory corpus; the AML console; the recorded video;
+### the decisions.aml_transaction_id seam; a second belief; a `verdicts` table; any change to the five
+### tables / aml_* / typology_corpus. Do NOT push without explicit approval.
