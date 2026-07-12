@@ -92,12 +92,20 @@ const ROWS: RowSpec[] = [
   },
   {
     item: "Belief embedding vector",
-    label: "placeholder → real",
+    label: "crimson: placeholder · azure: real",
     mode: "static",
     note: (
       <>
-        Phase-1 seed uses a deterministic placeholder; real{" "}
-        <code>text-embedding-3-small</code> vectors via <code>scripts/embed_beliefs.py</code>.
+        Stated as it actually is on the live cluster, not as an intent. The <strong>crimson</strong>{" "}
+        belief's stored vector <strong>is still the deterministic placeholder</strong> (measured
+        cosine distance 0.000000000 from <code>seed.placeholder_embedding(1536)</code>); the{" "}
+        <strong>azure</strong> laundering belief carries a real{" "}
+        <code>text-embedding-3-small</code> vector. This is not a forgotten to-do:{" "}
+        <code>seed.seed()</code> re-plants the placeholder on every reseed, so anything{" "}
+        <code>scripts/embed_beliefs.py</code> writes is discarded by the next one — "just run
+        embed_beliefs" is not a fix, and closing it properly needs its own decision. Embeddings
+        drive vector <em>search</em>, never the staleness signal, so a placeholder is honest — but
+        the previous label ("placeholder → real") described a transition that had not happened.
       </>
     ),
   },
@@ -220,15 +228,23 @@ const ROWS: RowSpec[] = [
   },
   {
     item: "Counterfactual invalidation query",
-    label: "measured, exact",
+    label: "measured, exact — verdict-aware",
     mode: "static",
     note: (
       <>
         <code>GET /beliefs/{"{id}"}/counterfactual-invalidation?at=T</code> returns{" "}
-        <b>exact</b> counts (each generation window is exactly 250 rows): N = belief-driven
-        approvals withdrawn, M = their real <code>is_fraud</code> subset — reported as
-        approvals-withdrawn, never a fabricated “fraud we’d have caught” (the belief only
-        ever approves; no faithful per-row fallback verdict exists, so none is invented).
+        <b>exact</b> counts, not estimates, split by the verdict that actually happened:{" "}
+        <b>N</b> = belief-driven <em>approvals</em> withdrawn, <b>M</b> = their real{" "}
+        <code>is_fraud</code> subset (the harm), plus <code>withdrawn_blocks</code> and{" "}
+        <code>frauds_caught_by_block</code> — what invalidating would <em>forfeit</em>. No
+        fabricated “fraud we’d have caught”: no faithful per-row fallback verdict exists, so
+        none is invented. <b>Correction:</b> this row previously asserted “the belief only
+        ever approves”. That was true of the crimson card belief and is <b>false of the
+        fleet</b> — the azure laundering belief <b>blocks</b> (57 of its 1,500 decisions).
+        Under the old un-split aggregate the endpoint counted the 43 laundering rows it
+        correctly <em>blocked</em> as auto-approved frauds, crediting its catches as its
+        harms. Fixed, with a regression test that fails against the old aggregate. A belief
+        with no measured windows returns <code>windows: null</code>, never a grid of zeros.
       </>
     ),
   },
@@ -327,7 +343,20 @@ export function HonestyLedger(props: {
 
   // The one seeded belief — the subject of the two per-belief live reads. There is
   // exactly one belief in the data model; the genealogy row reports the live count.
-  const beliefId = beliefs && beliefs.beliefs.length > 0 ? beliefs.beliefs[0].id : undefined;
+  // The two per-belief live reads (performance windows, provenance verdict) describe ONE belief,
+  // and the fleet now holds two. Picking `beliefs[0]` silently meant "crimson" only by UUID sort
+  // luck (both beliefs share a formed_at, so list_beliefs falls through to an id tiebreak). A
+  // credibility surface must not depend on that: the belief is chosen explicitly, and its label
+  // is rendered next to the values so the row cannot silently come to mean a different belief.
+  const ledgerBelief =
+    beliefs?.beliefs.find((b) => b.rule_text.includes("merchant category")) ??
+    beliefs?.beliefs[0];
+  const beliefId = ledgerBelief?.id;
+  const beliefTag = ledgerBelief
+    ? ledgerBelief.rule_text.includes("merchant category")
+      ? "crimson card belief"
+      : "azure laundering belief"
+    : undefined;
   const { perfWindows, provenance } = useLedgerLive(beliefId);
 
   // Per-slot degradation, identical idiom to the Inspector: a not-ready number is "—".
@@ -341,7 +370,8 @@ export function HonestyLedger(props: {
     genealogy: {
       node: (
         <>
-          {n(agents?.count)} agents · {n(alive)} alive · {n(beliefs?.count)} belief
+          {n(agents?.count)} agents · {n(alive)} alive ·{" "}
+          {n(beliefs?.count)} {beliefs?.count === 1 ? "belief" : "beliefs"}
         </>
       ),
     },
@@ -356,10 +386,11 @@ export function HonestyLedger(props: {
         ) : (
           <>
             {n(decisionsTotal)} decisions · {n(perf)} perf windows
+            {beliefTag ? ` (${beliefTag})` : ""}
           </>
         ),
     },
-    provenance: provenanceValue(provenance),
+    provenance: provenanceValue(provenance, beliefTag),
   };
 
   return (
@@ -427,13 +458,17 @@ export function HonestyLedger(props: {
 
 /** The provenance-audit live fact. CLEAN/INCONCLUSIVE stay cold; a genuinely ANOMALOUS
  *  verdict is the one earned --alert on the whole surface (a real tamper signal). */
-function provenanceValue(slot: Slot<ProvenanceAuditResponse>): LiveValue {
+function provenanceValue(
+  slot: Slot<ProvenanceAuditResponse>,
+  beliefTag?: string,
+): LiveValue {
   if (slot.status !== "ready") return { node: DASH };
   const { status, edge_count, anomaly_count } = slot.data;
   return {
     node: (
       <>
         {status} · {formatCount(edge_count)} edges · {formatCount(anomaly_count)} anomalies
+        {beliefTag ? ` (${beliefTag})` : ""}
       </>
     ),
     alert: status === "ANOMALOUS",
