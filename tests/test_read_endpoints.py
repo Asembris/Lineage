@@ -25,6 +25,8 @@ from seed.seed import seed as run_seed
 CRIMSON_7 = aid("crimson-7")
 CRIMSON_0 = aid("crimson-0")
 ORIGIN = bid("origin")
+AZURE_0 = aid("azure-0")
+AML_BELIEF = bid("aml-cycle")  # the grounding seam's second belief (G3)
 
 
 def _client() -> httpx.AsyncClient:
@@ -104,7 +106,16 @@ def test_list_decisions_feed_filter_and_pagination():
     asyncio.run(_run())
 
 
-def test_list_beliefs_returns_the_founding_belief():
+def test_list_beliefs_returns_both_founding_beliefs():
+    """The catalog carries TWO beliefs — a STATED re-baseline, not a silent one (G3).
+
+    This assertion was `count == 1` from Phase 1 through the grounding seam's G2. G3 seeds a
+    SECOND founding belief (the azure laundering typology) into `seed.seed()`, so the fleet
+    genuinely holds two. The count moved because the world moved; it was not relaxed to make a
+    test pass. The two closures are disjoint (crimson: 8 edges / 2 living holders; azure:
+    7 edges / 1 living holder), which is why every other belief test — all of them scoped to
+    `bid("origin")` explicitly — is unaffected.
+    """
     async def _run():
         try:
             await run_seed()
@@ -114,15 +125,25 @@ def test_list_beliefs_returns_the_founding_belief():
                 r_invalid = await client.get("/beliefs", params={"status": "invalidated"})
             assert r.status_code == 200, r.text
             body = r.json()
-            assert body["count"] == 1, body
-            belief = body["beliefs"][0]
-            assert belief["id"] == str(ORIGIN)
-            assert belief["status"] == "active"
-            assert belief["originating_agent_id"] == str(CRIMSON_0)
-            assert belief["invalidated_at"] is None
+            assert body["count"] == 2, body
 
-            # Status filter partitions cleanly (seed has exactly one active belief).
-            assert r_active.json()["count"] == 1
+            by_id = {b["id"]: b for b in body["beliefs"]}
+            assert set(by_id) == {str(ORIGIN), str(AML_BELIEF)}, by_id
+
+            crimson = by_id[str(ORIGIN)]
+            assert crimson["status"] == "active"
+            assert crimson["originating_agent_id"] == str(CRIMSON_0)
+            assert crimson["invalidated_at"] is None
+
+            azure = by_id[str(AML_BELIEF)]
+            assert azure["status"] == "active"
+            assert azure["originating_agent_id"] == str(AZURE_0)
+            assert azure["invalidated_at"] is None
+            # The rule text states exactly what the witness decides (MIN_CYCLE_LEN / MAX_CYCLE_HOPS).
+            assert "12 hops" in azure["rule_text"] and "3 distinct accounts" in azure["rule_text"]
+
+            # Status filter still partitions cleanly: both seeded beliefs are active.
+            assert r_active.json()["count"] == 2
             assert r_invalid.json()["count"] == 0
         finally:
             await engine.dispose()
