@@ -17,6 +17,7 @@ from app.schemas import (
     PreInvalidationState,
     ProvenanceAuditResponse,
     ReplaySnapshotResponse,
+    StalenessUncertainty,
 )
 from app.resilience import TransientRetryExhausted, run_with_retry
 from app.services import (
@@ -49,14 +50,22 @@ async def list_beliefs(
 async def get_belief_performance(belief_id: uuid.UUID) -> BeliefPerformanceResponse:
     """The measured staleness curve for a belief — ordered belief_performance windows.
 
-    Real measured data only (confidence = correct/total per window, never asserted). Unknown
+    Real measured data only (confidence = correct/total per window, never asserted), each point
+    estimate carrying the sample size behind it and its 95% Wilson interval. `uncertainty` says
+    whether those samples can be trusted and whether the measured decay survives them. Unknown
     belief → 404; a known belief with no measured windows → 200 with an empty list.
     """
-    rows = await catalog.list_belief_performance(belief_id)
-    if rows is None:
+    block = await catalog.list_belief_performance(belief_id)
+    if block is None:
         raise HTTPException(status_code=404, detail="belief not found")
-    windows = [BeliefPerformanceWindow(**r) for r in rows]
-    return BeliefPerformanceResponse(belief_id=belief_id, windows=windows, count=len(windows))
+    windows = [BeliefPerformanceWindow(**w) for w in block["windows"]]
+    unc = block.get("uncertainty")
+    return BeliefPerformanceResponse(
+        belief_id=belief_id,
+        windows=windows,
+        count=len(windows),
+        uncertainty=StalenessUncertainty(**unc) if unc else None,
+    )
 
 
 @router.get("/beliefs/{belief_id}/lineage", response_model=LineageResponse)
