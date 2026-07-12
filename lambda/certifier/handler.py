@@ -13,7 +13,8 @@ CRDB + S3 work, NOT a local function wearing a Lambda costume:
      is "recompute, don't trust the label" applied to the certificate itself. Hash-coverage
      proves a document has not CHANGED; it can never prove the document was TRUE. The only
      field this certifier would otherwise take on faith is the one it now re-derives.
-  3. read current committed state + belief_performance (staleness evidence)
+  3. read current committed state + belief_performance JOINED to the `decisions` it aggregates
+     (staleness evidence WITH its sample sizes — see _STALENESS_SQL)
   4. build the certificate (+ aost_verification and closure_verification stamps, hash-covered)
      and WRITE it to S3
   5. stamp audit_log: cert_status='written', cert_s3_key, content_hash, certificate_id
@@ -21,6 +22,13 @@ CRDB + S3 work, NOT a local function wearing a Lambda costume:
 Agreement is a TRI-STATE, never a silent pass. 'agreed' / 'disagreed' / 'unavailable' — the
 last when the endpoint's certificate never reached S3 (cert_status='failed') or predates schema
 1.1 and carries no closure hash. A missing counterparty must not read as a successful check.
+
+The staleness block carries a SECOND, INDEPENDENT tri-state (schema 1.2):
+`staleness_evidence.uncertainty.sample_agreement`, which says whether each persisted confidence
+still reproduces from the decisions it claims to summarize. Do not confuse the two — the closure
+one is a CROSS-CHECK between two parties; the staleness one is a within-read CONSISTENCY check,
+and _STALENESS_SQL's comment explains at length why a cross-check is neither possible nor honest
+there.
 
 Runtime notes (Linux, Lambda Python 3.12):
   * psycopg 3 SYNC — no asyncio, no Windows selector-loop dance.
@@ -57,6 +65,41 @@ _BELIEF_SQL = (
     "SELECT id, rule_text, status, originating_agent_id, formed_at, invalidated_at "
     "FROM beliefs WHERE id=%s"
 )
+# The sync half of the staleness read (schema 1.2). Same aggregate as the app's
+# certificate._STALENESS_SQL, in the sync psycopg placeholder style — the TEXT cannot be shared
+# across the two drivers, so what is shared instead is the COLUMN CONTRACT
+# (certificate.STALENESS_COLUMNS) and the pure statistics (certificate.staleness_evidence).
+# tests/test_staleness_uncertainty.py asserts both SELECTs project exactly those columns.
+#
+# This Lambda does NOT cross-check the endpoint's intervals, and that is deliberate — a
+# confidence interval is pure arithmetic over (k, n), not a claim about the world, so there is
+# no independent oracle to re-derive it against (unlike the closure hash, which CRDB's own MVCC
+# history can corroborate). Both halves read belief_performance at CURRENT committed state, so
+# neither is a check on the other. A `staleness_verification: agreed` block would fabricate the
+# appearance of closure_verification's guarantee while proving nothing. Full reasoning is in
+# certificate.py's staleness block comment. Do not "fix" this by adding a cross-check.
+#
+# `n` is re-aggregated from `decisions`; the window BOUNDS come from the persisted
+# belief_performance rows, which is what lets this Lambda run the identical aggregate without
+# importing app.sim.transactions (it cannot).
+_STALENESS_SQL = """
+    SELECT bp.window_start, bp.window_end, bp.confidence, bp.false_positive_rate,
+           bp.frauds_approved,
+           count(d.id) AS n,
+           sum(CASE WHEN (d.verdict = 'approve' AND NOT d.is_fraud)
+                      OR (d.verdict IN ('decline', 'blocked') AND d.is_fraud)
+                    THEN 1 ELSE 0 END) AS correct
+    FROM belief_performance bp
+    LEFT JOIN decisions d
+      ON d.driving_belief_id = bp.belief_id
+     AND d.decided_at >= bp.window_start
+     AND d.decided_at <  bp.window_end
+    WHERE bp.belief_id = %(belief_id)s
+    GROUP BY bp.window_start, bp.window_end, bp.confidence, bp.false_positive_rate,
+             bp.frauds_approved
+    ORDER BY bp.window_start
+"""
+
 _CLOSURE_SQL = """
     WITH RECURSIVE chain AS (
         SELECT a.id AS agent_id, a.generation, a.bloodline, a.status,
@@ -162,12 +205,7 @@ def lambda_handler(event: dict, context) -> dict:
             )
             edge_count = cur.fetchone()["n"]
 
-            cur.execute(
-                "SELECT window_start, window_end, confidence, false_positive_rate, "
-                "frauds_approved FROM belief_performance WHERE belief_id=%s "
-                "ORDER BY window_start",
-                (belief_id,),
-            )
+            cur.execute(_STALENESS_SQL, {"belief_id": belief_id})
             perf = cur.fetchall()
 
         # 3. INDEPENDENT AOST re-verification — a separate txn whose FIRST statement is the
@@ -218,8 +256,12 @@ def lambda_handler(event: dict, context) -> dict:
         else:
             agreement = "disagreed"
 
-        # 4. build + write the certificate
-        staleness = _staleness(perf)
+        # 4. build + write the certificate. The staleness block is built by the SHARED pure
+        #    builder — this Lambda supplies only its own (k, n) from its own read. If it grew
+        #    its own Wilson/window/support-criterion code, the interval on this certificate and
+        #    the interval on the endpoint's certificate FOR THE SAME INVALIDATION could drift
+        #    apart in silence. Same lesson as the shared canonicalizer.
+        staleness = certificate.staleness_evidence(perf)
         living = [a for a in agents if a["status"] == "alive"]
         inv = {
             "audit_id": audit["id"],
@@ -294,31 +336,17 @@ def lambda_handler(event: dict, context) -> dict:
             "aost_verified": bool(aost_verified),
             "closure_hash_agreement": agreement,
             "rederived_closure_hash": derived_hash,
+            # The staleness tri-state, surfaced in the return payload rather than left buried in
+            # the certificate body — the same reason demo_certifier.py prints the closure
+            # agreement as a headline banner: a tri-state nobody looks at is not a check.
+            "staleness_sample_agreement": (
+                (staleness.get("uncertainty") or {}).get("sample_agreement")
+            ),
+            "staleness_decay_supported": (
+                (staleness.get("uncertainty") or {}).get("decay_supported")
+            ),
             "affected_agent_count": len(agents),
             "affected_edge_count": int(edge_count),
         }
     finally:
         conn.close()
-
-
-def _staleness(perf: list[dict]) -> dict:
-    if not perf:
-        return {"available": False, "window_count": 0, "windows": []}
-    windows = [
-        {
-            "window_start": r["window_start"],
-            "window_end": r["window_end"],
-            "confidence": r["confidence"],
-            "false_positive_rate": r["false_positive_rate"],
-            "frauds_approved": int(r["frauds_approved"]),
-        }
-        for r in perf
-    ]
-    return {
-        "available": True,
-        "confidence_when_formed": windows[0]["confidence"],
-        "confidence_now": windows[-1]["confidence"],
-        "frauds_approved_last_window": windows[-1]["frauds_approved"],
-        "window_count": len(windows),
-        "windows": windows,
-    }
