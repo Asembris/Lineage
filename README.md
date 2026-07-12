@@ -177,7 +177,7 @@ configured in `.mcp.json`; see the Technical Implementation note above for its h
 
 ## Evaluation results
 
-### Item 7 — structural detection (per-edge, ring-membership ground truth, 95% Wilson CI)
+### The structural detection eval (per-edge, ring-membership ground truth, 95% Wilson CI)
 
 The **hold-out is account-disjoint from every design decision**; the development set is in-sample and
 labeled as such. The full honest picture — including SCATTER-GATHER's weaker, disclosed recall:
@@ -206,10 +206,10 @@ precision and an auditable cited path — is leak-independent. The eval prints t
 label` crosstab every run so anyone can check it.
 
 **Scope:** scored against pattern-typology **membership** (ring detection), not general fraud
-detection; measured against Item 1's *deliberately adversarial* benign set (noise anchored to the
-same accounts). Both caveats travel with every quote.
+detection; measured against the AML evidence layer's *deliberately adversarial* benign set (noise
+anchored to the same accounts). Both caveats travel with every quote.
 
-### Item 8 — RAG-grounding faithfulness (secondary to Item 7)
+### The RAG-grounding faithfulness eval (secondary to the detection eval)
 
 Scores the only LLM-generated prose in the pipeline — the agent's `rationale` — for faithfulness to
 the evidence it actually saw. Judge is **Ollama gemma (free, primary) + NVIDIA nemotron
@@ -225,9 +225,9 @@ the evidence it actually saw. Judge is **Ollama gemma (free, primary) + NVIDIA n
 - The **"full 40" category means** (32 real + 8 authored) are descriptive distribution over tuples
   with **no per-tuple label** — not an accuracy figure. 8/10 must not be read as over 40.
 
-Item 8 is a credible *secondary* result — "a judge that catches the prose-entailment hallucinations
-the deterministic guard structurally cannot, with its own instrument limits disclosed" — not a
-number to rival Item 7's detection precision.
+The faithfulness eval is a credible *secondary* result — "a judge that catches the prose-entailment
+hallucinations the deterministic guard structurally cannot, with its own instrument limits
+disclosed" — not a number to rival the detection eval's precision.
 
 ---
 
@@ -252,16 +252,16 @@ number to rival Item 7's detection precision.
 | AML transactions (648 accounts / 1,500 edges / 20 instances / 300 members) | **real + sampled** | Real IBM HI-Small AML data; benign negatives are `is_laundering=0` rows *anchored to the same accounts* as the fraud (deliberately adversarial), capped 4:1 |
 | `decisions` / `belief_performance` | **measured, reproducible** | Currently empty on the live cluster; a deterministic `python -m seed.backfill_decisions` repopulates 4,000 rows + 8 windows (curve conf 0.924 → 0.528, byte-identical every run) |
 | Belief embedding vector | **placeholder → real** | Phase-1 seed uses a deterministic placeholder; real `text-embedding-3-small` vectors via `scripts/embed_beliefs.py` |
-| Item 7 dev-set numbers | **in-sample** | Selection decisions (`FLAG_CAPABLE`, SG tightening) were made on this set; the hold-out is the never-tuned figure |
-| Item 8 GEval rubric | **partly in-sample** | Rubric iterated on 5 of the calibration examples; generalizes 5/5 on fresh authored negatives, but "never tuned" is false for the calibration subset |
-| Item 8 judge | **open-model** | Ollama gemma / NVIDIA nemotron — never OpenAI; unreliable on dense structural-reasoning prose (disclosed) |
+| Detection eval — dev-set numbers | **in-sample** | Selection decisions (`FLAG_CAPABLE`, SG tightening) were made on this set; the hold-out is the never-tuned figure |
+| Faithfulness eval — GEval rubric | **partly in-sample** | Rubric iterated on 5 of the calibration examples; generalizes 5/5 on fresh authored negatives, but "never tuned" is false for the calibration subset |
+| Faithfulness eval — judge | **open-model** | Ollama gemma / NVIDIA nemotron — never OpenAI; unreliable on dense structural-reasoning prose (disclosed) |
 | MCP Server / ccloud CLI | **configured, not exercised** | MCP Server declared in `.mcp.json`; verification done via direct SQL probes; ccloud CLI not used |
 | Regulatory corpus (FATF/FFIEC/FinCEN) | **not built** | Gated on a `data/raw/` drop (sources block automated fetch); `typology_corpus` holds the 4 IBM typology definitions only |
 | Certificate authorship | **integrity, not authorship** | `content_hash` is an unkeyed sha256 — it proves integrity + (within the GC window) AOST-reproducibility, not authorship; asymmetric signing is documented, not built |
-| Provenance audit (Item A) | **verification, not a patch** | The two legitimate `belief_inheritance` writers preserve the A1–A4 invariants by construction, so **no live vulnerability exists**; `GET /beliefs/{id}/provenance-audit` is verification + out-of-band tamper detection. OWASP `ASI06` primary-verified; MITRE ATLAS `AML.T0080` **secondary-sourced**, not confirmed on the authoritative page |
-| Counterfactual invalidation (Item B) | **measured, exact** | `GET /beliefs/{id}/counterfactual-invalidation?at=T` returns **exact** counts (each generation window is exactly 250 rows, not estimated): N = belief-driven approvals withdrawn, M = their real `is_fraud` subset — reported as approvals-withdrawn, never a fabricated "fraud we'd have caught" (the belief only ever approves; no faithful per-row fallback verdict exists, so none is invented) |
-| Explanation-faithfulness guard (Item E) | **probabilistic guard** | Scores the agent's `rationale` against the exact evidence it saw; `SUPPORTED` means "passed the check", **not "proven faithful"** (documented false-negatives — Item 8's fabricated-hop 0.50, faithful SG anchor 0.40). Cites OWASP `LLM09:2025 Misinformation`; **explicitly not** a retrieval/memory-poisoning defense (`LLM08`/`ASI06`) — it checks prose against retrieved rows, not whether those rows are poisoned |
-| Interrogate / provenance-audit / counterfactual endpoints | **built, no UI yet** | `GET /aml/transactions/{id}/interrogate` (Item 5), `/beliefs/{id}/provenance-audit` (Item A), `/beliefs/{id}/counterfactual-invalidation` (Item B) are built, tested, and verified against real cluster data but have no console surface yet — each is a separate plan-gated frontend session; listed here rather than left undiscoverable |
+| Provenance-integrity audit | **verification, not a patch** | The two legitimate `belief_inheritance` writers preserve the A1–A4 invariants by construction, so **no live vulnerability exists**; `GET /beliefs/{id}/provenance-audit` is verification + out-of-band tamper detection. OWASP `ASI06` primary-verified; MITRE ATLAS `AML.T0080` **secondary-sourced**, not confirmed on the authoritative page |
+| Counterfactual invalidation query | **measured, exact** | `GET /beliefs/{id}/counterfactual-invalidation?at=T` returns **exact** counts (each generation window is exactly 250 rows, not estimated): N = belief-driven approvals withdrawn, M = their real `is_fraud` subset — reported as approvals-withdrawn, never a fabricated "fraud we'd have caught" (the belief only ever approves; no faithful per-row fallback verdict exists, so none is invented) |
+| Explanation-faithfulness guard | **probabilistic guard** | Scores the agent's `rationale` against the exact evidence it saw; `SUPPORTED` means "passed the check", **not "proven faithful"** (documented false-negatives — the faithfulness eval's fabricated-hop 0.50, faithful SG anchor 0.40). Cites OWASP `LLM09:2025 Misinformation`; **explicitly not** a retrieval/memory-poisoning defense (`LLM08`/`ASI06`) — it checks prose against retrieved rows, not whether those rows are poisoned |
+| Interrogate / provenance-audit / counterfactual endpoints | **built, no UI yet** | `GET /aml/transactions/{id}/interrogate`, `/beliefs/{id}/provenance-audit`, `/beliefs/{id}/counterfactual-invalidation` are built, tested, and verified against real cluster data but have no console surface yet — each is a separate plan-gated frontend session; listed here rather than left undiscoverable |
 
 ---
 
@@ -282,7 +282,7 @@ pip install -r requirements.txt
 #   DATABASE_URL=cockroachdb+psycopg://USER:PASS@HOST:26257/defaultdb?sslmode=verify-full
 #   OPENAI_API_KEY=sk-...           (required for app import; only the agent/embed paths call it)
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_BUCKET   (optional — certificates)
-#   NVIDIA_API_KEY                  (optional — Item 8 grounding eval only)
+#   NVIDIA_API_KEY                  (optional — the grounding-faithfulness eval only)
 
 alembic upgrade head               # apply migrations 0001–0005 to the cluster
 python -m seed.seed                # seed the genealogy (24 agents, 1 belief, 8 inheritance edges)
@@ -308,7 +308,7 @@ run on 5173.
 
 ```bash
 pytest                                          # 89 tests against the real cluster (~2m39s)
-PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # Item 7 detection eval
+PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
 ```
 
 ---
