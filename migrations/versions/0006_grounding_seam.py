@@ -20,7 +20,15 @@ the throwaway `demo` database with `Base.metadata.create_all` (app/demo_db.py::e
 Declaring `ForeignKey("aml_transactions.id")` on the Base-mapped `Decision` therefore points
 Base.metadata at a table it does not contain, and `create_all` raises **NoReferencedTableError** —
 so the `demo` database can no longer be provisioned and the SSE consistency demo breaks at runtime.
-VERIFIED by running it, not by reasoning (scratchpad/probe_fk_isolation.py).
+
+This was established by RUNNING it, not by reasoning — but that run was a one-off probe in the
+gitignored `scratchpad/` and IS GONE. Do not go looking for it. The DURABLE guarantee, which you can
+run right now, is `tests/test_grounding_seam.py`:
+`test_no_base_foreign_key_escapes_base_metadata` fails the moment a ForeignKey on `Decision` points
+outside `Base.metadata`, and `test_defaultdb_has_the_real_foreign_key` fails if the migration's FK
+is missing from the database. Those two, not a vanished probe, are what hold this design in place.
+(An earlier version of this header cited the probe path directly, which promised a reader an
+artifact that does not exist. See NOTES "FABRICATED VERIFICATION CITATIONS".)
 
 Putting the FK in the MIGRATION instead gives us both halves:
   * defaultdb gets a GENUINE, DATABASE-ENFORCED foreign key, so CLAUDE.md's "no dangling
