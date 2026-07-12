@@ -99,14 +99,17 @@ as stale.
 1. **Restore console state** (the feed, the staleness curve, the counterfactual, and the certificate
    staleness all read `decisions` / `belief_performance`, which are empty on a fresh cluster).
 
-   > **⚠️ TWO ORDERED COMMANDS. THE ORDER IS NOT FREE.** `backfill_decisions` opens with a reseed,
-   > and the reseed **DELETEs every decision** — so running it *second* would destroy the AML rows.
-   > `backfill_aml_decisions` never reseeds, and **refuses to run** (exit 1) if the card backfill
-   > has not been run first, rather than silently building half a world.
+   > **⚠️ THREE ORDERED COMMANDS. THE ORDER IS NOT FREE.** `backfill_decisions` opens with a reseed,
+   > and the reseed **DELETEs every decision** — so running it *second* would destroy the AML rows,
+   > and running it *alone* destroys them too. `backfill_aml_decisions` never reseeds, and **refuses
+   > to run** (exit 1) if the card backfill has not been run first, rather than silently building
+   > half a world. The reseed also re-plants the placeholder embedding, so the third command is what
+   > gives the azure belief its real vector back.
 
    ```bash
    PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_decisions
    PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_aml_decisions
+   PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m scripts.embed_beliefs aml-cycle
    ```
 
    Deterministic (~4–5 min total): restores 24 agents, **2 active beliefs** (crimson card + azure
@@ -114,6 +117,9 @@ as stale.
    1,500 AML citing real IBM transactions), and 8 crimson performance windows (confidence
    `0.924 → 0.528`, byte-identical every run). The azure belief has **0** performance windows,
    deliberately — see NOTES "THE BASE-RATE MIRAGE".
+
+   **This is the same procedure as the between-takes reset below.** There is exactly one way to
+   rebuild this world, and it is these three commands in this order.
 
 2. **Bring the stack up:**
 
@@ -324,18 +330,35 @@ the roadmap's premise does not survive contact with the data.
 >
 > The Invalidate beat is **destructive by design**: it consumes the active belief
 > (`status → invalidated`), leaves `belief_performance`/`decisions` intact but the belief dead, and
-> writes a real S3 certificate. **Between takes**, restore with:
+> writes a real S3 certificate. **Between takes**, restore with the *same three ordered commands as
+> the pre-flight* — the first one alone is not a restore, it is a demolition:
 >
 > ```bash
 > PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_decisions
+> PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_aml_decisions
+> PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m scripts.embed_beliefs aml-cycle
 > ```
 >
-> That reseeds the genealogy (24 agents, belief back to **active**, 8 inheritance edges) and
-> repopulates 4,000 decisions + 8 performance windows (curve `0.924 → 0.528`). ~4–5 min,
-> deterministic. **You cannot re-record Beats 6–9 without it** — a dead belief has no staleness
-> curve and the Invalidate returns `409 already-invalidated`. Do **not** fire two backfills at once
-> (documented `TRUNCATE`/schema-change collision). The console's **Invalidate** is the *only* console
-> action that requires this reset; the isolated consistency demo (below) does not.
+> > **WHY THE ORDER IS NOT FREE — and why stopping after command one destroys the seam.**
+> > `backfill_decisions` **opens with a reseed** (`backfill_decisions.py:124` → `seed.seed()`), and
+> > that reseed **DELETEs every row of `decisions`** — the 1,500 AML rows included. Run it by itself
+> > and you restore the card world while **silently destroying the grounding seam**: the feed loses
+> > every AML decision, the honesty ledger's live census row degrades to `—`, and the Bridge beat
+> > has nothing left to point at. `backfill_aml_decisions` never reseeds — it only **appends** — and
+> > it *refuses to run* (exit 1, printing both commands in order) if the card backfill has not gone
+> > first. So the one failure mode it cannot protect you from is precisely the one above: **stopping
+> > after command one.** The reseed also re-plants the *placeholder* embedding on both beliefs, which
+> > is why `embed_beliefs aml-cycle` is third rather than optional — without it the azure belief's
+> > real vector is gone.
+>
+> That restores 24 agents, **two active beliefs** (crimson card + azure laundering), **15**
+> inheritance edges (8 crimson + 7 azure), **5,500** decisions (4,000 card + 1,500 AML citing real
+> IBM rows), and 8 crimson performance windows (curve `0.924 → 0.528`). The azure belief keeps **0**
+> performance windows — deliberately; see NOTES *"THE BASE-RATE MIRAGE"*. ~4–5 min, deterministic.
+> **You cannot re-record Beats 6–9 without it** — a dead belief has no staleness curve and the
+> Invalidate returns `409 already-invalidated`. Run the three **sequentially**; never fire two at
+> once (documented `TRUNCATE`/schema-change collision). The console's **Invalidate** is the *only*
+> console action that requires this reset; the isolated consistency demo (below) does not.
 
 ### Beat 10 — (optional supporting exhibit) atomic vs eventual, made visible
 
