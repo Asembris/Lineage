@@ -5337,3 +5337,76 @@ existing practice, made mandatory instead of optional.**
 
 ### Commits (Conventional Commits, each its own; on main; held for review before push)
 - `docs(notes): consensus among documents is not evidence — only running the check is`
+
+## ====== RESTORE INSTRUCTIONS HAVE NOW LIED TWICE. THIS IS A HAZARD CLASS. (2026-07-12, G6) ======
+
+**Any instruction that tells a human how to REBUILD THE WORLD is a piece of executable code that
+lives in prose, and this project has now shipped a broken one twice.**
+
+| # | where | what it said | what it would actually do |
+|---|---|---|---|
+| 1 | **README setup block** (found in G5) | `alembic upgrade head  # apply migrations 0001–0005`; seed "1 belief, 8 edges"; the card backfill "optional"; `backfill_aml_decisions` **not mentioned at all** | Followed verbatim: a world with **no seam**. No AML decisions, ever. |
+| 2 | **DEMO.md production reset note** (found in G6) | *"Between takes, restore with:"* → **`python -m seed.backfill_decisions`**, one command, described as restoring "24 agents, belief back to active, 8 inheritance edges" | `backfill_decisions` **opens with `run_seed()`** (`backfill_decisions.py:124`), and `seed.seed()` **DELETEs every row of `decisions`**. Followed verbatim it **DESTROYS all 1,500 AML decisions** and leaves the operator with a card-only world, a dead seam, a `—` in the honesty ledger's live census row, and no idea why. |
+
+**#2 IS THE WORSE OF THE TWO, AND THE PLACEMENT IS WHY.** The README block is run once, carefully,
+by someone setting up. The reset note is run **repeatedly, under time pressure, between takes**, by
+an operator who is thinking about the camera and not about `seed.seed()`'s DELETE list. It is the
+single worst place in the repo to put a destructive command wearing the word "restore".
+
+**AND IT SURVIVED THE SESSION THAT FIXED ITS TWIN.** G3/G4's pre-push review explicitly fixed
+DEMO.md's *pre-flight* ("it said '1 active belief' and ran ONE backfill, which is the two-backfill
+landmine sitting in the operator's own instructions") — and **did not look 200 lines further down at
+the reset note, which had the identical defect.** Fixing one instance of a lie is not fixing the
+class. Grep for the *shape* (`backfill`, `restore`, `reseed`, `between takes`), not the sentence.
+
+### THE RULE, and it is the same rule as the citations one, arrived at from a different direction
+> **An instruction that rebuilds the world must be EXECUTED, not written.** If a document tells a
+> reader to run a sequence of commands, that sequence has to be run, in order, from the state the
+> document assumes — and the resulting world independently SELECTed. A restore procedure that has
+> never been executed is a hypothesis, and this project has now falsified two of them.
+
+G5 already proved this works: it *executed* the corrected README block verbatim against the live
+cluster and tabulated each line's real result ("The corrected README was EXECUTED, not just
+written"). **G6 does the same for the corrected DEMO procedure** — see the G6 verification gate.
+Both fixes were found the same way every real defect in this project is found: by going and looking
+at what the command actually does, rather than at what the paragraph says it does.
+
+### THE STRUCTURAL HALF (because prose corrections demonstrably do not stick)
+`backfill_aml_decisions` already **refuses to run** (exit 1, naming both commands in order) if the
+card backfill has not gone first. That guard is real and it works — but note *exactly* what it can
+and cannot catch: it fires on **wrong order**. It **cannot fire on "stopped after command one"**,
+because nothing runs to notice. The destructive-restore failure mode is, by construction, the one
+the existing guard is blind to. So the defence there is the only one available — say so, loudly, at
+the point of use, and make the pre-flight and the reset note the SAME procedure so there is exactly
+one way to rebuild this world. Both now list the same three ordered commands, and each names the
+other.
+
+## THE 65.3% COLLISION — TWO UNRELATED QUANTITIES, ONE NUMBER, ONE PAGE (2026-07-12, G6)
+
+**`65.3%` means two completely different things in this project, and they now appear in the same
+documents.** Recorded because this is precisely the kind of thing that gets quoted wrong once and
+then propagates — and one of the two is already the number this project has corrupted twice.
+
+| the number | what it is | where it comes from |
+|---|---|---|
+| **65.3% hold-out RECALL** | the structural detector's recall on the never-tuned hold-out (CYCLE ∪ SCATTER-GATHER members vs benign) — a **performance** figure, and the one the logreg *beats* (80.6%) | `scripts/eval_detection.py`; README's baseline table; DEMO Beat 1 |
+| **65.3% COULD-NOT-DETERMINE** | the `INCONCLUSIVE` share of the 1,500-edge extract (980/1500) — a **coverage** figure, the seam's central disclosure, silently approving 252 of 300 laundering rows | `app/services/aml_seam.py`; README's ledger; DEMO's Bridge beat |
+
+They are not related. They are not derived from each other. **One is a strength being honestly
+qualified; the other is a limitation being honestly disclosed** — so conflating them inverts the
+meaning in the most damaging possible direction: a reader who fuses them concludes the *disclosure*
+is a *score*, or that the detector "gets 65.3% right", or that the INCONCLUSIVE share is somehow the
+recall's complement. None of that is true.
+
+**MITIGATION (applied everywhere both can be reached):** neither number is ever written bare. Every
+occurrence carries its noun — **"65.3% hold-out recall"** / **"65.3% could-not-determine"** — so the
+two cannot be silently swapped, and a future session cannot "simplify" one into the other by
+deleting what looks like a redundant word. **It is not redundant. It is the disambiguator.**
+
+**DO NOT "clean this up" by dropping the qualifier.** The collision is a coincidence of arithmetic,
+not a duplication, and there is no edit that removes it — 980/1500 and the hold-out recall are both
+simply 65.3%. The only defence is labelling, and it must survive every future edit to either doc.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `fix(demo): the reset note told the operator to destroy the seam — three ordered commands`
+- `docs(notes): restore instructions have lied twice; and the 65.3% collision`
