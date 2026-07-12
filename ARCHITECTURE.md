@@ -34,7 +34,7 @@ data-model boundaries impossible to cross by accident.
 ```mermaid
 graph TB
     subgraph moat["FIVE-TABLE MOAT — Base metadata (app/models.py)"]
-        A[agents<br/>genealogy graph] --> B[beliefs<br/>rule_text + VECTOR embedding]
+        A[agents<br/>genealogy graph] --> B["beliefs<br/>rule_text + VECTOR 1536<br/>index is vector_l2_ops · query is cosine<br/>❌ INDEX NEVER SELECTED (0002)"]
         A --> BI[belief_inheritance<br/>provenance + closure state]
         B --> BI
         A --> D[decisions<br/>verdict + driving_belief]
@@ -47,8 +47,8 @@ graph TB
         ATX --> APM
     end
     subgraph corpus["RAG CORPUS — CorpusBase metadata (app/corpus_models.py)"]
-        TC[typology_corpus — 4 rows<br/>VECTOR 1536 · index is vector_l2_ops<br/>query is cosine — INDEX NEVER USED]
-        RC[regulatory_corpus — 233 rows<br/>VECTOR 1536 · vector_cosine_ops<br/>C-SPANN index GENUINELY SELECTED]
+        TC["typology_corpus — 4 rows<br/>VECTOR 1536 · index is vector_l2_ops<br/>query is cosine<br/>❌ INDEX NEVER SELECTED (0005)"]
+        RC["regulatory_corpus — 233 rows<br/>VECTOR 1536 · vector_cosine_ops<br/>✅ C-SPANN INDEX GENUINELY SELECTED (0009)"]
     end
 
     D ==> |"THE ONE SEAM (built, 0006):<br/>aml_transaction_id FK — 1,500 decisions"| ATX
@@ -638,13 +638,39 @@ introduced, watched fail with real output, and reverted.
 > table below — because no guard existed to catch it.** For months, NOTES, README, ARCHITECTURE and
 > `verify_corpus.py` all stated that CockroachDB's vector index went unused *because the corpus was
 > small*. Four documents, in agreement. The observation was true; the **cause was invented**. The
-> index is built `vector_l2_ops` and the query ranks with cosine `<=>` — an opclass that cannot
+> indexes are built `vector_l2_ops` and the queries rank with cosine `<=>` — an opclass that cannot
 > serve that operator **at any row count**. One `EXPLAIN` against a `vector_cosine_ops` index over
 > **four rows** settles it, and nobody ran it, because the existing explanation was plausible and
 > the check was green. **A green check that asserts a true fact for a false reason is the most
 > durable kind of wrong**: it survives review, it survives CI, and it teaches the next session the
 > false thing. `verify_corpus.py` now asserts the *cause*, read from the live catalog — not just
 > the symptom.
+
+### The three vector indexes, and the two that are still inert
+
+Stated as a table rather than left to diagram labels, because the natural way to misread the
+correction above is *"so they fixed it."* **They did not. Two of the three are still dead, by
+decision.**
+
+| Index | Migration | Opclass | Query operator | Selected by the planner? |
+|---|---|---|---|---|
+| `ix_beliefs_embedding` | **0002** | `vector_l2_ops` | cosine `<=>` (`agent_brain.py:69`) | ❌ **never — at any row count** |
+| `ix_typology_corpus_embedding` | **0005** | `vector_l2_ops` | cosine `<=>` (`corpus.py:109`) | ❌ **never — at any row count** |
+| `ix_regulatory_corpus_embedding` | **0009** | `vector_cosine_ops` | cosine `<=>` (`regulation.py`) | ✅ **yes** — `EXPLAIN` emits a `vector search` node |
+
+Every retrieval in the system still returns **correct** nearest neighbours; the two inert indexes
+mean those two tables get the right answer by **full scan** rather than by ANN. So this is a
+performance and honest-claims defect, not a correctness one.
+
+**Why they were not simply fixed in the same session that found them.** A selected C-SPANN index is
+an **approximate** search. The full scan they fall back to today is **exact**. Item 4's Gate 0 turns
+on *which three of four* typology documents come back at `k=3`, and Item 8's 40-tuple golden set was
+generated against exact retrieval. Flipping the opclass is therefore a live change to the brake's
+input and to a published evaluation — **and the whole test suite would stay green while it happened.**
+That is its own gated session with its own before/after measurement (NOTES → *THE VECTOR INDEX WAS
+NEVER USED*). Until then, `tests/test_regulatory_corpus.py` and `scripts/verify_corpus.py` **pin both
+as `vector_l2_ops`**, so the change cannot be made silently: when someone makes it, a test fails, and
+that failure is the decision point.
 
 | # | The wrong thing | Why a comment was not enough | What makes it impossible | Enforced in |
 |---|---|---|---|---|

@@ -114,6 +114,26 @@ async def main() -> None:
         PdfReader = None
 
     if PdfReader is not None:
+        # ================= 0.95 IS A CHOSEN THRESHOLD, NOT A DERIVED ONE =================
+        # Said plainly, because this project rejected MARGIN_FLOOR for being a hand-picked constant.
+        # 0.95 is a round number picked A PRIORI, before any coverage was measured. It was not
+        # derived from the corpus and it was not re-tuned to fit the results — but nothing about
+        # these five documents implies it either.
+        #
+        # The measured margin is REAL and ASYMMETRIC:
+        #     worst REAL red-flag line (of 247) ...... 0.973   (+0.023 above the floor — THIN)
+        #     a plausible FABRICATED red flag ........ 0.189   (-0.761 below it — enormous)
+        #
+        # So this gate is far likelier to FALSE-ALARM on a legitimate re-parse than to miss invented
+        # text. That is the right bias here: a false alarm sends a human to read a diff; a miss ships
+        # fabricated regulatory language that reads as authoritative. But the headroom on the TRUE
+        # side is thin — a drifting re-parse WILL trip this, and that is a signal to investigate the
+        # drift, NOT a licence to lower the floor.
+        #
+        # Why this is not MARGIN_FLOOR: that gated a VERDICT on a quantity measured to have no
+        # bearing on whether the structure existed. This gates whether a CORPUS MAY SHIP, offline,
+        # on a quantity that IS directly the thing asserted (does this text exist in the source
+        # PDF?). It authorizes nothing at runtime. See NOTES "THE FIDELITY FLOOR (0.95) WAS CHOSEN".
         FLOOR = 0.95
         stem_for = {PROFILES[s].source: s for s in PROFILES}
         worst_overall, bad_total = (1.0, ""), 0
