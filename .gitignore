@@ -27,6 +27,16 @@ __pycache__/
 # --- Local diagnostic output / logs ---
 *.log
 
+# --- Ephemeral probe scratchpad ---
+# Every session's one-off probes land here. It was ALREADY treated as gitignored by NOTES, by
+# ARCHITECTURE, and by tests/test_citations.py — and it was NOT, merely untracked. The effect was
+# the same (probes never survive a session) but the CLAIM was false, which is the exact disease
+# test_citations.py exists to kill. Making it true rather than rewording the claim: a probe that
+# matters enough to cite belongs in scripts/, committed. See NOTES "FABRICATED VERIFICATION
+# CITATIONS" and test_citations.py rule (C).
+scratchpad/
+**/scratchpad/
+
 # --- Lambda build artifacts (rebuilt from build.py; wheels are large) ---
 lambda/*/package/
 lambda/*/*.zip
