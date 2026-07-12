@@ -44,4 +44,21 @@ lambda/*/*.zip
 
 audit.md
 FRONTEND.md
-data/
+
+# --- Corpus data ---
+# data/raw/ holds the source PDFs and the 475MB IBM CSV — never committed.
+# data/corpus/ holds the PARSED MARKDOWN, and it IS committed, deliberately. It is a derived
+# artifact, but it is the INGEST'S ACTUAL INPUT: scripts/ingest_regulatory.py reads these files,
+# not the PDFs. Committing them is what makes the regulatory ingest reproducible by someone with
+# no LlamaParse key, and it keeps llama-cloud-services (67 packages; it upgrades SQLAlchemy and
+# numpy out from under the app) out of requirements.txt entirely. Re-derive with
+# scripts/parse_regulatory.py in an ISOLATED venv. See NOTES "The regulatory corpus".
+#
+# NOTE THE SHAPE: `data/*`, not `data/`. Git does not descend into an excluded DIRECTORY, so a
+# later `!data/corpus/` cannot re-include anything under it — the negation is silently dead and
+# the markdown stays ignored while .gitignore reads as though it does not. Verified by running
+# `git check-ignore`, which is the only thing that settles this. (See NOTES: the same class of
+# defect as scratchpad/ being asserted-ignored but merely untracked, in the opposite direction.)
+data/*
+!data/corpus/
+!data/corpus/*.md
