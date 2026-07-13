@@ -10,9 +10,10 @@ The seam's frozen census is `MATCH 57 / CONCLUSIVE_NO 463 / INCONCLUSIVE 980`, a
 travelled with it — in the decider's docstring, in `DecisionOut`'s docstring (and therefore in
 `/openapi.json`), in README, in DEMO's Bridge beat, in the honesty ledger — was:
 
-    CONCLUSIVE_NO  463   "searched; there is no cycle"
+    CONCLUSIVE_NO  463   "searched; there is no cycle"   <- FALSE for 447 of them: they are
+                                                            SELF-LOOPS, and no search ever ran
 
-**That is true of 16 of them.** Measured here:
+**That gloss is true of 16 of them.** Measured here:
 
     self-loops                    447   an account paying itself. NOT a transfer between two
                                         accounts, so it is excluded from adjacency by construction
@@ -122,7 +123,8 @@ async def main() -> None:
         print(f"  {kind:30s} laundering: {fraud:3d} / {len(es)}")
     print(
         "\n  reconciles with the frozen census's 5 laundering CONCLUSIVE_NO. The gloss "
-        "'searched; there is no cycle' is true of the 16, not of the 463."
+        "'searched; there is no cycle' is true of the 16 real transfers, and false of the "
+        "447 self-loops — i.e. of 96.5% of the 463 it was written about."
     )
 
 

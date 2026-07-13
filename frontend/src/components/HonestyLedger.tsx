@@ -92,19 +92,26 @@ const ROWS: RowSpec[] = [
         1,500 decisions cite real IBM <code>aml_transactions</code> rows through a
         database-enforced FK, and their <code>is_fraud</code> is the real{" "}
         <code>is_laundering</code>. <b>Two witness outcomes both map to <code>approve</code>, and
-        the verdict alone cannot tell them apart:</b> <code>CONCLUSIVE_NO</code> (the search closed
-        inside the extract — there is no cycle) and <code>INCONCLUSIVE</code> (the search ran off
-        the edge of the 1,500-edge slice and <em>could not determine</em>).{" "}
-        <code>INCONCLUSIVE → approve</code> is a <b>disclosed modeling choice</b>, not a corner
-        case: it is the majority of the extract, and it silently approves most of its laundering
-        rows. <em>(Its share is an unrelated quantity from the structural detector's 65.3%
-        hold-out recall — same number, different thing.)</em> The belief's honest failure mode is{" "}
-        <b>constant, not stale</b> — its error rate is flat over time, so{" "}
-        <code>belief_performance</code> is deliberately <em>not</em> computed for it (an AML rot
-        curve would be a base-rate artifact of the ingestion sample).{" "}
+        the verdict alone cannot tell them apart:</b> <code>CONCLUSIVE_NO</code> (there is no
+        cycle) and <code>INCONCLUSIVE</code> (the search ran off the edge of the 1,500-edge slice
+        and <em>could not determine</em>). <code>INCONCLUSIVE → approve</code> is a{" "}
+        <b>disclosed modeling choice</b>, not a corner case: it is the majority of the extract, and
+        it silently approves most of its laundering rows. <em>(Its share is an unrelated quantity
+        from the structural detector's 65.3% hold-out recall — same number, different thing.)</em>{" "}
+        <b>
+          And <code>CONCLUSIVE_NO</code> is not one thing: only 16 of its 463 were actually
+          searched.
+        </b>{" "}
+        The other 447 are <b>self-loops</b> — an account paying itself, which is not a transfer, so
+        it is excluded from the graph's adjacency and <em>no search ever ran</em>. Its gloss said
+        otherwise for the whole life of the seam. The count was never wrong; its description of
+        itself was.{" "}
+        The belief's honest failure mode is <b>constant, not stale</b> — its error rate is flat
+        over time, so <code>belief_performance</code> is deliberately <em>not</em> computed for it
+        (an AML rot curve would be a base-rate artifact of the ingestion sample).{" "}
         <b>The numbers to the left are COUNTED from the cluster, not quoted</b> — this census has
-        twice been corrupted by prose, once misstated and once falsely sourced, so it is no longer
-        entrusted to prose.
+        now been corrupted by prose three times: once misstated, once falsely sourced, and once
+        misdescribing its own complement. It is no longer entrusted to prose.
       </>
     ),
   },

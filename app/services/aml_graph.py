@@ -18,8 +18,14 @@ The three outcomes exist because the evidence layer is a BOUNDED extract (1,500 
 5,078,345-row universe. A search that finds nothing has two very different meanings:
 
   MATCH         — a witness exists. The cited rows are real and form the claimed structure.
-  CONCLUSIVE_NO — the search closed without ever touching the edge of what we ingested.
-                  The absence of structure is a fact about the world, not about our slice.
+  CONCLUSIVE_NO — the absence of structure is a fact about the world, not about our slice.
+                  TWO VERY DIFFERENT ROWS LAND HERE, and conflating them is how this outcome
+                  came to describe itself falsely for the whole life of the seam:
+                    * a self-loop (447 rows) — an account paying itself is not a transfer, so it
+                      is excluded from adjacency below and NO SEARCH EVER RAN;
+                    * a real transfer (16 rows) whose search genuinely closed inside the extract
+                      without ever touching the edge of what we ingested.
+                  The `detail` string distinguishes them, and it is served by /interrogate.
   INCONCLUSIVE  — the search ran into a SINK: an account whose outgoing edges are simply not
                   materialized here. "No cycle" and "the cycle leaves our extract" are
                   indistinguishable, so the honest answer is "cannot determine".
@@ -28,7 +34,9 @@ The three outcomes exist because the evidence layer is a BOUNDED extract (1,500 
 
 Self-loops (447 rows, 446 of them benign "Reinvestment" transfers) are excluded from all
 structure: an account paying itself is not a transfer between accounts. They are structurally
-inert and land in CONCLUSIVE_NO.
+inert. They land in CONCLUSIVE_NO — which is why "CONCLUSIVE_NO = 463 searches found nothing"
+is FALSE and was shipped anyway: 447 of those 463 are these rows, and they were never searched.
+See scripts/probe_conclusive_no.py.
 """
 
 from __future__ import annotations

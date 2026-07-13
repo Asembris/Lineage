@@ -169,12 +169,20 @@ export interface Decision {
    *
    * READ THIS BEFORE COUNTING AN AML `approve`. Two different witness outcomes both map to
    * `approve` and `verdict` alone CANNOT tell them apart:
-   *   CONCLUSIVE_NO — the search closed inside the extract; there is no cycle.   (463 edges)
+   *   CONCLUSIVE_NO — there is no cycle. BUT ONLY 16 OF THESE 463 WERE ACTUALLY SEARCHED:
+   *                   the other 447 are SELF-LOOPS (an account paying itself), which is not a
+   *                   transfer, so it is excluded from the graph's adjacency and no search ever
+   *                   ran. Its long-standing gloss ("searched; there is no cycle") described all
+   *                   463 as searches. The count was never wrong; its description of itself was.
    *   INCONCLUSIVE  — the search ran off the edge of the 1,500-edge extract and
    *                   COULD NOT DETERMINE.                (980 edges = 65.3%, 252 laundering)
    * So 980 of the belief's 1,443 approvals are not "this is clean" — they are "we could not
    * tell". That is a disclosed modeling choice, not a corner case. A PROJECTION of the persisted
-   * `txn_ref`, i.e. what the agent RECORDED, never a fresh re-run of the witness. */
+   * `txn_ref`, i.e. what the agent RECORDED, never a fresh re-run of the witness — which is also
+   * why this field stays THREE-valued: the self-loop split is a property of the EVIDENCE
+   * (re-derived from the graph), not of what the agent RECORDED. The evidence layer serves it, as
+   * a per-witness `detail` string on GET /aml/transactions/{id}/interrogate, and the AML console
+   * must render the four apart. */
   witness_outcome: WitnessOutcome | null;
 }
 
