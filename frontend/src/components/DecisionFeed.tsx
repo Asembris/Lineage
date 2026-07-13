@@ -27,10 +27,13 @@
  *
  * THE WITNESS CHIPS MAKE AN APPROVAL'S BASIS VISIBLE, and that is the point of the seam's whole
  * disclosure. Two different witness outcomes both map to `approve` and the verdict CANNOT tell them
- * apart: CONCLUSIVE_NO (there is no cycle) and INCONCLUSIVE (the search ran off the edge of the
- * extract — 65.3% of it, silently approving 252 of the 300 laundering rows). Each chip carries its
- * REAL cluster count, counted and never retyped, exactly as the honesty ledger does: this census has
- * been corrupted by prose three times, and a number read from the cluster cannot be wrong about it.
+ * apart: CONCLUSIVE_NO (there is no cycle — though only 16 of those 463 were actually SEARCHED; the
+ * other 447 are self-loops, an account paying itself, where no search was ever possible) and
+ * INCONCLUSIVE (the search ran off the edge of the extract — 65.3% of it, silently approving 252 of
+ * the 300 laundering rows). Each chip carries its REAL cluster count, counted and never retyped,
+ * exactly as the honesty ledger does: this census has been corrupted by prose three times — once
+ * misstated, once falsely sourced, once misdescribing its own complement — and a number read from
+ * the cluster cannot be wrong about the cluster.
  *
  * Cold by default. The single always-on signal is --alert on is_fraud rows (fraud
  * is the palette's designated alert meaning, distinct from the Phase-3 trace
@@ -106,8 +109,9 @@ function DecisionRow({
         </span>
         <span className="feed__tags">
           {/* THE BASIS. An AML `approve` without it is unreadable: CONCLUSIVE_NO means "there is
-              no cycle", INCONCLUSIVE means "we could not determine" — and they are 463 and 980
-              rows of the same verdict. Card decisions have no witness and get nothing here. */}
+              no cycle" (447 of its 463 are self-loops, never searched at all; only 16 were),
+              INCONCLUSIVE means "we could not determine" — and they are 463 and 980 rows of the
+              SAME verdict. Card decisions have no witness and get nothing here. */}
           {d.witness_outcome && (
             <span
               className={`feed__basis feed__basis--${d.witness_outcome.toLowerCase()}`}
@@ -182,7 +186,10 @@ function KindFilter({
 
 /** The BASIS chips. Only meaningful under `kind=aml` — a card decision has no witness — so they
  *  appear only there. Each carries its real cluster count, COUNTED (never retyped): this census has
- *  been corrupted by prose three times, once in each available way. */
+ *  been corrupted by prose three times, once in each available way. The "no cycle" chip covers 463
+ *  decisions, of which only 16 were genuinely searched; the other 447 are self-loops, structurally
+ *  incapable of forming a cycle, so no search ran. Rung 2's evidence pane renders that fourth state
+ *  from /interrogate's `detail` — it is a fact about the evidence, not about the record. */
 function WitnessFilter({
   witness,
   onWitness,
