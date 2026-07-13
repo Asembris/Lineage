@@ -128,7 +128,7 @@ as stale.
    deliberately — see NOTES "THE BASE-RATE MIRAGE".
 
    **This is the same procedure as the between-takes reset below.** There is exactly one way to
-   rebuild this world, and it is these three commands in this order.
+   rebuild this world, and it is these two commands in this order.
 
 2. **Bring the stack up:**
 
