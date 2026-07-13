@@ -4316,7 +4316,7 @@ session's job; this ripple only keeps the console type-correct and non-lying.**
 
 ### G2 VERIFICATION GATE — all green
 - **122 backend tests pass** (was 118 + the 4 new seam guards).
-- `tsc --noEmit` clean; `npm run build` green.
+- `tsc --noEmit` clean; `npm run build` green. **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 - `ensure_demo_ready()` still provisions `demo`; `demo` still has **0** `aml_*` tables.
 - `scripts/verify_aml_ingest.py` — ALL CHECKS PASSED against the live cluster + raw CSV.
 - `GET /decisions` serves the new fields; existing card rows read
@@ -4618,7 +4618,7 @@ vector is real (cosine distance 1.01 from the placeholder — verified).
   them exactly.
 - `ensure_demo_ready()` still provisions `demo` (2 beliefs, 15 edges, **0** `aml_*` tables) — the
   FK-in-migration-only design still holds.
-- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk).
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk). **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 - **Cluster restored and INDEPENDENTLY re-verified with real SELECTs** (not the script's echo):
   head 0007, 24 agents, 2 beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500 AML), 8 crimson
   perf windows, 0 azure perf windows, 1,500 aml_transactions, crimson curve byte-identical.
@@ -4938,7 +4938,7 @@ row forces a lockstep frontend edit, and this session is scoped backend-only. Fl
   re-ingested, NOT re-sampled.
 - `ensure_demo_ready()` still provisions `demo` (24 agents / 2 beliefs / 15 edges / **0** `aml_*`
   tables). 0008 targets defaultdb only; demo is untouched.
-- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green. **NO frontend change was
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green. **NO frontend change was **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
   needed** — verified rather than assumed: the console renders `txn_ref` verbatim in two places, so
   an added OPTIONAL field creates no lie (unlike G2's `formatAmount`, which had to move).
 - **Cluster restored and INDEPENDENTLY re-verified with real SELECTs** (not a script's echo): head
@@ -5232,7 +5232,7 @@ that `/openapi.json` carries the field you are testing **and that a DB-backed ro
 
 ### G5 (ledger) VERIFICATION GATE — all green
 - **150 backend tests pass** (149 + the countable-census test), ~3m13s.
-- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green.
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green. **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 - Cluster restored + independently re-verified with real SELECTs: head **0008**, 5,500 decisions
   (4,000 card / 1,500 AML), 8 perf windows, 15 edges, 2 beliefs.
 - README and `HonestyLedger.tsx` moved in LOCKSTEP (the component's docstring makes README the
@@ -5559,7 +5559,7 @@ written to prevent exactly that*. The generalization is the project's own thesis
 - **Citation guard green before AND after** (4 tests). Every new path/test cited in this session was
   confirmed to resolve: `.gitignore:37-38`, `seed/backfill_aml_decisions.py:112` (`DECIDED_AT`),
   `aml_seam.py`, `test_oracle_boundary.py`, `test_citations.py`, migrations 0006-0008.
-- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk).
+- Frontend: `tsc --noEmit` clean, `oxlint` clean, `vite build` green (the known >500KB three chunk). **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 - **THE CORRECTED DEMO RESET PROCEDURE WAS EXECUTED, NOT JUST WRITTEN** — the G5 standard, and the
   entire point of the hazard-class entry. All three commands, in order, verbatim from the document:
 
@@ -6198,7 +6198,7 @@ one procedure, two ordered commands. **A seventh site is a bug.**
 
 **VERIFIED BY DRIVING IT, NOT BY READING IT** (Playwright @1440, live vite -> uvicorn -> live cluster;
 the empty state forced with route-fulfill so the cluster was never wiped — the Frontend-Phase-3
-precedent). Both hints render the two ordered commands, **0 page errors**. `tsc --noEmit`, `oxlint`
+precedent). Both hints render the two ordered commands, **0 page errors**. `tsc --noEmit`, `oxlint` **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 and `vite build` all exit 0. And the server was pre-checked for the two documented harness traps
 before any result was trusted: `/openapi.json` carries `witness_outcome` (not a zombie serving stale
 code) and a DB-backed route returns 200 (not the Proactor-loop failure that masquerades as a CORS
@@ -6353,7 +6353,7 @@ read.
 
 ### GATE — all green (2026-07-13)
 - **167 backend tests pass** (~3m21s), citation guard included. No backend file was touched.
-- `tsc --noEmit`, `oxlint`, `vite build` all exit 0 (the >500 kB three.js chunk is the known,
+- `tsc --noEmit`, `oxlint`, `vite build` all exit 0 (the >500 kB three.js chunk is the known, **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
   accepted Phase-5 bundle).
 - **Driven at 1280 / 1440 / 1920, motion AND reduced-motion**, live vite -> uvicorn -> live cluster:
   ribbon renders, 8 dots, `95% CI [0.88, 0.95] · n = 250` when formed -> `[0.47, 0.59] · n = 250`
@@ -6435,7 +6435,7 @@ naming both commands, so the import counts as the counterpart. Otherwise the gua
 next author back into writing the procedure out by hand — manufacturing the tenth site itself.
 
 ### GATE
-- **185 backend tests pass** (167 + 18 new), ~3m24s. `tsc`, `oxlint`, `vite build` all exit 0.
+- **185 backend tests pass** (167 + 18 new), ~3m24s. `tsc`, `oxlint`, `vite build` all exit 0. **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
 - **Driven live:** both gate branches and the ledger row render the two ordered commands.
   **Confirm was never clicked — the cluster was not touched.**
 - Cluster restored with both backfills and re-verified with real SELECTs: 24 agents, 2 beliefs (both
@@ -6577,7 +6577,7 @@ motion / reduced-motion passes run separately. **Do NOT weaken the limiter to ma
 ### GATE — all green (2026-07-13)
 - **185 backend tests pass** (~3m28s), citation + restore-instruction guards included. **No backend
   file was touched.**
-- `tsc --noEmit`, `oxlint` (**zero** warnings — the baseline is zero, so the predicate moved to
+- `tsc --noEmit`, `oxlint` (**zero** warnings — the baseline is zero, so the predicate moved to **[†VACUOUS — see "THE TYPECHECK THAT COULD NOT FAIL" at the bottom of this file: `tsc --noEmit` checks ZERO files here and exits 0 unconditionally. This gate proved nothing about types.]**
   `lib/invalidate.ts` rather than ship a new one), `vite build` all exit 0.
 - **Driven live at 1280x800 / 1280x900 / 1440x900 / 1920x1080, motion AND reduced-motion, on a
   crimson AND an azure decision**, vite -> uvicorn -> live cluster. Asserted each run: the control is
@@ -6804,3 +6804,118 @@ be re-derived on every rebuild is not a fix.** `scripts/` already holds four com
 ### rendering; the four-way basis in pixels; the `neighbourhood` endpoint (Rung 5, gated on looking
 ### at a render); any change to the brake, the eval inputs, any measured constant, or the
 ### invalidation flow; a second r3f use. Do NOT push without explicit approval.
+
+## ============ THE TYPECHECK THAT COULD NOT FAIL ============
+### (2026-07-13 — cited as evidence by NINE gates, green for its entire life, and it checked NOTHING)
+
+`npx tsc --noEmit`, run in `frontend/`, typechecks **ZERO FILES** and exits **0, unconditionally.**
+
+It was cited as proof that the frontend typechecked in **nine** verification gates — every one of
+them in the grounding-seam arc. It could not have failed in any of them. It surfaced only because a
+missing import slipped past it and **CI caught the error in 22 seconds.**
+
+### THE MECHANISM — structural, not a quirk
+`frontend/tsconfig.json` is a **SOLUTION file**: `"files": []` plus `references` to
+`tsconfig.app.json` / `tsconfig.node.json`. A bare `tsc` invocation resolves to it, finds an empty
+file list, checks nothing, and reports success. **Measured, not reasoned:**
+
+```
+npx tsc --noEmit --listFiles          | grep -c /src/   ->    0     <-- what I ran, all session
+npx tsc -p tsconfig.app.json --listFiles | grep -c /src/ ->  446     <-- what it should have been
+```
+
+**MADE TO FAIL, with the real output.** Remove `WitnessOutcome` from `App.tsx`'s type import (the
+exact error CI hit) and run all three:
+
+```
+npx tsc --noEmit                  ->  exit 0    *** GREEN. THE BUG IS PRESENT. ***
+npx tsc -b                        ->  exit 2    src/App.tsx(104,42): error TS2304: Cannot find name 'WitnessOutcome'.
+                                                src/App.tsx(125,25): error TS2304: Cannot find name 'WitnessOutcome'.
+npx tsc -p tsconfig.app.json --noEmit -> exit 2  (same two errors)
+```
+
+### THIS IS THE SAME DISEASE AS THE DEAD VECTOR INDEXES, AND IT IS THE WORST VARIANT
+Item 3 recorded *"at 4 rows the planner correctly brute-forces a full scan"* — the observation was
+TRUE and the **cause was INVENTED**, and a passing `verify_corpus.py` stood behind it for months.
+This is that, one level up: not a false cause behind a green check, but **a green check that was
+structurally incapable of being anything else.**
+
+The pattern's full record, now five deep:
+1. **Item 3** — a green check asserting a true fact for a false cause (the vector indexes).
+2. **Lap 2** — the guard written to fix that EXPLAINed a query the application never runs.
+3. **`test_citations.py`** — its own docstring carried the disease it was written to cure
+   (*"scratchpad is gitignored"* — it was not).
+4. **The restore guard** — a 14-line proximity window that **passed its own bug**.
+5. **THIS** — a verification command that could not fail, cited more times than any other check in
+   the project.
+
+> **A check that cannot fail is not a check. And a green result feels like corroboration, which is
+> exactly why nobody re-derives it.** The decisive experiment here cost one `--listFiles` and a
+> `grep -c`. Nobody ran it for nine gates.
+
+### THE SCOPE — MEASURED, AND SMALLER THAN IT FIRST LOOKED. Do not overstate this either.
+The instinct was *"every frontend session in this project's history"*. **That is false, and stating
+it would be its own dishonesty.** The split is clean and it is a fact about the log:
+
+| gates | command cited | verdict |
+|---|---|---|
+| **Frontend Phases 2-6, Item 9, Item F, Item 10** (NOTES:541, 640, 683, 732, 776, 831, 929, 1000, 1138, 3224, 3423) | **`tsc -b`** | **REAL.** These gates typechecked. |
+| **G2, G3/G4, G5, G5-ledger, G6, the staleness-uncertainty frontend, the restore-sweep session, the inspector fold, Rung 1** (NOTES:4319, 4621, 4941, 5235, 5562, 6201, 6356, 6438, 6580) | **`tsc --noEmit`** | **VACUOUS.** Proved nothing about types. |
+
+The nine are **annotated in place with a `[†VACUOUS]` marker, NOT rewritten** — the precedent this
+project already set (Phase 2's gen-6 claim annotated by Item C; Item 2's canonicalizer decision
+annotated by Item 6). Rewriting the log to satisfy a grep would be the actual dishonesty, and it is
+the same reason `test_restore_instructions.py` does not sweep NOTES.
+
+**WHAT BOUNDS THE DAMAGE, and it is not luck:** `npm run build` is `"tsc -b && vite build"`, so any
+session that ran **`npm run build`** WAS genuinely typechecked. A session that ran **`npx vite
+build`** (which is what I did) skipped `tsc` entirely. That asymmetry is precisely how this hid.
+
+**AND THE CURRENT TREE IS CLEAN — measured, not assumed.** The first honest typecheck this project
+has run over the whole frontend: `tsc -b --force` **exit 0**; `tsc -p tsconfig.app.json --noEmit`
+over **446 source files** exit 0; `tsc -p tsconfig.node.json` exit 0; `oxlint` zero warnings. So the
+vacuous command was hiding **one** real error — the one CI caught — not a backlog accumulated over
+nine gates. That is genuinely good news, and it is stated as a measured result.
+
+### THE FIX IS STRUCTURAL: one named command, and a guard that PINS THE CAUSE
+- **`npm run typecheck`** (`"typecheck": "tsc -b"`) now exists in `frontend/package.json`, so no
+  future session has to know which of three invocations is the real one.
+- **`tests/test_frontend_typecheck.py`** — four properties, **each MADE TO TRIP with real output**:
+  1. **THE CAUSE IS PINNED, not the symptom** — `tsconfig.json` must still be a solution file with
+     `"files": []`. This is the correction Item 3's index check needed: *a true rule resting on a
+     stale premise is one skeptical reader away from deletion.* If someone flattens the config,
+     `--noEmit` stops being vacuous, the ban loses its reason, and **this test fails** so the change
+     is a decision rather than a silent drift. (Trip: `AssertionError: frontend/tsconfig.json is no
+     longer a solution file with an EMPTY file list.`)
+  2. `frontend-ci` must typecheck with `tsc -b` and must NOT use `--noEmit`. (Trip: real output.)
+  3. `package.json` must expose `typecheck: tsc -b`, and `build` must gate on it.
+  4. **No judge-facing surface may cite `tsc --noEmit` as evidence.** (Trip: planting
+     "`tsc --noEmit` clean" in DEMO.md fails at `DEMO.md:587`.)
+
+### BANKED: `NOTES.md` IS NOT A FRONTEND FILE, AND A DOCS-ONLY COMMIT WIPES THE CLUSTER
+`ci.yml` carries `paths-ignore: ['frontend/**']` — and **nothing else.** So a commit touching
+`NOTES.md` (or README / ARCHITECTURE / DEMO, or any root doc) **re-fires the FULL BACKEND SUITE**,
+which calls `seed()` (DELETEs every decision) and runs `test_atomic_invalidation` (invalidates a
+belief, writes a real S3 cert).
+
+I hit this live: the tsc fix commit bundled `App.tsx` **and** `NOTES.md`, so I assumed only
+`frontend-ci` would fire, started the restore immediately, and collided with a backend CI run that
+was still going. The symptoms were a `SerializationFailure /
+ReadWithinUncertaintyIntervalError` mid-backfill, `decisions` oscillating 0 -> 15 -> 8 -> 0, and
+`active_beliefs` dropping to **1** with `audit_log = 1` (test_atomic_invalidation, mid-flight).
+
+**THE RULE, restated with the missing clause:** *push -> wait for CI -> restore -> verify* — and
+**"is this commit frontend-only?" is decided by `paths-ignore`, not by intuition.** A docs commit is
+a backend-CI commit. **Poll the cluster until it is STABLE (unchanged across several consecutive
+reads) before backfilling; do not race CI.** This is the fourth recorded instance of the
+CI-vs-LOCAL collision and the first where I caused it by misreading which workflow a commit fires.
+
+### GATE
+- **192 backend tests pass** (188 + 4 new typecheck guards).
+- `npm run typecheck` (`tsc -b`) exit 0 · `oxlint` zero warnings · `vite build` clean.
+- The nine historical gates annotated in place; no NOTES history rewritten.
+- **Cluster restored AFTER CI settled** and independently re-verified with real SELECTs: 24 agents,
+  2 active beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500 AML), 8 crimson perf windows,
+  `audit_log = 0`, `count(DISTINCT decided_at) = 1` for AML, 1,500 `aml_transactions` (NOT
+  re-ingested), crimson curve `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical, census
+  57/463/980 reproduced.
