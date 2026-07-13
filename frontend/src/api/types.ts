@@ -52,19 +52,58 @@ export interface AgentBeliefsResponse {
 }
 
 /** One measured performance window (BeliefPerformanceWindow). Windows are
- *  generation-ordered by window_start — ordinal position IS the generation. */
+ *  generation-ordered by window_start — ordinal position IS the generation.
+ *
+ *  `sample_size` is the number of belief-driven decisions the window's confidence was aggregated
+ *  over. belief_performance persists NO denominator, so the backend re-aggregates it from
+ *  `decisions` at read time. The Wilson bounds are NULL whenever the sample cannot be trusted
+ *  (see StalenessUncertainty.sample_agreement) — withheld, never faked. A null bound must be
+ *  rendered as a STATED absence, never as a narrow interval.
+ *
+ *  `false_positive_rate` deliberately has NO interval: it is structurally 0 for a belief that only
+ *  ever approves, and an interval there would dress a structural impossibility as an estimate. */
 export interface BeliefPerformanceWindow {
   window_start: ISODateTime;
   window_end: ISODateTime;
   confidence: number;
   false_positive_rate: number;
   frauds_approved: number;
+  sample_size: number;
+  confidence_ci_low: number | null;
+  confidence_ci_high: number | null;
+}
+
+/** How much to trust the curve — the backend's honest "cannot determine" state (StalenessUncertainty).
+ *
+ *  `sample_agreement`:
+ *    - "agreed"      — every window's persisted confidence reproduces from the decisions it
+ *                      summarizes; the intervals are real and are emitted.
+ *    - "disagreed"   — a persisted confidence does NOT reproduce; belief_performance is stale
+ *                      w.r.t. `decisions`. Intervals withheld (a fresh denominator on a stale point
+ *                      estimate is exactly the confidently-wrong number).
+ *    - "unavailable" — a window has no decisions to aggregate. No interval is derivable.
+ *
+ *  `decay_supported` — whether "valid then / rotten now" survives its own uncertainty: a two-sided
+ *  FISHER EXACT test on first vs. last window rejects "same rate" at 95%, AND the movement is
+ *  downward. There is NO minimum-sample-size gate; Fisher is exact at every n, so a thin window
+ *  disqualifies itself. Comparing the intervals for overlap would NOT have done this — it calls a
+ *  single wrongly-decided decision a supported decay. null = not assertable. */
+export interface StalenessUncertainty {
+  method: string;
+  confidence_level: number;
+  sample_source: string;
+  sample_agreement: "agreed" | "disagreed" | "unavailable";
+  decay_supported: boolean | null;
+  decay_p_value: number | null;
+  decay_support_criterion: string;
 }
 
 export interface BeliefPerformanceResponse {
   belief_id: UUID;
   windows: BeliefPerformanceWindow[];
   count: number;
+  /** null when the belief has no measured windows at all (an honest absence, not an error). */
+  uncertainty: StalenessUncertainty | null;
 }
 
 /** Top-line provenance-integrity verdict (ProvenanceAuditResponse, Item A). The full
