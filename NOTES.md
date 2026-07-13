@@ -5656,9 +5656,14 @@ The decisive experiment cost one EXPLAIN against a four-row table. Nobody ran it
   retrieval. Flipping the opclass is a live behavioural change to the brake and to a published eval —
   it needs its own before/after measurement over the real four documents, not a drive-by fix in a
   session about something else. `verify_corpus.py` and
-  `tests/test_regulatory_corpus.py::test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_l2`
-  now **PIN them as L2**, so the fix cannot happen silently: when someone makes it, a test fails, and
+  `tests/test_regulatory_corpus.py::test_exactly_one_vector_index_exists_and_it_is_the_one_that_works`
+  now **PIN them**, so the fix cannot happen silently: when someone makes it, a test fails, and
   that failure is the decision point.
+  **[SUPERSEDED 2026-07-13 — the pin FIRED and the decision was made: migration 0010 DROPPED both
+  indexes. The "before/after measurement" demanded here was run and its PREMISE WAS FALSE — flipping
+  the opclass is INERT (it changes no plan), because both real queries carry a WHERE and neither
+  index has a prefix column. The test named above was renamed accordingly and now pins the two
+  indexes as ABSENT. See "THE TWO DEAD INDEXES ARE GONE" at the bottom of this file.]**
 
 ## The regulatory corpus — 233 red flags, and the first working vector index (2026-07-13)
 
@@ -5815,10 +5820,16 @@ it. A direct `NOT_A_SECTION` assertion was added. *The first version of that gua
 
 ## THE OPCLASS FIX: THE NAMED TRIGGER, AND THE TRAP THAT MAKES IT DANGEROUS (2026-07-13)
 
-The two dead indexes are PINNED as `vector_l2_ops` by `verify_corpus.py` and by
-`tests/test_regulatory_corpus.py::test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_l2`.
+The two dead indexes are PINNED by `verify_corpus.py` and by
+`tests/test_regulatory_corpus.py::test_exactly_one_vector_index_exists_and_it_is_the_one_that_works`.
 That stops the change happening SILENTLY. It does not tell the session that makes it what to measure.
 This does.
+
+**[RESOLVED 2026-07-13. The pin fired; the session ran; BOTH INDEXES WERE DROPPED (migration 0010).
+AND THE CENTRAL CLAIM OF THE SECTION BELOW IS FALSE — it says the `typology_corpus` opclass flip
+"WOULD work" because "its query has no WHERE and no JOIN". Its query HAS a WHERE: every one of the
+12 row-returning `retrieve_typology()` call sites passes `source=SOURCE`. The flip is INERT. Read
+"THE TWO DEAD INDEXES ARE GONE" at the bottom of this file before trusting anything below.]**
 
 ### ============ THE TRAP: THE ENTIRE SUITE STAYS GREEN WHILE THE BRAKE'S INPUT CHANGES ============
 **A future session must NOT flip the opclass, run the tests, see 162 green, and ship.** The tests
@@ -5931,3 +5942,222 @@ at ingest time, over a bounded and curated five-document set, on a quantity (doe
 the source PDF?) that is *directly* the thing being asserted. It authorizes nothing at runtime and
 touches no verdict. Different class entirely — but it is still a chosen number, and if it is ever moved
 the move must be recorded with its new margin, not quietly edited.
+
+## ============ THE TWO DEAD INDEXES ARE GONE. AND THE FIX ON FILE WAS ITSELF FALSE. ============
+### (2026-07-13 — migration 0010, and the THIRD lap of the same disease)
+
+Both dead vector indexes are DROPPED. Neither was repaired, because **the repair this file
+prescribed does not work** — and the way that false prescription got here is the finding, not the
+indexes.
+
+### THE HEADLINE: THE ENTRY ABOVE ("THE OPCLASS FIX") WAS WRONG ON ITS CENTRAL CLAIM
+
+The previous session wrote, in bold, that the two indexes are **two different problems** and that:
+
+> **`typology_corpus` (0005): the opclass change WOULD work — and that is exactly why it is
+> dangerous.** Its query has no WHERE and no JOIN, so flipping to `vector_cosine_ops` genuinely
+> activates the index.
+
+**Its query has a WHERE.** `app/services/corpus.py::_retrieval_sql` emits `WHERE source = :source`
+whenever `source` is passed, and **all 12 row-returning `retrieve_typology()` call sites pass
+`source=SOURCE`** — the agent's own path (`aml_agent.py:139`) among them. The claim was measured
+against a query shape **this application never issues.**
+
+Measured on the live cluster (`scripts/probe_vector_opclass.py`, planner stats verified fresh; a
+stats-lagged plan was thrown away and re-run rather than reported):
+
+| index                            | query                        | vector index used?                        |
+|----------------------------------|------------------------------|-------------------------------------------|
+| `(embedding)` **cosine** opclass  | `ORDER BY <=>`, no WHERE     | **YES**                                   |
+| `(embedding)` **cosine** opclass  | `ORDER BY <=>`, WHERE source | **NO — scan**  <- the REAL corpus.py query |
+| `(source, embedding)` cosine      | `ORDER BY <=>`, WHERE source | **YES**                                   |
+| `(source, embedding)` cosine      | `ORDER BY <=>`, no WHERE     | **NO — scan**                             |
+
+**A CockroachDB vector index is selected ONLY when every PREFIX column is constrained.** Both legacy
+indexes were on `(embedding)` alone — zero prefix columns — so ANY where-clause forces a scan
+**whatever the opclass**. Replicating the real table exactly (4 real vectors + the real
+`uq_typology_corpus_source_typology` constraint) and building the index the naive fix would build
+produced a plan **identical to today's**: an index join spanning the unique index, vector index
+unused. **The flip is INERT. It changes no plan.**
+
+So the two indexes are dead for the SAME structural reason after all. They remain two different
+problems only in what a repair would cost — and both repairs were rejected.
+
+### THE TRAP THE BRIEF WAS BUILT AROUND DOES NOT EXIST
+
+The deferral demanded a before/after measurement because "a selected C-SPANN index is APPROXIMATE
+where today's full scan is EXACT", so Gate 0 could silently flip. **The flip cannot make retrieval
+approximate, because the flip cannot change the plan.** Zero Gate 0 flips, by construction rather
+than by luck. The mandated measurement was moot for the thing it was mandated for.
+
+It was run anyway — on the ONE option that genuinely activates an ANN search (a
+`(source, embedding vector_cosine_ops)` PREFIX index), because that is the only place a wrong call
+could degrade the brake. Against the FOUR REAL corpus vectors, with a plan confirmed to contain a
+real `vector search` node:
+
+- **1,572 synthetic queries** — 960 near-ties manufactured by interpolating between every ordered
+  pair of documents (margins down to **0.000040**), 400 random unit vectors, 200 centroid queries.
+  **783 fell inside Item 4's dangerous band** (top-1/top-2 margin <= 0.02). **Top-3 set mismatches
+  vs exact: 0.**
+- **132 REAL AGENT QUERIES** — `structure_text()` over real subjects (32 golden-set + 100
+  deterministically sampled edges), embedded with `text-embedding-3-small`. **NOT self-retrieval**
+  (a document's own stored embedding retrieves itself at distance 0.000 and proves nothing — the
+  trap `test_aml_brake` sits in). Real margins: min **0.000099**, median **0.010153**, max
+  **0.031056** — **114 of 132 inside the dangerous band**, which independently CONFIRMS Item 4's
+  measured 0.0005-0.02 regime. Results:
+    * **TOP-3 SET CHANGES: 0**
+    * **GATE 0 OUTCOMES FLIPPED: 0** (of the 32 subjects carrying a real cached model claim)
+    * **Item 8 golden-set `retrieval_context` drift: 0** — the cached top-3 reproduces live exact
+      retrieval, so the golden set is still re-derivable and needs no regeneration.
+
+**AND IT WAS STILL REJECTED, WITH ALL THAT EVIDENCE SAYING IT IS SAFE.** Four rows fit in ONE
+C-SPANN partition, so the "approximate" search scans them all and is exact *in practice*. That is a
+property of **n=4**, not a property of the design. The moment the corpus grows the guarantee
+evaporates silently, and Gate 0 is a set-membership test on exactly the top-3 of a k=3 retrieval
+over a 4-document corpus — one document swapping out flips FLAG to INSUFFICIENT_COVERAGE. Buying a
+working index by making the brake's input approximate is the trade this project has refused a dozen
+times. **Safety that holds by luck of scale is not a guarantee; it is a coincidence with good PR.**
+
+### `beliefs`: THE "CORRECTNESS REGRESSION" ON FILE DID NOT REPRODUCE — AND THE REAL CASE IS STRONGER
+
+The previous entry claimed a C-SPANN search filtering AFTER retrieval "could silently hand a living
+agent FEWER beliefs than it holds — a correctness regression". **It does not, and I tried hard to
+make it.** Constructed the adversarial world on the live cluster: 400 active beliefs, the agent
+holds EXACTLY ONE, and that one is deliberately the FARTHEST vector from the query
+(near-anti-parallel). Result: the moment a non-prefix predicate appears, **CockroachDB DECLINES the
+vector index entirely and falls back to an exact full scan.** The held belief came back correctly,
+on both the plain and the prefix-index variants. Adding `status` as a prefix column does not rescue
+it either — the ownership predicate is an `OR` across a `LEFT JOIN`, which can never be a prefix
+constraint, so the planner abandons the vector index. CRDB even volunteers a **non-vector** index in
+the plan (`CREATE INDEX ... (status) STORING (originating_agent_id, embedding)`).
+
+So the planner will not produce the dangerous plan. **That makes the case for dropping simpler, not
+weaker:** the argument is not "this index is dangerous", it is **"this index can never be selected
+by the only query that exists to use it."** A vector index over 2 rows whose query shape forbids it
+is not a deferred optimization — it is a false claim in the schema, and a standing invitation for a
+future session to "fix" it. Making it selectable would mean denormalizing holder identity onto the
+moat to turn the ownership predicate into a prefix constraint: a five-table schema change to run an
+approximate search over TWO rows. Theatre, twice over.
+
+### ====== THE THIRD LAP: A GUARD WRITTEN TO KILL A FALSE CAUSE WAS ASSERTING A TRUE FACT ABOUT A QUERY THAT DOES NOT EXIST ======
+
+Read this next to "CONSENSUS AMONG DOCUMENTS IS NOT EVIDENCE" above. It is the same disease, and
+this is its **third documented lap** — each lap running through the machinery built to stop the
+previous one.
+
+1. **Lap 1 (Item 3).** `verify_corpus.py` EXPLAINed, saw a real FULL SCAN, reported it honestly —
+   and attributed it to a cause nobody tested ("at 4 rows the planner correctly brute-forces"). The
+   observation was TRUE; the cause was INVENTED. It propagated into NOTES, README and ARCHITECTURE.
+   **A false cause with a green check is more durable than a false claim, because checking it feels
+   redundant.**
+2. **Lap 2 (last session).** The correction rewrote that check to "assert the CAUSE, not the
+   symptom" — reading the opclass from the live catalog. Correct, and a real improvement. **But it
+   EXPLAINed `FROM typology_corpus ORDER BY d LIMIT 3` — with no `WHERE source`.** No such query
+   exists in this system. The guard written *specifically to stop asserting a false cause* was now
+   asserting a **true fact about a query the application never runs** — and its own true-but-
+   irrelevant `FULL SCAN` result is precisely where the false claim "its query has no WHERE and no
+   JOIN" came from.
+3. **Lap 3 (this session).** That false claim propagated from the guard into NOTES, and from NOTES
+   into the session brief that convened this session — which was therefore built, in good faith, on
+   a trap that does not exist. **The scratchpad mechanism ran one more lap, through the very
+   machinery built to stop it.**
+
+**THE MECHANISM, NAMED:** a guard that measures a *hand-written lookalike* of the production query
+is not a guard. It is a second implementation that can silently disagree with the first — the exact
+false guarantee that forced the SHARED canonicalizer in Item 6, and the shared GEval rubric in
+Item E. The lesson was already learned twice, in two other subsystems, and it was not applied here
+because nobody noticed that a plain `SELECT` typed into a verification script *was* a second
+implementation.
+
+**THE FIX IS STRUCTURAL, NOT EDITORIAL.** `verify_corpus.py` now EXPLAINs
+`corpus._retrieval_sql(SOURCE)` — **the production SQL builder itself**. The plan under test cannot
+drift from the plan in production without the check failing. And the real plan turns out not to
+contain the string `FULL SCAN` at all: it is a constrained index join over
+`uq_typology_corpus_source_typology`. The old assertion was not merely irrelevant — it was **false
+of the real query**.
+
+> **THE RULE, and it is the citations rule arriving from a third direction: a check that verifies a
+> QUERY must run the query the application BUILDS, never a lookalike a human typed into the check.
+> If you retyped it, you are testing your typing.**
+
+### WHAT SURVIVES, AND IT IS A STRONGER CLAIM THAN WHAT IT REPLACES
+
+Migration 0010 drops `ix_beliefs_embedding` and `ix_typology_corpus_embedding`. `beliefs.embedding`
+and `typology_corpus.embedding` remain REAL `VECTOR(1536)` columns searched with CockroachDB's REAL
+cosine `<=>` operator, and the search is now honestly **EXACT** — at 2 and 4 rows, with these query
+shapes, a scan is not merely acceptable, it is the RIGHT plan, and it is the one the planner was
+choosing all along. Retrieval correctness never changed, and it has not changed now.
+
+`ix_regulatory_corpus_embedding` (0009, `vector_cosine_ops`, 233 rows, unscoped query) is untouched
+and is the ONE genuinely-exercised distributed vector index: its `EXPLAIN` contains a real
+`vector search` node, asserted every run by `verify_regulatory.py`.
+
+**"Three vector indexes were declared, two could never be used by their own queries, we removed them
+and kept the one that works" is a STRONGER claim than "we have three vector indexes" — because it is
+checkable, and because it is true.** A judge who runs one `EXPLAIN` finds the schema telling the
+truth about itself.
+
+### THE PLACEHOLDER EMBEDDING: THE LEDGER WAS FALSE *WHILE THIS SESSION WAS BEING CONVENED*
+
+The brief asked whether "just run embed_beliefs" could be made to stick. **Measured first, and the
+answer arrived before the question:** on the live cluster, BOTH beliefs sat at cosine distance
+**0.000000000** from `seed.placeholder_embedding(1536)`. Not just crimson — **azure too**, whose
+ledger row asserted in static prose that it carried a real `text-embedding-3-small` vector.
+
+**THE STATIC-ROWS-ROT HAZARD DEMONSTRATED ITSELF DURING THE SESSION CONVENED PARTLY TO ADDRESS IT.**
+The entry "THE LEDGER'S LIVE ROWS SURVIVE SCHEMA CHANGE. ITS STATIC ROWS ROT" concluded that
+anything in a ledger note not read from the cluster is prose, and prose rots at the speed the schema
+moves. That row was written **one session ago**, it was STATIC, and it was **already false when this
+session opened it.** The rule is now proven three times on itself.
+
+Root cause, and why the old fix could never hold: `seed.seed()` re-planted the placeholder on EVERY
+reseed, and the fix was an **instruction** — third in a three-command restore procedure, run
+repeatedly, under time pressure, between takes. It was forgotten exactly once and the claim silently
+became false. **An instruction that must be remembered on every rebuild is not a fix.**
+
+**THE FIX: the seed plants the REAL vector, from a committed fixture** (`seed/belief_embeddings.json`,
+generated by `python -m scripts.embed_beliefs --refresh-fixture`). The seed stays **OpenAI-FREE** —
+CI runs it with a dummy key and the isolated `demo` database is seeded through the same path — so it
+reads the cached vector rather than calling the API. **A cached embedding is a genuine model output;
+caching one is not inventing one.** `seed.belief_embedding()` stores the `rule_text` WITH the vector
+and refuses to plant a vector computed from different words, so editing a belief's wording without
+re-embedding fails LOUDLY at seed time rather than seeding a real vector for the wrong sentence —
+the subtlest available version of this bug.
+
+**VERIFIED THE WAY THE CLAIM DEMANDS:** `tests/test_belief_embeddings.py` **reseeds the live cluster
+and then measures**, because the claim under test is precisely *"a RESEED cannot undo it"* and only
+a reseed can prove that. After the two real backfills (each of which reseeds), both beliefs measure
+cosine distance **1.0033** and **1.0099** from the placeholder. Under the old code they would both
+be 0.000000000 — as they demonstrably were.
+
+**AND THE RESTORE PROCEDURE LOST A COMMAND (three -> two).** That is worth as much as the fix.
+"RESTORE INSTRUCTIONS HAVE NOW LIED THREE TIMES" is its own entry in this file; a fourth lie would
+have come from a fourth site. **A procedure with fewer steps is a procedure that lies less often.**
+All four INSTRUCTION sites (README setup, DEMO pre-flight, DEMO reset note, the honesty ledger's
+rendered row) now say the SAME TWO COMMANDS. A fifth site is still a bug.
+
+**ENTANGLEMENT WITH THE INDEX DECISION: NONE, and it was checked rather than assumed.** The embedding
+is the DATA in the column; the index is the ACCESS PATH. Dropping `ix_beliefs_embedding` does not
+change what `<=>` computes, and fixing the embedding does not change any plan. They touch the same
+column and belonged in the same session; neither decision constrained the other.
+
+### GATE — all green (2026-07-13)
+- **167 backend tests pass** (162 prior + 5 new belief-embedding tests), ~3m25s. The **citation guard
+  CAUGHT the pinning-test rename** (NOTES cited the old test name in two places) — the guard working
+  exactly as built; fixed in place.
+- `verify_corpus.py` / `verify_regulatory.py` / `verify_aml_ingest.py` — **ALL CHECKS PASSED**.
+  verify_regulatory's legacy pin FIRED first (it pinned the two indexes as `vector_l2_ops`), which is
+  precisely the decision point it was built to force; it now pins them as ABSENT.
+- Cluster restored with **both backfills in order** and INDEPENDENTLY re-verified with real SELECTs
+  (not a script's echo): head **0010**, 24 agents, 2 beliefs (both active, **both carrying REAL
+  vectors**), 15 edges, **5,500** decisions (4,000 card / 1,500 AML), 8 crimson perf windows, 0 azure
+  perf windows, `count(DISTINCT decided_at)=1` for AML (the base-rate mirage still unrepresentable),
+  1,500 `aml_transactions` (**NOT** re-ingested), crimson curve `.924 .952 .876 .852 .724 .556 .624
+  .528` byte-identical, seam census 57/463/980 + 43/5/252 reproduced.
+- **Item 7's eval inputs untouched** (no `aml_*` re-ingestion, no re-sampling). Item 8's golden set is
+  **still re-derivable** — 0 retrieval_context drift, measured rather than assumed.
+
+### Explicitly NOT done (still gated): making any dropped index selectable (re-read this entry — the
+### opclass flip is INERT, and the prefix index makes the brake's input approximate); the AML console;
+### the recorded video; `belief_performance` for the azure belief (step 4 stays CUT — re-read THE
+### BASE-RATE MIRAGE); a `verdicts` table; any re-ingestion of `aml_*`; any LLM on the deciding path.
