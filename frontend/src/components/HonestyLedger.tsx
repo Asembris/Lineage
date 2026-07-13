@@ -32,7 +32,7 @@ import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsole
 import type { ProvenanceAuditResponse, UUID, WitnessOutcome } from "../api/types";
 import { countDecisions, getBeliefPerformance, getProvenanceAudit } from "../api/client";
 import { formatCount } from "../lib/format";
-import { RestoreHint } from "./RestoreHint";
+import { RestoreCommands, RestoreHint } from "./RestoreHint";
 import "./HonestyLedger.css";
 
 const DASH = "—";
@@ -148,8 +148,7 @@ const ROWS: RowSpec[] = [
         it opens with a reseed, and <code>seed.seed()</code> <b>DELETEs every decision</b> —
         so on its own it repopulates the 4,000 card rows + 8 windows (curve conf 0.924 →
         0.528, byte-identical every run) <em>and silently destroys the 1,500 AML decisions
-        in the grounding-seam row above.</em> Run{" "}
-        <code>backfill_decisions</code> → <code>backfill_aml_decisions</code>, in that order.
+        in the grounding-seam row above.</em> Run <RestoreCommands />, in that order.
         (It was three commands until 2026-07-13; the third re-embedded the beliefs, and the
         seed now plants their real vectors itself.)
       </>

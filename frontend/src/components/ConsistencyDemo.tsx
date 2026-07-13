@@ -34,6 +34,7 @@ import type {
 import { getBeliefLineage } from "../api/client";
 import { runConsistencyStream, type ConsistencyStreamController } from "../lib/consistencyStream";
 import { ConsistencyScene3D } from "./ConsistencyScene3D";
+import { RestoreCommands } from "./RestoreHint";
 import { fragId, formatDate } from "../lib/format";
 import "./ConsistencyDemo.css";
 
@@ -591,8 +592,10 @@ export function ConsistencyDemo() {
                 the live cluster. The belief is <b>genuinely invalidated across every holder in one
                 irreversible commit</b>; there is no rollback. It also <b>truncates and reseeds the
                 cluster</b>, leaving <b>decisions / performance empty</b>, so Investigate, Trace,
-                Time-travel and Invalidate read empty until the fleet is re-backfilled (
-                <code>python -m seed.backfill_decisions</code>). Only one stream can run at a time.
+                Time-travel and Invalidate read empty until the fleet is re-backfilled with{" "}
+                <RestoreCommands />, <b>in that order</b> (the reseed destroys the 1,500 AML
+                decisions too, so the first command alone leaves the grounding seam dead). Only one
+                stream can run at a time.
               </p>
             ) : (
               <p className="cx__gate-warn">
@@ -600,8 +603,9 @@ export function ConsistencyDemo() {
                 <b>truncates and reseeds the cluster</b> and runs a fleet-wide invalidation to
                 completion. When it finishes the belief is left <b>invalidated</b> and{" "}
                 <b>decisions / performance reset to empty</b> — Investigate, Trace, Time-travel and
-                Invalidate will read empty until the fleet is re-backfilled (
-                <code>python -m seed.backfill_decisions</code>). Only one stream can run at a time.
+                Invalidate will read empty until the fleet is re-backfilled with <RestoreCommands />,{" "}
+                <b>in that order</b> (the reseed destroys the 1,500 AML decisions too, so the first
+                command alone leaves the grounding seam dead). Only one stream can run at a time.
               </p>
             )}
             <div className="cx__gate-actions">
