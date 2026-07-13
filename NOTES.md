@@ -6222,3 +6222,160 @@ error).
   **The VECTOR(1536) COLUMNS SURVIVE on both de-indexed tables** (`SHOW CREATE TABLE` confirms), and a
   real cosine query still returns the right rows from each. Dropping the column instead of the index
   would have been catastrophic and silent; it was checked.
+
+## THE STALENESS-UNCERTAINTY FRONTEND — and the guard that made its subject unreachable (2026-07-13)
+
+The last piece of already-shipped backend that had no surface. `GET /beliefs/{id}/performance` has
+served `n` and a 95% Wilson CI per window since the staleness-uncertainty item; the console still
+drew **bare point estimates**. It showed `0.53` as a confident number when the real figure is 0.53
+with a 95% CI of **[0.466, 0.589]** — a band 12 points wide — and that is the one quantity in the
+system that justifies the single irreversible governed write. Frontend only: **no new endpoint, no
+new field, no migration, no change to the brake, the eval inputs, or any measured constant.**
+
+### ============ A GUARD'S BLAST RADIUS EXTENDS PAST THE THING IT GUARDS ============
+### (the session's real finding, and it belongs beside SECTION 7)
+
+The investigation was supposed to be about a sparkline. It found that **the crimson belief was
+UNREACHABLE from the console**, and had been for the entire seam arc.
+
+The chain, every link verified rather than reasoned:
+- G4 gives every AML decision a **single fixed `decided_at`** (2026-07-12T12:00Z). That is a
+  deliberate SECTION-7 guard, and a good one: with every decision at one instant there are no time
+  windows to draw a curve from, so **the base-rate mirage is unrepresentable rather than merely
+  discouraged.** It does exactly its job. It is not weakened here.
+- The feed is `ORDER BY decided_at DESC` (`catalog.py`), and that fixed timestamp is **newer than
+  every card decision** (newest card row: 2026-06-29). Measured: **exactly 1,500 rows rank above
+  every card decision.**
+- `useConsoleData` fetched **one page of 200**, unfiltered, no pagination. So all 200 feed rows were
+  AML rows.
+- `onSelect` is wired **only** to `DecisionFeed` (App.tsx) — the feed is the SOLE entry to
+  Investigate -> Trace -> Time-travel -> Invalidate.
+
+**Therefore all four supervisor interactions ran on the azure belief only, and the crimson belief —
+the fork, the two living holders, the whole measured 0.924 -> 0.528 curve, the thing the entire
+thesis rests on — could not be reached by any user action.** Driving the console confirmed it:
+every visible row was `aml:`, and clicking the first one opened Time-travel onto *"no measured
+performance windows"*. **The band, had it shipped alone, would have been invisible to every human.**
+
+**Nobody noticed for the whole seam arc, and the reason is the lesson.** The guard was reviewed
+against its own purpose (does it make the mirage unrepresentable? yes) and never against the
+surfaces downstream of the column it constrains. A `decided_at` chosen to kill a curve also
+**re-sorted the only navigable list in the product.** SECTION 7's principle stands; this is its
+missing corollary: **when you make a wrong thing unrepresentable by constraining real data, that
+constraint propagates into every ordering, filter, and page built on that column — check those, or
+the guard silently takes a feature with it.**
+
+**The fix uses what the backend already served:** `GET /decisions?kind=card|aml` — structural
+(0007's `ck_decisions_kind`), 422 on anything else, never a silent empty page. Verified live:
+`kind=card` -> 4,000, first row crimson; `kind=aml` -> 1,500.
+
+### THE DEFAULT IS UNFILTERED, AND THE CHIPS COUNT — a navigation-honesty call, not a convenience
+A console that silently pre-filters the fleet's record is choosing for the supervisor what is worth
+looking at. So `kind = null` is the default. What the filter does instead is **COUNT**: each chip
+carries its real cluster total (`countDecisions`, counted and never retyped — the census discipline),
+so **all 5,500 · card 4,000 · aml 1,500** is on screen at all times. The 4,000 card decisions are
+visibly present even while you are looking at the AML ones; either kind is **one click** away and
+nothing is hidden. The feed header's denominator follows the filter (`200 / 4,000` under card), so
+the ratio never overstates what is on screen.
+
+### A SEVENTH RESTORE-INSTRUCTION SITE. THE SWEEP SAID ONE WOULD BE A BUG, AND IT WAS.
+`DecisionFeed`'s empty state said *"Rerun the backfill to populate the feed"* — **singular, unnamed,
+and therefore the destructive half-restore** (`backfill_decisions` alone reseeds and leaves the seam
+empty). Same class as sites five and six: **not prose in a doc, a value a component renders**, which
+is why every prose review missed it. The procedure's one definition moved OUT of `HonestyLedger.tsx`
+into **`components/RestoreHint.tsx`**; both surfaces import it. Seven sites, one definition.
+
+**And the filter introduced a NEW way to lie, closed before it shipped:** an empty *filter* on a
+*populated* cluster is not a broken world. `clusterEmpty` is now decided by the counted `all` total,
+not by the filtered one, so a filter that matches nothing prints **no restore instructions at all**.
+Conflating "this filter matched nothing" with "the world is gone" would have been a fresh lie in the
+exact place the last four lived.
+
+### THE RIBBON IS ACHROMATIC, AND THAT IS THE LOAD-BEARING DESIGN CALL
+The line's `--alive`->`--alert` gradient already means **health**. A band tinted with that gradient
+would render its widest stretches — the late, stale windows, whose intervals genuinely ARE the widest
+(0.066 -> 0.123) — as a spreading red haze: **width masquerading as severity, a second alert channel
+invented by accident.** Uncertainty is not a state; it is a lack of resolution. So the corridor takes
+the cold provenance-grey (`--ash`) the honesty ledger chose for exactly this reason ("deliberately NOT
+the `--alive`/`--alert` vocabulary, so it can never read as a second alert system"). **The coloured
+line is the MEANING; the grey corridor is the PRECISION.** Warmth stays Trace's.
+
+### NO CLAMP, NO MINIMUM-n GATE — the thin window renders at true size
+`performance.py` writes a row for any `n >= 1`. A 1-sample window (n=1, k=0) has a Wilson interval of
+**[0.000, 0.793]**, and its ribbon really would cover **four-fifths of the chart**. That IS the truth,
+and a chart that hid it would be lying. This project has refused hand-picked thresholds twice
+(MARGIN_FLOOR; the disjoint-intervals rule that **failed open**) and does not get to invent a third
+here. **Because the corridor is grey, a band that tall reads as "we do not know here" rather than
+"danger here"** — which is precisely what a wide interval means. The Fisher support line would
+independently say "not distinguishable", so the chart and the criterion agree without either being
+clamped.
+
+### `[lo, hi]`, NEVER `+/-` — and the reason is arithmetic, not taste
+A Wilson interval is **asymmetric**: 0.924 -> [0.884, 0.951] is **-0.040 / +0.027**. `0.92 +/- 0.03`
+would assert a symmetry the statistic does not have. The interval sits UNDER the hero number (which
+keeps its scale and its tone — the healthy->stale toggle is still the moment), with **`n` shown**,
+because n is the entire point: without it a reader cannot tell 250 samples from 5.
+
+### THE SUPPORT CRITERION IS ON SCREEN, IN THE NEUTRAL REGISTER
+`decay_supported` / `decay_p_value` / `decay_support_criterion` were **already served** — no backend
+change was needed, and the investigation checked rather than assumed. The panel now states:
+`MEASURED DECAY SUPPORTED — Fisher exact, two-sided, p = 1.6e-24`. **Colouring it green would INVERT
+it** (a supported decay is bad news for the belief); colouring it red would make it a second alarm
+beside the curve it qualifies. So it is achromatic, like the ledger's provenance tags: a statement of
+evidentiary standing, not an alarm. A supervisor about to perform an irreversible write is exactly
+the person who needs to know whether the evidence supports it.
+
+**The tri-state STATES its absence rather than rendering it.** When `sample_agreement != "agreed"` the
+bounds are null: the line and dots still draw (the point estimates are still true), **no ribbon**, and
+the reason is printed. **A withheld interval must never be readable as a narrow one** — an absent
+corridor and a tight corridor look identical if you only omit the shape.
+
+### THE CHART GREW 42px -> 96px. HEIGHT IS RESOLUTION, NOT SCALE.
+Found **by looking at the render, not by reasoning about it**: at 42px a real band (0.054-0.123 wide)
+renders **2-5px tall** and reads as a fat grey outline thickening the line — it swallowed the
+gradient through the middle windows and never read as a corridor at all. **A band you cannot see is
+the same as no band.** The domain stays fixed at **[0,1]** (never auto-fitted, so the decay is never
+exaggerated); the chart simply got the pixels the band needs. The empty lower half is honest — it is
+how far there is left to fall.
+
+### THE PANEL WAS THROWING AWAY A WORKING PROOF (the azure finding)
+`TimeTravel.tsx` DID handle `windows.length === 0` honestly — verified, not assumed. But the early
+return fired **after both AOST calls had already succeeded**, discarding the MVCC deposition. **Signal
+1 is TRUE for the azure belief** — deposed at a past instant and at present, `held · ACTIVE`, the row
+demonstrably immutable — and the panel hid it to show a dead end. Discarding a working, honest proof
+is the opposite of this project's discipline. The deposition now renders for **every** belief, and its
+closing note adapts rather than referring to a curve that is not there.
+
+**The component still does NOT explain WHY azure has no windows.** The base-rate-mirage reasoning is
+real, but the API does not say it, and hardcoding it in a component would be the **static-rows-rot
+hazard, third instance** (LIVE rows survive schema change; STATIC rows rot). It states only what it
+read.
+
+### GATE — all green (2026-07-13)
+- **167 backend tests pass** (~3m21s), citation guard included. No backend file was touched.
+- `tsc --noEmit`, `oxlint`, `vite build` all exit 0 (the >500 kB three.js chunk is the known,
+  accepted Phase-5 bundle).
+- **Driven at 1280 / 1440 / 1920, motion AND reduced-motion**, live vite -> uvicorn -> live cluster:
+  ribbon renders, 8 dots, `95% CI [0.88, 0.95] · n = 250` when formed -> `[0.47, 0.59] · n = 250`
+  present day, `p = 1.6e-24`, azure keeps its deposition, **0 page errors** at every width in both
+  modes. Every rendered value matches the live endpoint.
+- **Both live-HTTP traps cleared before any rendered result was trusted:** `/openapi.json` carries
+  `sample_size` + `StalenessUncertainty` + `witness_outcome` (not a zombie serving stale code), and a
+  DB-backed route returns 200 (not the Proactor-loop failure that masquerades as a CORS error).
+- **THE CLUSTER WAS WIPED WHEN THE SESSION OPENED** — 24 agents / 2 beliefs / 15 edges intact, but
+  `decisions` = 0 and `belief_performance` = 0 (`aml_transactions` survived; `seed()` does not touch
+  it). The documented **CI-vs-LOCAL collision**: CI's pytest calls `seed()`, which DELETEs `decisions`.
+  Both beliefs were returning `count: 0, uncertainty: null`, making the azure case indistinguishable
+  from the crimson one. Restored with the **two ordered backfills** and re-verified with real SELECTs.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(frontend): a kind filter on the decision feed — the crimson curve was unreachable`
+- `feat(frontend): the staleness curve carries its uncertainty`
+- `docs(notes): the staleness-uncertainty frontend, and the guard that hid its subject` (this entry)
+
+### Explicitly NOT done (still gated): any backend change (none was needed — the support criterion was
+### already served); a per-HOLDER confidence surface (Item D stays CUT); `belief_performance` for the
+### azure belief (step 4 stays CUT — re-read THE BASE-RATE MIRAGE); pagination or an agent drill-in on
+### the feed (the kind filter is the minimum that restores reachability; a full drill-in is its own
+### plan-gate); the AML console; the recorded video; a `verdicts` table; any change to the five tables /
+### aml_* / typology_corpus. Do NOT push without explicit approval — held for review of the result.
