@@ -6457,3 +6457,160 @@ shell itself never scrolls (`overflow:hidden` holds; 0 page errors); the Inspect
 `.panel__body` scrolls, which is the shell's design. **Reaching the one irreversible write should not
 require a scroll**, and fixing that properly (e.g. a sticky action footer in the Inspector) is a
 layout change with its own scope — **NOT smuggled into this session.**
+
+## THE INSPECTOR FOLD — and the defect was INVERTED, not merely present (2026-07-13)
+
+The open item from the last session: the Invalidate control — the ONE irreversible governed write —
+sat below the fold at laptop heights. Re-measured fresh against what is actually shipped (the prior
+numbers were taken with an injected old height as a counterfactual). Frontend only: **no backend
+change, no endpoint, no migration, no change to the arm/confirm behaviour or the certificate.**
+
+### ========== THE DEFECT IS INVERTED. THAT IS THE FINDING, NOT THE OVERFLOW. ==========
+
+With Time-travel **CLOSED**, the entire Investigation surface **fits at every viewport** — overflow
+**0px**, Invalidate fully visible at 1280x800 (y=503..540). The moment Time-travel **OPENS** — i.e.
+the moment the supervisor actually **looks at the evidence** — the control drops below the fold.
+
+**The console made the irreversible kill-shot one unobstructed click away while UNINFORMED, and hid
+it behind a scroll once INFORMED.** "A button is below the fold" is the symptom; this is the bug.
+
+Measured (Inspector `.panel__body`, crimson decision, `scrollTop = 0`, live cluster):
+
+| viewport | TT closed | TT open | Invalidate, TT open |
+|---|---|---|---|
+| 1280x800 | 706/706 — **0px** | 960/706 — **254px** | **BELOW** (y=905..942) |
+| 1280x900 | 806/806 — **0px** | 960/806 — **154px** | **BELOW** |
+| 1440x900 | 806/806 — **0px** | 960/806 — **154px** | **BELOW** |
+| 1920x1080 | 986/986 — **0px** | 986/986 — 0px | visible |
+
+The prior entry's 254px / 154px **reproduce exactly**. One correction: **1440x900 fails identically
+to 1280x900** — the variable is HEIGHT, not width, and both have an 806px panel. Every prior audit
+pinned width and let height float, which is precisely how this survived Phase 6. **1280x800 and
+1280x900 are now required audit viewports.**
+
+### THE ASSUMPTION THE BRIEF CARRIED IN WAS FALSE, AND MEASURING IT SAID SO
+
+The convening brief expected to find that the *evidence justifying the write* was itself below the
+fold — "a worse finding than the button being below it." At `scrollTop = 0` that is TRUE (at
+1280x800, TT open: the Fisher criterion, the MVCC deposition and the button are all below it).
+
+**But at the moment of the write it was false.** Scrolled so Confirm is reachable — where a
+supervisor actually *is* — **all the staleness evidence was already co-visible with the Confirm
+button at every viewport**: the hero confidence, the 95% CI, n, the curve+ribbon, the Fisher
+criterion, the deposition. The scroll was doing evidence-traversal work **by accident**.
+
+Reported rather than left to flatter the fix. **What was genuinely missing at the moment of the
+write is a different thing entirely** — see below.
+
+### ========== THE REAL WORST DEFECT: THE GATE NAMED A HASH, NOT A SENTENCE ==========
+
+At 1280x800 and 1440x900, scrolled to Confirm, the belief's **rule text was OFF-SCREEN**. Every
+number justifying the kill was on screen — `0.53`, `95% CI [0.47, 0.59]`, `n = 250`,
+`p = 1.6e-24` — and **the thing being killed was not.** The gate said `898ad0`.
+
+**A supervisor about to irreversibly delete a rule fleet-wide could not read the rule.** This was
+not the defect the session was convened for; it is worse than the one that was, and it was found
+only by measuring **co-visibility** instead of assuming it. The gate now carries `rule_text` in
+full — **no clamp, no ellipsis** (truncating the sentence someone is about to delete would be a lie
+of omission at peak stakes). The existing scope copy is untouched; this is additive.
+
+### THE RULE: CONTROLS ARE PINNED; EVIDENCE AND RECEIPTS SCROLL
+
+Condensing was **rejected, with reasons**: the armed surface is **1202px** against a 706px panel
+(it overflowed at EVERY viewport, 1920x1080 included, by 216px). The 96px curve was grown from 42px
+last session **on a measurement** — shrinking it reverses a defended decision. Even aggressive
+condensing buys ~300px and still fails. **Condensing is a hope; pinning is a guarantee** — the same
+"make the wrong thing unrepresentable" principle as SECTION 7.
+
+The certificate outcome is a **RECEIPT, not a control**: nothing is left to reach for, so it scrolls
+with the evidence rather than eating half the panel with a sha256.
+
+### ===== NOT `position: sticky` — AND THAT IS THE WHOLE POINT (the focus hazard, designed out) =====
+
+A sticky footer **floats above** the scroll region, so a control tabbed into while scrolling can
+slide **underneath** it — a real Phase-6 keyboard-focus failure. Instead the Investigation now owns
+a **head / scrolling body / footer** split — the shared `.panel` chrome's own shape, reused, not
+reinvented. The footer is a **sibling** of the scroller, so it **cannot overlay anything**.
+
+**The hazard is designed out, not mitigated** — and then asserted anyway: every focusable control in
+the Investigation is focused in turn and its rect checked against the footer's. **Zero overlaps**,
+all viewports, both motion modes. The shell itself still never scrolls (`panel__body` overflow 0).
+
+### ====== A CONFIRM GATE PROTECTS AGAINST NOT KNOWING. IT CANNOT PROTECT AGAINST NOT MOVING YOUR HAND. ======
+
+Pinning put the arm button and the confirm button in the **same bottom-anchored footer** — so **two
+clicks of muscle memory in one screen position would be an irreversible fleet-wide write.** The
+existing arm/confirm gate is no defence against this: it defends against ignorance, not against a
+hand that has not moved.
+
+So the gate's actions now **STACK**, and **Cancel takes the arm button's exact footprint**: a
+repeated click at the remembered position now **CANCELS**. Measured, not eyeballed (1280x800):
+
+- arm (where the hand just clicked) `y=749..786`
+- confirm `y=694..729` — **DISJOINT from the arm rect**
+- cancel `y=737..772` — **covers the arm rect**
+
+DOM order (Confirm, Cancel) == visual order, so **tab order is unchanged**. This shipped in the SAME
+commit as the footer: the footer *creates* the collision, so separating them would have committed a
+known hazard.
+
+### CO-VISIBILITY IS NOW STRUCTURAL, NOT AN ACCIDENT OF SCROLL POSITION
+
+With the gate armed, the supervisor can scroll the evidence to the curve and the Fisher criterion
+**while Confirm stays fully visible** — asserted at all four viewports. Before, one scroll region
+meant reaching the gate scrolled the evidence away and vice versa; co-visibility was luck. Now the
+gate is outside the scroller and it holds **by construction**.
+
+The armed evidence pane still overflows (614px at 1280x800; footer 311px). **What is above the fold
+at `scrollTop=0` when armed: the decision, the belief rule text, the inherited badge.** The curve /
+CI / Fisher criterion / deposition are below it — **but all are reachable by scrolling the evidence
+pane with the gate still on screen**, which is the property that actually matters and did not exist
+before.
+
+### HARNESS GOTCHA (banked): THE RATE LIMITER LOOKS EXACTLY LIKE A UI BUG
+The verification sweep started failing at `waitForSelector('.tt__depo')` and then at the feed chips.
+It was **not** the UI: `app/main.py` runs `RateLimiter(max_requests=60, window_seconds=60.0)` per
+(ip, route), each console load fires several `/decisions` calls, and an unpaced 16-run sweep trips
+it. **Probed, not assumed: 60x200 then 10x429.** The harness is paced (11s between runs) and the
+motion / reduced-motion passes run separately. **Do NOT weaken the limiter to make a sweep pass.**
+
+### GATE — all green (2026-07-13)
+- **185 backend tests pass** (~3m28s), citation + restore-instruction guards included. **No backend
+  file was touched.**
+- `tsc --noEmit`, `oxlint` (**zero** warnings — the baseline is zero, so the predicate moved to
+  `lib/invalidate.ts` rather than ship a new one), `vite build` all exit 0.
+- **Driven live at 1280x800 / 1280x900 / 1440x900 / 1920x1080, motion AND reduced-motion, on a
+  crimson AND an azure decision**, vite -> uvicorn -> live cluster. Asserted each run: the control is
+  reachable without a scroll in **every** state including TT-open (the one that used to hide it);
+  confirm/arm rects **disjoint**; cancel **covers** the arm rect; rule text **byte-equal to the API's
+  `rule_text` and unclipped**; **no focusable control obscured by the footer**; panel-body overflow
+  **0**; **0 page errors** in all 16 runs.
+- **Both live-HTTP traps cleared before any rendered result was trusted:** `/openapi.json` carries
+  `sample_size` + `StalenessUncertainty` + `witness_outcome` + `decay_support_criterion` (not a
+  zombie serving stale code), and a DB-backed route returns 200 (not the Proactor-loop failure that
+  masquerades as CORS).
+- **THE CLUSTER WAS WIPED WHEN THE SESSION OPENED** (`decisions` = 0, both beliefs still active) —
+  the documented CI-vs-LOCAL collision, third occurrence. Restored with the **two ordered backfills**
+  and re-verified with real SELECTs + the `/performance` endpoint: 24 agents, 2 active beliefs, 15
+  edges, 5,500 decisions (4,000 card / 1,500 AML), 8 windows, curve
+  `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical, CI `[0.884, 0.951]` -> `[0.466, 0.589]`,
+  Fisher `p = 1.56e-24`, agreement `agreed`. **The pytest suite wipes it again — re-backfill after.**
+
+### OPEN — THE GEOMETRY INVARIANT HAS NO COMMITTED GUARD, AND A PROXY WOULD BE THEATRE
+The muscle-memory guard (confirm's rect disjoint from the arm's footprint) is **only provable by
+rendering**. The frontend has no browser test in CI (tsc/oxlint/build only). A pytest grep asserting
+`flex-direction: column` in `Invalidate.css` would assert the **CSS text, not the geometry** — the
+exact failure mode of the guard that EXPLAINed a query the application never runs, and of the
+14-line proximity guard that passed its own bug. **Not shipped, rather than shipped as decoration.**
+Closing it properly means Playwright in frontend CI — its own plan-gated decision, flagged not taken.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(frontend): pin the governed write — and move Confirm off the arm button's footprint`
+- `feat(frontend): the confirm gate names the RULE, not the hash`
+- `docs(notes): the inspector fold, the inverted defect, and the hash that should have been a sentence` (this entry)
+
+### Explicitly NOT done (still gated): Playwright in frontend CI (the geometry guard above); any
+### backend change; any change to the arm/confirm behaviour, the scope copy, or the certificate
+### outcome; condensing the 96px curve (re-read "HEIGHT IS RESOLUTION" before re-proposing it); the
+### AML console; the recorded video; `belief_performance` for the azure belief (step 4 stays CUT).
+### Do NOT push without explicit approval — held for review of the result.
