@@ -19,11 +19,35 @@
  *
  * A guard's blast radius extends past the thing it guards. The filter is the fix, and it uses the
  * `kind` parameter the backend already serves (structural, per 0007's CHECK) — no new endpoint.
+ *
+ * AND THE FILTER ALONE WAS NOT ENOUGH: THE FEED REACHED 200 OF 1,500.
+ *
+ * `kind=aml` narrowed the feed correctly and then stopped at ONE PAGE — the backend's max, 200 —
+ * with no offset paging. So 1,300 of the 1,500 AML decisions, and with them 1,300 of the real
+ * money-flow transactions they cite 1:1, were unreachable by any user action. Among them **50 of
+ * the 57 CYCLE rings**: the AML console's signature exhibit was invisible in 88% of its instances.
+ * That is the same shape as the bug above — a surface that looks complete and silently is not —
+ * and it is why pagination is load-bearing for the witness geometry, not hygiene.
+ *
+ * OFFSET PAGING IS ONLY SAFE BECAUSE THE SORT IS TOTAL, and that was CHECKED, not assumed. All
+ * 1,500 AML rows share ONE `decided_at` by design; `ORDER BY decided_at DESC` alone would be a
+ * non-total order, and LIMIT/OFFSET over it silently duplicates and skips rows — pagination that
+ * looks fine and loses transactions. `catalog.py` orders by `decided_at DESC, id DESC`, and `id`
+ * is unique, so every page boundary is deterministic.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, countDecisions, listAgents, listBeliefs, listDecisions } from "../api/client";
-import type { AgentGenealogy, Belief, Decision, DecisionKind } from "../api/types";
+import type {
+  AgentGenealogy,
+  Belief,
+  Decision,
+  DecisionKind,
+  WitnessOutcome,
+} from "../api/types";
+
+/** The backend's max page (`Query(le=200)`). Asking for more is a 422, not a bigger page. */
+export const PAGE_SIZE = 200;
 
 export type Loadable<T> =
   | { status: "loading" }
@@ -53,11 +77,25 @@ export interface KindCounts {
   aml: number;
 }
 
+/** The seam's census, COUNTED from the cluster (never retyped — this number has been corrupted by
+ *  prose three times). Each is a `total` at `limit=1` through `?witness_outcome=`. It is the BASIS
+ *  of an AML decision: two of these three map to `approve`, and the verdict alone cannot tell them
+ *  apart. `INCONCLUSIVE` is 65.3% of the extract and means "we could not determine". */
+export interface WitnessCounts {
+  MATCH: number;
+  CONCLUSIVE_NO: number;
+  INCONCLUSIVE: number;
+}
+
 export interface ConsoleData {
   agents: Loadable<AgentsData>;
   decisions: Loadable<DecisionsData>;
   beliefs: Loadable<BeliefsData>;
   counts: Loadable<KindCounts>;
+  witnessCounts: Loadable<WitnessCounts>;
+  /** Append the next page. No-op when everything matching the filter is already loaded. */
+  loadMore: () => void;
+  loadingMore: boolean;
 }
 
 const LOADING = { status: "loading" } as const;
@@ -68,20 +106,34 @@ function toError(err: unknown): { status: "error"; message: string; code: number
   return { status: "error", message, code };
 }
 
-/** `kind = null` is the unfiltered fleet-wide feed. */
-export function useConsoleData(kind: DecisionKind | null): ConsoleData {
+/** `kind = null` is the unfiltered fleet-wide feed. `witness = null` is every basis.
+ *
+ *  The witness filter is only meaningful for AML decisions (a card decision has no witness), so a
+ *  caller should only pass one under `kind === "aml"`. Passing a bad value is a 422 from the
+ *  backend, never a silent empty page. */
+export function useConsoleData(
+  kind: DecisionKind | null,
+  witness: WitnessOutcome | null = null,
+): ConsoleData {
   const [agents, setAgents] = useState<Loadable<AgentsData>>(LOADING);
   const [decisions, setDecisions] = useState<Loadable<DecisionsData>>(LOADING);
   const [beliefs, setBeliefs] = useState<Loadable<BeliefsData>>(LOADING);
   const [counts, setCounts] = useState<Loadable<KindCounts>>(LOADING);
+  const [witnessCounts, setWitnessCounts] = useState<Loadable<WitnessCounts>>(LOADING);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  // The feed re-fetches when the filter changes; the genealogy, the belief catalog and the
-  // per-kind census do not depend on it and are fetched once.
+  // The feed re-fetches from page 0 whenever a filter changes; the genealogy, the belief catalog
+  // and the two censuses do not depend on the filter and are fetched once.
   useEffect(() => {
     let cancelled = false;
+    setDecisions(LOADING);
 
-    // Newest first (backend default order); a generous page so the feed reads as a real stream.
-    listDecisions({ limit: 200, kind: kind ?? undefined })
+    listDecisions({
+      limit: PAGE_SIZE,
+      offset: 0,
+      kind: kind ?? undefined,
+      witnessOutcome: witness ?? undefined,
+    })
       .then((res) => {
         if (!cancelled) {
           setDecisions({
@@ -95,7 +147,42 @@ export function useConsoleData(kind: DecisionKind | null): ConsoleData {
     return () => {
       cancelled = true;
     };
-  }, [kind]);
+  }, [kind, witness]);
+
+  /** Append the next page. Safe under offset paging ONLY because `catalog.py` orders by
+   *  `decided_at DESC, id DESC` — a TOTAL order. All 1,500 AML rows share one `decided_at`, so
+   *  without the `id` tiebreak every page boundary would be arbitrary and this would silently
+   *  duplicate and drop rows. Checked against the query, not assumed. */
+  const loadMore = useCallback(() => {
+    if (decisions.status !== "ready" || loadingMore) return;
+    const loaded = decisions.data.decisions.length;
+    if (loaded >= decisions.data.total) return;
+
+    setLoadingMore(true);
+    listDecisions({
+      limit: PAGE_SIZE,
+      offset: loaded,
+      kind: kind ?? undefined,
+      witnessOutcome: witness ?? undefined,
+    })
+      .then((res) => {
+        setDecisions((cur) =>
+          cur.status === "ready"
+            ? {
+                status: "ready",
+                // `total` comes from the SAME response as the rows, so the denominator can never
+                // describe a different world than the page it arrived with.
+                data: {
+                  decisions: [...cur.data.decisions, ...res.decisions],
+                  total: res.total,
+                },
+              }
+            : cur,
+        );
+      })
+      .catch((err: unknown) => setDecisions(toError(err)))
+      .finally(() => setLoadingMore(false));
+  }, [decisions, loadingMore, kind, witness]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,10 +214,29 @@ export function useConsoleData(kind: DecisionKind | null): ConsoleData {
       })
       .catch((err: unknown) => !cancelled && setCounts(toError(err)));
 
+    // The seam's census — the BASIS of each AML decision — likewise counted, never quoted. The
+    // honesty ledger already reads it this way for the same reason: a number read from the cluster
+    // cannot be wrong about the cluster, and this particular number has been corrupted by prose
+    // three times.
+    Promise.all([
+      countDecisions({ kind: "aml", witnessOutcome: "MATCH" }),
+      countDecisions({ kind: "aml", witnessOutcome: "CONCLUSIVE_NO" }),
+      countDecisions({ kind: "aml", witnessOutcome: "INCONCLUSIVE" }),
+    ])
+      .then(([MATCH, CONCLUSIVE_NO, INCONCLUSIVE]) => {
+        if (!cancelled) {
+          setWitnessCounts({
+            status: "ready",
+            data: { MATCH, CONCLUSIVE_NO, INCONCLUSIVE },
+          });
+        }
+      })
+      .catch((err: unknown) => !cancelled && setWitnessCounts(toError(err)));
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  return { agents, decisions, beliefs, counts };
+  return { agents, decisions, beliefs, counts, witnessCounts, loadMore, loadingMore };
 }

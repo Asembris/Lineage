@@ -20,6 +20,18 @@
  * decisions are visibly present even while you are looking at the AML ones. Nothing is hidden;
  * either kind is one click away.
  *
+ * PAGINATION IS LOAD-BEARING, NOT HYGIENE. The feed fetched ONE page (the backend max, 200) and
+ * stopped, so `kind=aml` reached 200 of 1,500 — leaving 1,300 AML decisions, and the 1,300 real
+ * money-flow transactions they cite 1:1, unreachable by any user action. Among them 50 of the 57
+ * CYCLE rings. "Load more" is what makes the evidence layer navigable at all.
+ *
+ * THE WITNESS CHIPS MAKE AN APPROVAL'S BASIS VISIBLE, and that is the point of the seam's whole
+ * disclosure. Two different witness outcomes both map to `approve` and the verdict CANNOT tell them
+ * apart: CONCLUSIVE_NO (there is no cycle) and INCONCLUSIVE (the search ran off the edge of the
+ * extract — 65.3% of it, silently approving 252 of the 300 laundering rows). Each chip carries its
+ * REAL cluster count, counted and never retyped, exactly as the honesty ledger does: this census has
+ * been corrupted by prose three times, and a number read from the cluster cannot be wrong about it.
+ *
  * Cold by default. The single always-on signal is --alert on is_fraud rows (fraud
  * is the palette's designated alert meaning, distinct from the Phase-3 trace
  * warmth): a thin left rule + a small dot, kept minimal so it reads as a forensic
@@ -27,11 +39,29 @@
  * The chips are cold too (--bone/--ash): a filter is not a state of alarm.
  */
 
-import type { DecisionsData, KindCounts, Loadable } from "../hooks/useConsoleData";
-import type { Decision, DecisionKind, UUID } from "../api/types";
-import { formatAmount, formatConfidence, formatCount, splitInstant } from "../lib/format";
+import {
+  PAGE_SIZE,
+  type DecisionsData,
+  type KindCounts,
+  type Loadable,
+  type WitnessCounts,
+} from "../hooks/useConsoleData";
+import type { Decision, DecisionKind, UUID, WitnessOutcome } from "../api/types";
+import { formatAmount, formatConfidence, formatCount, fragId, splitInstant } from "../lib/format";
 import { RestoreHint } from "./RestoreHint";
 import "./DecisionFeed.css";
+
+/* The basis, spelled out. Deliberately NOT the "463 searches" gloss: only 16 of those 463 were
+   searched — the other 447 are self-loops, an account paying itself, where no search ever ran. */
+const BASIS_TITLE: Record<WitnessOutcome, string> = {
+  MATCH: "MATCH — the graph re-derived a real directed cycle. Corroborated; the transfer is blocked.",
+  CONCLUSIVE_NO:
+    "CONCLUSIVE_NO — there is no cycle. Approved. (Only 16 of these 463 were actually searched; " +
+    "447 are self-loops, where no search was possible.)",
+  INCONCLUSIVE:
+    "INCONCLUSIVE — the search ran off the edge of the 1,500-edge extract and COULD NOT DETERMINE. " +
+    "Approved anyway: a disclosed modeling choice, and 65.3% of the extract.",
+};
 
 function DecisionRow({
   d,
@@ -62,12 +92,30 @@ function DecisionRow({
 
         <span className="feed__where">
           {/* merchant is null for AML decisions (a bank-to-bank transfer has no merchant). An em
-              dash keeps the absence visible; presenting AML decisions properly is the deferred
-              frontend session's job, not a drive-by here. */}
+              dash keeps the absence visible. */}
           <span className="feed__merchant">{d.merchant ?? "—"}</span>
-          <span className="feed__txn">{d.txn_ref}</span>
+          {/* THE ROW MUST NAME WHAT THE DECISION WAS ABOUT, and for an AML row `txn_ref` is NOT it:
+              0008 makes txn_ref carry the BASIS (`aml:INCONCLUSIVE`), and the real reference is the
+              FK. Without the transaction, every AML row showed one shared `decided_at`, no merchant,
+              no confidence and the same basis string — so rows differing only in a repeated amount
+              were VISUALLY IDENTICAL. Measured on the real feed: 12 of the 1,500. A supervisor
+              could not tell them apart, and the id is the one thing that always can. */}
+          <span className="feed__txn">
+            {d.aml_transaction_id ? `txn ${fragId(d.aml_transaction_id)}` : d.txn_ref}
+          </span>
         </span>
         <span className="feed__tags">
+          {/* THE BASIS. An AML `approve` without it is unreadable: CONCLUSIVE_NO means "there is
+              no cycle", INCONCLUSIVE means "we could not determine" — and they are 463 and 980
+              rows of the same verdict. Card decisions have no witness and get nothing here. */}
+          {d.witness_outcome && (
+            <span
+              className={`feed__basis feed__basis--${d.witness_outcome.toLowerCase()}`}
+              title={BASIS_TITLE[d.witness_outcome]}
+            >
+              {d.witness_outcome === "CONCLUSIVE_NO" ? "no cycle" : d.witness_outcome.toLowerCase()}
+            </span>
+          )}
           {beliefDriven && (
             <span className="feed__belief" title="belief-driven decision">
               belief
@@ -132,6 +180,54 @@ function KindFilter({
   );
 }
 
+/** The BASIS chips. Only meaningful under `kind=aml` — a card decision has no witness — so they
+ *  appear only there. Each carries its real cluster count, COUNTED (never retyped): this census has
+ *  been corrupted by prose three times, once in each available way. */
+function WitnessFilter({
+  witness,
+  onWitness,
+  counts,
+}: {
+  witness: WitnessOutcome | null;
+  onWitness: (w: WitnessOutcome | null) => void;
+  counts: Loadable<WitnessCounts>;
+}) {
+  const chips: { label: string; value: WitnessOutcome | null }[] = [
+    { label: "any basis", value: null },
+    { label: "match", value: "MATCH" },
+    { label: "no cycle", value: "CONCLUSIVE_NO" },
+    { label: "inconclusive", value: "INCONCLUSIVE" },
+  ];
+
+  return (
+    <div
+      className="feed__filter feed__filter--basis"
+      role="group"
+      aria-label="Filter AML decisions by the basis of the decision"
+    >
+      {chips.map((c) => {
+        const count =
+          c.value !== null && counts.status === "ready"
+            ? formatCount(counts.data[c.value])
+            : null;
+        return (
+          <button
+            key={c.label}
+            type="button"
+            className={`feed__chip${witness === c.value ? " feed__chip--on" : ""}`}
+            aria-pressed={witness === c.value}
+            onClick={() => onWitness(c.value)}
+            title={c.value ? BASIS_TITLE[c.value] : "Every AML decision, whatever its basis."}
+          >
+            {c.label}
+            {count !== null && <span className="feed__chip-n">{count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DecisionFeed({
   data,
   selectedId,
@@ -139,6 +235,11 @@ export function DecisionFeed({
   kind,
   onKind,
   counts,
+  witness,
+  onWitness,
+  witnessCounts,
+  loadMore,
+  loadingMore,
 }: {
   data: DecisionsData;
   selectedId: UUID | null;
@@ -146,35 +247,72 @@ export function DecisionFeed({
   kind: DecisionKind | null;
   onKind: (k: DecisionKind | null) => void;
   counts: Loadable<KindCounts>;
+  witness: WitnessOutcome | null;
+  onWitness: (w: WitnessOutcome | null) => void;
+  witnessCounts: Loadable<WitnessCounts>;
+  loadMore: () => void;
+  loadingMore: boolean;
 }) {
   // TWO DIFFERENT EMPTIES, AND CONFLATING THEM WOULD BE A LIE. An empty FILTER on a populated
   // cluster is not a broken world and must never print restore instructions; only a genuinely
   // empty cluster gets the (single, shared) restore procedure.
   const clusterEmpty = counts.status === "ready" ? counts.data.all === 0 : data.total === 0;
+  const loaded = data.decisions.length;
+  const remaining = data.total - loaded;
 
   return (
     <>
       <KindFilter kind={kind} onKind={onKind} counts={counts} />
+      {kind === "aml" && (
+        <WitnessFilter witness={witness} onWitness={onWitness} counts={witnessCounts} />
+      )}
       {clusterEmpty ? (
         <p className="panel__note">
           No decisions on the cluster — <RestoreHint />
         </p>
       ) : data.total === 0 ? (
         <p className="panel__note">
-          No <span className="feed__chip-inline">{kind}</span> decisions on the cluster. The other
-          kinds are still there — the cluster is populated.
+          No matching decisions on the cluster. The other kinds and bases are still there — the
+          cluster is populated.
         </p>
       ) : (
-        <ol className="feed">
-          {data.decisions.map((d) => (
-            <DecisionRow
-              key={d.id}
-              d={d}
-              selected={d.id === selectedId}
-              onSelect={onSelect}
-            />
-          ))}
-        </ol>
+        <>
+          <ol className="feed">
+            {data.decisions.map((d) => (
+              <DecisionRow
+                key={d.id}
+                d={d}
+                selected={d.id === selectedId}
+                onSelect={onSelect}
+              />
+            ))}
+          </ol>
+          {/* The feed is a bounded window over a growing table, so it must SAY how much of the
+              match it is showing. Silence here is what hid 1,300 AML decisions — and 50 of the 57
+              rings — behind a page that looked complete. */}
+          {remaining > 0 ? (
+            <div className="feed__more">
+              <button
+                type="button"
+                className="feed__more-btn"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore
+                  ? "loading…"
+                  : `load ${formatCount(Math.min(remaining, PAGE_SIZE))} more`}
+              </button>
+              <span className="feed__more-n">
+                {formatCount(loaded)} of {formatCount(data.total)} · {formatCount(remaining)} not
+                yet loaded
+              </span>
+            </div>
+          ) : (
+            <p className="feed__more-done">
+              all {formatCount(data.total)} loaded
+            </p>
+          )}
+        </>
       )}
     </>
   );

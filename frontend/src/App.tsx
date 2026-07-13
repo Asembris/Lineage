@@ -98,7 +98,12 @@ function App() {
   // does not pre-filter the fleet's record for the supervisor. See DecisionFeed's header for why
   // the filter had to exist at all (the fixed AML `decided_at` buried every card decision).
   const [kind, setKind] = useState<DecisionKind | null>(null);
-  const { agents, decisions, beliefs, counts } = useConsoleData(kind);
+  // The BASIS filter, meaningful only for AML decisions. Null = every basis, and that is the
+  // default for the same reason `kind` defaults to unfiltered: the console does not decide for the
+  // supervisor which part of the record is worth looking at.
+  const [witness, setWitness] = useState<WitnessOutcome | null>(null);
+  const { agents, decisions, beliefs, counts, witnessCounts, loadMore, loadingMore } =
+    useConsoleData(kind, witness);
   const [view, setView] = useState<View>("console");
 
   // Investigate: which decision is under investigation (null = none). Clicking a
@@ -112,6 +117,13 @@ function App() {
   // whose decision is no longer on screen is a stale surface. Clear it with the filter.
   const onKind = (k: DecisionKind | null) => {
     setKind(k);
+    setSelectedId(null);
+    // A basis filter is meaningless off the AML kind (a card decision has no witness), so leaving
+    // one armed while switching to `card` would silently return nothing and read as an empty world.
+    if (k !== "aml") setWitness(null);
+  };
+  const onWitness = (w: WitnessOutcome | null) => {
+    setWitness(w);
     setSelectedId(null);
   };
   const investigation = resolveInvestigation(selectedId, decisions, agents, beliefs);
@@ -290,6 +302,11 @@ function App() {
                     kind={kind}
                     onKind={onKind}
                     counts={counts}
+                    witness={witness}
+                    onWitness={onWitness}
+                    witnessCounts={witnessCounts}
+                    loadMore={loadMore}
+                    loadingMore={loadingMore}
                   />
                 )}
               </Loaded>
