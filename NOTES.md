@@ -5347,6 +5347,10 @@ existing practice, made mandatory instead of optional.**
 - `docs(notes): consensus among documents is not evidence — only running the check is`
 
 ## ====== RESTORE INSTRUCTIONS HAVE NOW LIED **THREE TIMES**. THIS IS A HAZARD CLASS. (2026-07-12, G6) ======
+> **[SUPERSEDED 2026-07-13 — it is now FOUR, and the fourth was found by the sweep this entry
+> demands. Sites 5 and 6 are RENDERED IN THE PRODUCT (HonestyLedger.tsx empty states), each naming a
+> SINGLE command. Prose review could never have found them, because they are not prose. See "THE SWEEP
+> FOUND A FIFTH AND SIXTH INSTRUCTION SITE" at the bottom of this file.]**
 
 **Any instruction that tells a human how to REBUILD THE WORLD is a piece of executable code that
 lives in prose, and this project has now shipped a broken one three times.**
@@ -6161,3 +6165,60 @@ column and belonged in the same session; neither decision constrained the other.
 ### opclass flip is INERT, and the prefix index makes the brake's input approximate); the AML console;
 ### the recorded video; `belief_performance` for the azure belief (step 4 stays CUT — re-read THE
 ### BASE-RATE MIRAGE); a `verdicts` table; any re-ingestion of `aml_*`; any LLM on the deciding path.
+
+## THE SWEEP FOUND A FIFTH AND SIXTH INSTRUCTION SITE — RENDERED IN THE PRODUCT (2026-07-13)
+
+The pre-push sweep was run because the restore procedure dropped from three commands to two, and
+G6's rule says a localized fix does not fix the class — **grep for the SHAPE, not the sentence.** It
+turned up **two sites nobody knew existed**, and they are the worst class in the taxonomy: not prose
+in a setup doc, but **live-rendered UI inside the honesty ledger** — the one surface whose entire job
+is to be trustworthy.
+
+`frontend/src/components/HonestyLedger.tsx` rendered an EMPTY-STATE hint on two live rows, and each
+named a **single** command:
+
+| site | it said | what following it actually does |
+|---|---|---|
+| `:573` — the `decisions` / `belief_performance` row, when the cluster is wiped | *"empty — run seed.backfill_decisions"* | Restores the CARD world and **silently leaves the grounding seam empty** — so the seam-census row **directly above it** stays `—`. This is the destructive half-restore the DEMO reset note was fixed for, reproduced in the UI, one row away from the damage it causes. |
+| `:657` — the grounding-seam census row, when it has no AML decisions | *"empty — run seed.backfill_aml_decisions"* | **REFUSES, exit 1.** The script never reseeds and declines to run until the card backfill has gone first. The hint tells the operator to run a command that cannot run. |
+
+**These are INSTRUCTION sites by G6's own definition** (they tell a reader how to rebuild the world),
+they had never been counted as such, and they were **rendered to a judge**, not buried in a doc. The
+sweep is the only thing that could have found them: they are not prose, so no amount of re-reading
+the four known sites would have surfaced them.
+
+**RESTORE INSTRUCTIONS IN THIS REPO HAVE NOW LIED FOUR TIMES.** The count in the earlier entry
+("THREE TIMES") is superseded, and the shape of the fourth is the most instructive yet: the previous
+three were *sentences a human wrote*; these two were *values a component renders*, which is why every
+prose review missed them.
+
+**THE FIX IS A SINGLE DEFINITION, NOT A BETTER SENTENCE.** Both empty states now render one shared
+`RestoreHint` component, so they cannot drift from each other or from the four prose sites. Six sites,
+one procedure, two ordered commands. **A seventh site is a bug.**
+
+**VERIFIED BY DRIVING IT, NOT BY READING IT** (Playwright @1440, live vite -> uvicorn -> live cluster;
+the empty state forced with route-fulfill so the cluster was never wiped — the Frontend-Phase-3
+precedent). Both hints render the two ordered commands, **0 page errors**. `tsc --noEmit`, `oxlint`
+and `vite build` all exit 0. And the server was pre-checked for the two documented harness traps
+before any result was trusted: `/openapi.json` carries `witness_outcome` (not a zombie serving stale
+code) and a DB-backed route returns 200 (not the Proactor-loop failure that masquerades as a CORS
+error).
+
+### The other pre-push checks (real output, all green)
+- **The fixture is genuine model output, proven the only way that settles it:** the committed vector
+  was compared against a LIVE re-embed of the same `rule_text` through `text-embedding-3-small` —
+  **cosine distance 0.000000000000**. Not a placeholder (distance from `placeholder_embedding(1536)`
+  is 1.0033 / 1.0099, not 0.0), not zero, not truncated: dim 1536, L2 norm 1.0000, 0 zero components,
+  ~1,414 distinct values. Tracked and NOT gitignored — `git check-ignore` returns nothing and
+  `git ls-files` lists it (this repo has had two gitignore surprises; the claim was RUN, not read).
+- **The `<=>` metric was confirmed to be COSINE DISTANCE**, not similarity, using known-answer
+  anchors on the live cluster: `v <=> v` = **0.000000000**, `v <=> -v` = **2.000000000**,
+  `v <=> placeholder` = **1.003275377**. A value slightly above 1.0 is near-orthogonal — exactly what
+  unrelated texts must give, and in range [0, 2]. *A number above 1.0 in a column labelled "distance"
+  is precisely the kind of thing that looks fine and isn't, so it was checked rather than assumed.*
+- **The catalog says exactly what 0010 intended:** `information_schema` lists ONE index whose name
+  mentions `embedding` — `ix_regulatory_corpus_embedding`. `ix_beliefs_embedding` GONE,
+  `ix_typology_corpus_embedding` GONE, and the survivor still EXPLAINs to a real `vector search` node.
+  **The VECTOR(1536) COLUMNS SURVIVE on both de-indexed tables** (`SHOW CREATE TABLE` confirms), and a
+  real cosine query still returns the right rows from each. Dropping the column instead of the index
+  would have been catastrophic and silent; it was checked.
