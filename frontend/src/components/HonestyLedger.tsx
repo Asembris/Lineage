@@ -36,6 +36,31 @@ import "./HonestyLedger.css";
 
 const DASH = "—";
 
+/** THE RESTORE PROCEDURE HAS EXACTLY ONE DEFINITION IN THIS COMPONENT, AND THIS IS IT.
+ *
+ * A FIFTH AND SIXTH INSTRUCTION SITE were found here by the pre-push sweep (2026-07-13), and they
+ * are the worst class: **rendered in the product**, inside the honesty ledger — the one surface
+ * whose entire job is to be trustworthy. Each named a SINGLE command:
+ *
+ *   * the `decisions` row's empty state said "run seed.backfill_decisions" — which restores the
+ *     CARD world and silently leaves the grounding seam empty, so the seam census row directly
+ *     ABOVE it stays `—`. That is precisely the destructive half-restore the DEMO reset note was
+ *     fixed for, reproduced in the UI;
+ *   * the seam row's empty state said "run seed.backfill_aml_decisions" — which, run alone,
+ *     REFUSES with exit 1, because the card backfill has not gone first.
+ *
+ * Restore instructions in this repo have now lied FOUR times. The defence is not a better
+ * sentence, it is a single definition: both empty states render THIS, and it says the same two
+ * ordered commands as README's setup block, DEMO's pre-flight, DEMO's reset note, and the ledger
+ * note above. There is exactly one way to rebuild this world. A seventh site is a bug.
+ */
+const RestoreHint = () => (
+  <>
+    empty — run <code>seed.backfill_decisions</code> → <code>seed.backfill_aml_decisions</code>, in
+    that order (the first alone leaves the seam empty; the second alone refuses)
+  </>
+);
+
 /** One ledger row. `note` is prose faithful to the README. `mode` is the provenance
  *  marker; `liveKey` (present only when mode==="live") selects which computed value the
  *  row surfaces under its name. */
@@ -570,7 +595,7 @@ export function HonestyLedger(props: {
         decisionsTotal === undefined && perf === undefined ? (
           DASH
         ) : decisionsTotal === 0 && perf === 0 ? (
-          <>empty — run seed.backfill_decisions</>
+          <RestoreHint />
         ) : (
           <>
             {n(decisionsTotal)} decisions · {n(perf)} perf windows
@@ -654,7 +679,7 @@ function seamValue(slot: Slot<SeamCensus>): LiveValue {
   if (slot.status !== "ready") return { node: DASH };
   const { total, byOutcome } = slot.data;
   if (total === 0) {
-    return { node: <>empty — run seed.backfill_aml_decisions</> };
+    return { node: <RestoreHint /> };
   }
   const inc = byOutcome.INCONCLUSIVE;
   const share = ((inc.n / total) * 100).toFixed(1);
