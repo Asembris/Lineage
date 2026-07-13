@@ -104,17 +104,21 @@ as stale.
 1. **Restore console state** (the feed, the staleness curve, the counterfactual, and the certificate
    staleness all read `decisions` / `belief_performance`, which are empty on a fresh cluster).
 
-   > **⚠️ THREE ORDERED COMMANDS. THE ORDER IS NOT FREE.** `backfill_decisions` opens with a reseed,
+   > **⚠️ TWO ORDERED COMMANDS. THE ORDER IS NOT FREE.** `backfill_decisions` opens with a reseed,
    > and the reseed **DELETEs every decision** — so running it *second* would destroy the AML rows,
    > and running it *alone* destroys them too. `backfill_aml_decisions` never reseeds, and **refuses
    > to run** (exit 1) if the card backfill has not been run first, rather than silently building
-   > half a world. The reseed also re-plants the placeholder embedding, so the third command is what
-   > gives the azure belief its real vector back.
+   > half a world.
+   >
+   > **It used to be THREE.** A third command re-embedded the beliefs, because the seed planted a
+   > placeholder vector and re-planted it on every reseed. It was forgotten exactly once and the
+   > honesty ledger silently became false. The seed now plants the real vectors from a committed
+   > fixture, so that command no longer exists. Both sites that rebuild this world — here and the
+   > reset note below — say the same two commands.
 
    ```bash
    PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_decisions
    PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_aml_decisions
-   PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m scripts.embed_beliefs aml-cycle
    ```
 
    Deterministic (~4–5 min total): restores 24 agents, **2 active beliefs** (crimson card + azure
@@ -406,13 +410,12 @@ met**, seven generations up a spine of dead agents. Every hop is a real row.
 >
 > The Invalidate beat is **destructive by design**: it consumes the active belief
 > (`status → invalidated`), leaves `belief_performance`/`decisions` intact but the belief dead, and
-> writes a real S3 certificate. **Between takes**, restore with the *same three ordered commands as
+> writes a real S3 certificate. **Between takes**, restore with the *same two ordered commands as
 > the pre-flight* — the first one alone is not a restore, it is a demolition:
 >
 > ```bash
 > PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_decisions
 > PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m seed.backfill_aml_decisions
-> PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m scripts.embed_beliefs aml-cycle
 > ```
 >
 > > **WHY THE ORDER IS NOT FREE — and why stopping after command one destroys the seam.**
@@ -423,9 +426,13 @@ met**, seven generations up a spine of dead agents. Every hop is a real row.
 > > has nothing left to point at. `backfill_aml_decisions` never reseeds — it only **appends** — and
 > > it *refuses to run* (exit 1, printing both commands in order) if the card backfill has not gone
 > > first. So the one failure mode it cannot protect you from is precisely the one above: **stopping
-> > after command one.** The reseed also re-plants the *placeholder* embedding on both beliefs, which
-> > is why `embed_beliefs aml-cycle` is third rather than optional — without it the azure belief's
-> > real vector is gone.
+> > after command one.**
+> >
+> > **This note used to list a THIRD command** (`embed_beliefs aml-cycle`), because the reseed
+> > re-planted a placeholder embedding over both beliefs. That was a restore step an operator had to
+> > remember *between takes, under time pressure* — and it was forgotten, leaving the live cluster
+> > with two placeholder vectors while the honesty ledger asserted one of them was real. The seed now
+> > plants the real vectors from a committed fixture, so the step is gone rather than emphasised.
 >
 > That restores 24 agents, **two active beliefs** (crimson card + azure laundering), **15**
 > inheritance edges (8 crimson + 7 azure), **5,500** decisions (4,000 card + 1,500 AML citing real

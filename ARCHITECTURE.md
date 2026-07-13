@@ -34,7 +34,7 @@ data-model boundaries impossible to cross by accident.
 ```mermaid
 graph TB
     subgraph moat["FIVE-TABLE MOAT — Base metadata (app/models.py)"]
-        A[agents<br/>genealogy graph] --> B["beliefs<br/>rule_text + VECTOR 1536<br/>index is vector_l2_ops · query is cosine<br/>❌ INDEX NEVER SELECTED (0002)"]
+        A[agents<br/>genealogy graph] --> B["beliefs<br/>rule_text + VECTOR 1536<br/>exact cosine search, no index<br/>🪦 dead index DROPPED (0010)"]
         A --> BI[belief_inheritance<br/>provenance + closure state]
         B --> BI
         A --> D[decisions<br/>verdict + driving_belief]
@@ -47,8 +47,8 @@ graph TB
         ATX --> APM
     end
     subgraph corpus["RAG CORPUS — CorpusBase metadata (app/corpus_models.py)"]
-        TC["typology_corpus — 4 rows<br/>VECTOR 1536 · index is vector_l2_ops<br/>query is cosine<br/>❌ INDEX NEVER SELECTED (0005)"]
-        RC["regulatory_corpus — 233 rows<br/>VECTOR 1536 · vector_cosine_ops<br/>✅ C-SPANN INDEX GENUINELY SELECTED (0009)"]
+        TC["typology_corpus — 4 rows<br/>VECTOR 1536 · exact cosine search<br/>no index — a scan IS the right plan here<br/>🪦 dead index DROPPED (0010)"]
+        RC["regulatory_corpus — 233 rows<br/>VECTOR 1536 · vector_cosine_ops<br/>✅ THE ONE C-SPANN INDEX THAT WORKS (0009)"]
     end
 
     D ==> |"THE ONE SEAM (built, 0006):<br/>aml_transaction_id FK — 1,500 decisions"| ATX
@@ -630,47 +630,64 @@ then **violated by the very session that had just read it**. Four separate docum
 > in a type, a metadata boundary, a database constraint, or a test that fails loudly.** Documentation
 > is how you explain a guard. It is not a guard.
 
-There are **ten** instances, each shipped for its own reason and each independently verified to
+There are **eleven** instances, each shipped for its own reason and each independently verified to
 **trip** — a guard that cannot fail is theatre, so every one of these had its violation deliberately
 introduced, watched fail with real output, and reverted.
 
-> **The sharpest illustration of this section arrived after it was written, and it is not in the
-> table below — because no guard existed to catch it.** For months, NOTES, README, ARCHITECTURE and
-> `verify_corpus.py` all stated that CockroachDB's vector index went unused *because the corpus was
-> small*. Four documents, in agreement. The observation was true; the **cause was invented**. The
-> indexes are built `vector_l2_ops` and the queries rank with cosine `<=>` — an opclass that cannot
-> serve that operator **at any row count**. One `EXPLAIN` against a `vector_cosine_ops` index over
-> **four rows** settles it, and nobody ran it, because the existing explanation was plausible and
-> the check was green. **A green check that asserts a true fact for a false reason is the most
-> durable kind of wrong**: it survives review, it survives CI, and it teaches the next session the
-> false thing. `verify_corpus.py` now asserts the *cause*, read from the live catalog — not just
-> the symptom.
+> **The sharpest illustration of this section arrived after it was written, and it took THREE laps
+> to kill — each lap running through the machinery built to stop the previous one.** For months,
+> NOTES, README, ARCHITECTURE and `verify_corpus.py` all stated that CockroachDB's vector index went
+> unused *because the corpus was small*. Four documents, in agreement. The observation was true; the
+> **cause was invented**. The indexes were built `vector_l2_ops` and the queries rank with cosine
+> `<=>` — an opclass that cannot serve that operator **at any row count**. **A green check that
+> asserts a true fact for a false reason is the most durable kind of wrong**: it survives review, it
+> survives CI, and it teaches the next session the false thing.
+>
+> **Then the correction was wrong too.** The guard rewritten to assert the *cause* instead of the
+> symptom EXPLAINed `FROM typology_corpus ORDER BY d LIMIT 3` — **a query this application never
+> issues.** Every one of the 12 row-returning `retrieve_typology()` call sites passes `source=`, so
+> the real query filters `WHERE source = :source`. From that hand-typed lookalike came the claim
+> *"its query has no WHERE and no JOIN, so flipping the opclass would revive the index"* — which
+> propagated into NOTES and became the premise of the session that had to unpick it. **The flip is
+> inert.** A CockroachDB vector index is selected only when every **prefix column** is constrained;
+> `(embedding)` has none; the `WHERE` forces a scan whatever the opclass.
+>
+> **The rule that ends it, and it is the shared-canonicalizer rule arriving from a third direction:
+> a check that verifies a QUERY must run the query the application BUILDS, never a lookalike a human
+> typed into the check. If you retyped it, you are testing your typing.** `verify_corpus.py` now
+> EXPLAINs `corpus._retrieval_sql(SOURCE)` — the production SQL builder itself.
 
-### The three vector indexes, and the two that are still inert
+### The three vector indexes, and the two that were dropped
 
-Stated as a table rather than left to diagram labels, because the natural way to misread the
-correction above is *"so they fixed it."* **They did not. Two of the three are still dead, by
-decision.**
+**Two of the three could never be used by their own queries. They are gone (migration 0010).** They
+were not "repaired", because the repair everyone assumed — flip the opclass — changes no plan.
 
-| Index | Migration | Opclass | Query operator | Selected by the planner? |
+| Index | Migration | Opclass | Its query | Selected by the planner? |
 |---|---|---|---|---|
-| `ix_beliefs_embedding` | **0002** | `vector_l2_ops` | cosine `<=>` (`agent_brain.py:69`) | ❌ **never — at any row count** |
-| `ix_typology_corpus_embedding` | **0005** | `vector_l2_ops` | cosine `<=>` (`corpus.py:109`) | ❌ **never — at any row count** |
-| `ix_regulatory_corpus_embedding` | **0009** | `vector_cosine_ops` | cosine `<=>` (`regulation.py`) | ✅ **yes** — `EXPLAIN` emits a `vector search` node |
+| ~~`ix_beliefs_embedding`~~ | 0002 → **dropped in 0010** | `vector_l2_ops` | cosine `<=>` + `WHERE status` + an ownership `OR` across a `LEFT JOIN` (`agent_brain.py:69`) | ❌ **never — and no index definition could fix it** |
+| ~~`ix_typology_corpus_embedding`~~ | 0005 → **dropped in 0010** | `vector_l2_ops` | cosine `<=>` + `WHERE source` (`corpus.py:109`) | ❌ **never — the opclass flip is inert** |
+| `ix_regulatory_corpus_embedding` | **0009** | `vector_cosine_ops` | cosine `<=>`, **unscoped** (`regulation.py`) | ✅ **yes** — `EXPLAIN` emits a real `vector search` node |
 
-Every retrieval in the system still returns **correct** nearest neighbours; the two inert indexes
-mean those two tables get the right answer by **full scan** rather than by ANN. So this is a
-performance and honest-claims defect, not a correctness one.
+**Why dropped rather than fixed.** For `typology_corpus`, the one index that *would* have worked is a
+`(source, embedding vector_cosine_ops)` **prefix** index — and it activates an **approximate**
+(C-SPANN/ANN) search where today's scan is **exact**. Item 4's Gate 0 is a set-membership test on
+exactly the top-3 of a `k=3` retrieval over a **four-document** corpus: one document swapping out
+flips a verdict from FLAG to INSUFFICIENT_COVERAGE. It measures safe *today* —
+`scripts/probe_vector_opclass.py` records **0** top-3 changes across 1,572 adversarial near-ties
+**and** across 132 real agent queries (`structure_text()` embeddings, not self-retrieval), with **0**
+Gate 0 flips — but only because four rows sit in **one** C-SPANN partition. **That is luck of scale,
+not a property of the design.** For `beliefs`, no index definition works at all: the ownership
+predicate is an `OR` across a `LEFT JOIN`, which can never be a prefix constraint, and CockroachDB
+responds by declining the vector index and scanning (verified against an adversarial 400-belief probe
+— the feared "agent silently receives fewer beliefs than it holds" **does not reproduce**; the
+planner simply will not produce that plan).
 
-**Why they were not simply fixed in the same session that found them.** A selected C-SPANN index is
-an **approximate** search. The full scan they fall back to today is **exact**. Item 4's Gate 0 turns
-on *which three of four* typology documents come back at `k=3`, and Item 8's 40-tuple golden set was
-generated against exact retrieval. Flipping the opclass is therefore a live change to the brake's
-input and to a published evaluation — **and the whole test suite would stay green while it happened.**
-That is its own gated session with its own before/after measurement (NOTES → *THE VECTOR INDEX WAS
-NEVER USED*). Until then, `tests/test_regulatory_corpus.py` and `scripts/verify_corpus.py` **pin both
-as `vector_l2_ops`**, so the change cannot be made silently: when someone makes it, a test fails, and
-that failure is the decision point.
+What survives is checkable: real `VECTOR(1536)` columns, real cosine `<=>` search, **exact** by scan
+at 2 and 4 rows — where a scan is not merely acceptable but *correct* — and **one**
+genuinely-exercised distributed vector index. *Three vector indexes were declared; two could never be
+used by their own queries; they were removed and the one that works remains.* Correctness was never
+affected. `tests/test_regulatory_corpus.py` and `scripts/verify_corpus.py` now pin the two as
+**absent**, so resurrecting one fails loudly.
 
 | # | The wrong thing | Why a comment was not enough | What makes it impossible | Enforced in |
 |---|---|---|---|---|
@@ -684,6 +701,7 @@ that failure is the decision point.
 | **8** | An ephemeral probe leaks into the repo — or, worse, the *premise* of guard 7 turns out to be false, and a skeptical reader deletes a guard that was doing real work | `scratchpad/` was asserted to be gitignored by NOTES, by ARCHITECTURE, **and by `test_citations.py`'s own docstring**. `git check-ignore` returned **nothing**. It was merely *untracked* | `scratchpad/` + `**/scratchpad/` in `.gitignore`. **The premise was made TRUE rather than reworded away** — a true rule resting on a false premise is one skeptical reader away from deletion | `.gitignore:37-38` |
 | **9** | The regulatory corpus contaminates the brake's candidate set — and the failure does **not** look like a false flag. At `k=3` over 270 rows, three red flags outrank all four typology definitions, `_doc_for()` returns `None` for every claim, and **every verdict silently collapses to `INSUFFICIENT_COVERAGE`**. The brake becomes a wall | A `source=` filter would have held it. All 12 row-returning `retrieve_typology()` call sites do pass it — but the parameter **defaults to `None`**, so the rule is held by *discipline*. And no test would catch the breach: `test_aml_brake`, `test_aml_interrogate` and `verify_corpus` all pass `source=SOURCE` | A **separate table**. `retrieve_typology()`'s SQL says `FROM typology_corpus` and is therefore *physically incapable* of returning a red flag, whatever arguments it is handed. An AST guard additionally forbids the deciding path from importing `retrieve_regulation` | `migrations/0009` · `app/corpus_models.py` · `tests/test_regulatory_corpus.py` |
 | **10** | A silently corrupted regulatory quote is embedded, retrieved, and cited as authoritative FATF/FFIEC language — **and it reads as more trustworthy than it is**, because the section path we attach to it makes its provenance look impeccable | Nothing downstream can catch it. A chunk is a *quote*; there is no internal consistency check that a quote is real, and a plausible-sounding invented red flag is indistinguishable from a real one by inspection | Every stored entry must **trace back to its source PDF**, re-extracted *independently* of the parser (pypdf, not LlamaParse) at ≥0.95 character-shingle coverage. **Shown to trip:** a plausible fabricated red flag scores **0.189**. A pinned per-document census makes a document that silently contributes **zero** fail with its name on it | `scripts/verify_regulatory.py` · `tests/test_regulatory_corpus.py` |
+| **11** | The seed re-plants a **placeholder** embedding on every reseed, and the fix is an *instruction* — "afterwards, run `scripts/embed_beliefs.py`" — sitting third in a three-command restore procedure run repeatedly, under time pressure, between takes | **It failed exactly as you would predict, and nobody noticed.** Measured on the live cluster: **both** beliefs at cosine distance **0.000000000** from `placeholder_embedding(1536)` — while the honesty ledger asserted in static prose that one of them carried a real vector. An instruction that must be remembered on every rebuild is not a fix | The **seed plants the real vector itself**, from a committed fixture, and stays OpenAI-free (CI runs it with a dummy key). `belief_embedding()` stores the `rule_text` *with* the vector and **refuses** to plant one computed from different words. A test **reseeds the cluster and then measures** — because the claim is precisely *"a reseed cannot undo it"*. The restore procedure lost a command: **three → two** | `seed/seed.py` · `seed/belief_embeddings.json` · `tests/test_belief_embeddings.py` |
 
 **Read the middle column, not the last one.** The mechanisms are ordinary — a metadata boundary, a
 CHECK constraint, an AST walk, a `.gitignore` line. What is not ordinary is *why each one exists*:
