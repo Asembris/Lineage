@@ -6379,3 +6379,81 @@ read.
 ### the feed (the kind filter is the minimum that restores reachability; a full drill-in is its own
 ### plan-gate); the AML console; the recorded video; a `verdicts` table; any change to the five tables /
 ### aml_* / typology_corpus. Do NOT push without explicit approval — held for review of the result.
+
+## RESTORE INSTRUCTIONS HAVE NOW LIED **NINE** TIMES. THE SWEEP IS A TEST NOW. (2026-07-13)
+
+The review asked for the sweep to be re-run **as an assertion, not by eye — that's the lesson** —
+and across **every doc AND every frontend component**. The previous sweep was **docs-only**, which is
+precisely why a component-rendered instruction survived it. It found two more sites.
+
+### THE EIGHTH SITE IS THE WORST IN THE TAXONOMY: the destructive demo's own confirmation gate
+`ConsistencyDemo.tsx`, **both branches** (strong and eventual). The screen an operator reads **while
+agreeing to TRUNCATE AND RESEED the live cluster** said the fleet would read empty *"until
+re-backfilled (`python -m seed.backfill_decisions`)"*. **One command.**
+
+Rank the aggravating factors, because they compound:
+- It is handed to **the one operator guaranteed to need the restore procedure** — they are about to
+  destroy the world on purpose.
+- It appears at **the moment of maximum consequence**, inside an irreversible confirmation gate.
+- The demo it gates **reseeds**, so it destroys the **1,500 AML decisions** as well. Following the
+  hint restores the card world and **leaves the grounding seam dead** — the exact half-restore.
+- It is **rendered in the product**, not written in a doc, which is why five prose reviews and two
+  human sweeps never saw it.
+
+### THE NINTH: `DEMO.md`'s beat table, "Backfill (prep)"
+A single `python -m seed.backfill_decisions` as the **prep step of the demo that must SHOW the seam.**
+Found by the assertion, not by eye — which is the entire point of writing it as an assertion.
+
+### THE STRUCTURAL HALF — nine lies is enough evidence that prose fixes do not stick
+`tests/test_restore_instructions.py` greps for **the SHAPE** across README, DEMO, and every `.tsx`: a
+card backfill named without its counterpart **fails CI**. `RestoreHint.tsx` now also exports
+**`RestoreCommands`** — the two ordered commands, composable into any sentence — and `HonestyLedger`
+**imports** it instead of respelling the procedure. The frontend has **exactly one definition**.
+
+NOT swept: **NOTES.md** (an append-only LOG whose historical entries quote the old, wrong procedures
+**on purpose** — rewriting history to satisfy a grep would be the actual dishonesty) and Python source
+(module docstrings cross-referencing a backfill by filename are references, not instructions).
+
+### ====== THE GUARD'S FIRST VERSION WAS ITSELF THEATRE. BREAKING IT ON PURPOSE IS WHAT PROVED IT. ======
+The first implementation used a **±14-line proximity window**: a card backfill must have
+`backfill_aml_decisions` within 14 lines. It passed the real tree. Then the eighth-site bug was
+**deliberately reintroduced into ONE branch** of the gate — and **the guard still passed.**
+
+`ConsistencyDemo` renders the gate **twice**. The *untouched* branch's correct `<RestoreCommands />`
+sat inside the 14-line window of the *broken* one, and satisfied it. **The guard would have shipped
+blind to the exact bug it was written for** — a guard that cannot fail on its own bug is decoration,
+and this project has now caught that in itself twice (the other was the guard that EXPLAINed a query
+the application never runs).
+
+**Proximity was a proxy. The real invariant is that the two commands travel IN THE SAME BREATH** —
+the same rendered `<p>` a user actually reads. The component rule is now exactly that (the markdown
+rule stays line-based; prose has no `<p>`). Re-broken, **watched fail on line 588**, reverted
+byte-identical, re-run green.
+
+**And the guard must not punish the fix it demands:** a component rendering `<RestoreCommands />` IS
+naming both commands, so the import counts as the counterpart. Otherwise the guard would push the
+next author back into writing the procedure out by hand — manufacturing the tenth site itself.
+
+### GATE
+- **185 backend tests pass** (167 + 18 new), ~3m24s. `tsc`, `oxlint`, `vite build` all exit 0.
+- **Driven live:** both gate branches and the ledger row render the two ordered commands.
+  **Confirm was never clicked — the cluster was not touched.**
+- Cluster restored with both backfills and re-verified with real SELECTs: 24 agents, 2 beliefs (both
+  active), 15 edges, 5,500 decisions (4,000 card / 1,500 AML), 8 windows, curve
+  `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical.
+
+### OPEN — NOT FIXED, FLAGGED FOR A RULING: the governed write is BELOW THE FOLD at laptop heights
+Measured at 1280 with Time-travel open, on the same rendered panel with the old height injected:
+
+| viewport | Inspector content | visible | overflow BEFORE (42px) | overflow NOW (96px) |
+|---|---|---|---|---|
+| 1280x800 | 960px | 706px | **200px — below fold** | 254px |
+| 1280x900 | 960px | 806px | **100px — below fold** | 154px |
+| 1280x1080 | 986px | 986px | 0 — fits | 0 — fits |
+
+**The Invalidate button did not BECOME scroll-dependent — it already was**, at laptop heights, since
+Time-travel shipped. The 42px -> 96px chart made a pre-existing 200px overflow into 254px. The page
+shell itself never scrolls (`overflow:hidden` holds; 0 page errors); the Inspector's own
+`.panel__body` scrolls, which is the shell's design. **Reaching the one irreversible write should not
+require a scroll**, and fixing that properly (e.g. a sticky action footer in the Inspector) is a
+layout change with its own scope — **NOT smuggled into this session.**
