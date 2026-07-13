@@ -10,31 +10,40 @@ Checks (each PASS/FAIL; exits non-zero on any failure):
   4. AOST time-travel of retrieval RUNS mechanically: the same query as_of a just-captured HLC and
      at present both return the expected top-1 (the SET TRANSACTION AS OF SYSTEM TIME path works
      over the vector search); an out-of-window as_of raises ValueError (-> 400), never a 500.
-  5. EXPLAIN: report the REAL query plan, and the REAL REASON the vector index is not used.
+  5. EXPLAIN **THE QUERY THE APPLICATION ACTUALLY RUNS**, and assert the dead index is GONE.
 
-     ===================== THIS CHECK USED TO STATE A FALSE CAUSE =====================
-     It previously reported the FULL SCAN and attributed it to the corpus being small ("at 4 rows
-     the planner correctly brute-forces"). The observation was true. The cause was WRONG, and it
-     had been repeated in NOTES, in README and in ARCHITECTURE without anyone running the check
-     that would settle it.
+     ============ THIS CHECK HAS NOW STATED A FALSE CAUSE *AND* MEASURED THE WRONG QUERY ============
+     Two corrections, in two consecutive sessions, to the same twelve lines. Worth reading before
+     touching them.
 
-     The real cause is an OPCLASS/OPERATOR MISMATCH:
+     (1) It originally reported the FULL SCAN and blamed the corpus being small ("at 4 rows the
+         planner correctly brute-forces"). The observation was true; the cause was invented. The
+         real cause was an OPCLASS/OPERATOR MISMATCH — `ix_typology_corpus_embedding` was
+         `(embedding vector_l2_ops)`, which accelerates `<->` ONLY, while `_retrieval_sql` ranks
+         with `<=>` (cosine). Row count was never the variable.
 
-         ix_typology_corpus_embedding  IS  (embedding vector_l2_ops)   <- migration 0005
-         _retrieval_sql                RANKS WITH  `<=>`               <- COSINE distance
+     (2) The check that FIXED (1) then EXPLAINed `FROM typology_corpus ORDER BY d LIMIT 3` — a
+         query with NO `WHERE source`, which **this application never issues.** Every one of the 12
+         row-returning `retrieve_typology()` call sites passes `source=SOURCE`, so the real query is
+         source-scoped. Its plan is not a FULL SCAN at all; it is a constrained index join over
+         `uq_typology_corpus_source_typology`. The guard written to stop asserting a false cause was
+         asserting a TRUE fact about a query that does not exist — and that false premise ("its
+         query has no WHERE and no JOIN") propagated from here into NOTES and from NOTES into the
+         session that had to unpick it.
 
-     CockroachDB's default vector opclass is `vector_l2_ops`, which accelerates `<->` ONLY.
-     `<=>` needs `vector_cosine_ops`. So this index has NEVER been selected by the planner — not at
-     4 rows, and not at any number of rows. Measured on the live cluster: a cosine-opclass index is
-     selected at 1,000 rows AND at 4; an L2-opclass index is not selected for a cosine query at
-     either. ROW COUNT WAS NEVER THE VARIABLE. See migration 0009, which builds the FIRST index in
-     this project whose opclass matches its operator, and scripts/verify_regulatory.py, which
-     EXPLAINs a plan that really does contain a `vector search` node.
+     THE FIX FOR BOTH IS THE SAME: EXPLAIN what `corpus.py` builds, not a hand-written lookalike.
+     This check now calls `_retrieval_sql(SOURCE)` — the production SQL builder itself — so the plan
+     under test cannot drift from the plan in production without this failing.
 
-     Fixing THIS index is deliberately deferred: a selected C-SPANN index is an APPROXIMATE search,
-     where today's full scan is EXACT, and Item 4's Gate 0 depends on which three of four documents
-     come back. That is a behavioural change needing its own before/after measurement, not a
-     drive-by. So the full scan is still asserted below — but now for the reason that is TRUE.
+     WHAT IT ASSERTS NOW (migration 0010): typology_corpus has **no vector index at all**, and the
+     retrieval is honestly EXACT. The index was dropped rather than repaired because the repair was
+     inert (an opclass flip changes no plan — a vector index needs its PREFIX columns constrained,
+     and `(embedding)` alone has none, so the `WHERE source` forces a scan regardless), and the only
+     repair that WOULD have worked — a `(source, embedding vector_cosine_ops)` prefix index — buys a
+     working index by making Item 4's Gate 0 input APPROXIMATE. Measured in
+     scripts/probe_vector_opclass.py. The one genuinely-exercised vector index in this project is
+     `ix_regulatory_corpus_embedding` (migration 0009); scripts/verify_regulatory.py EXPLAINs a plan
+     that really does contain a `vector search` node.
   6. structural isolation: NO foreign key touches typology_corpus in either direction (it is on its
      own CorpusBase metadata; the join to aml_* is by string, not FK).
 
@@ -51,7 +60,12 @@ from sqlalchemy import text  # noqa: E402
 
 from app.corpus_models import SOURCE  # noqa: E402
 from app.db import engine  # noqa: E402
-from app.services.corpus import TYPOLOGY_DOCS, retrieve_typology, vec_literal  # noqa: E402
+from app.services.corpus import (  # noqa: E402
+    TYPOLOGY_DOCS,
+    _retrieval_sql,
+    retrieve_typology,
+    vec_literal,
+)
 
 EXP_TYPOLOGIES = {"CYCLE", "SCATTER-GATHER", "GATHER-SCATTER", "STACK"}
 
@@ -118,36 +132,42 @@ async def main() -> None:
         oow_ok = True
     check("out-of-window as_of -> ValueError (not 500)", oow_ok)
 
-    # ---- 5. EXPLAIN: honest query-plan finding at 4 rows -------------------------------------
+    # ---- 5. EXPLAIN THE QUERY THE APPLICATION ACTUALLY RUNS -----------------------------------
+    # NOT a hand-written lookalike. `_retrieval_sql` is the production SQL builder, and SOURCE is
+    # what all 12 row-returning call sites pass — so the plan under test is the plan in production.
+    # An earlier version of this check EXPLAINed the same SELECT with no `WHERE source` and asserted
+    # a FULL SCAN against it. That query does not exist in this system. See the module docstring.
     lit = vec_literal(cyc)
+    prod_sql = str(_retrieval_sql(SOURCE)).replace(":qvec", f"'{lit}'").replace(":k", "3")
     async with engine.connect() as c:
-        plan_rows = (await c.execute(text(
-            f"EXPLAIN SELECT id, typology, embedding <=> '{lit}'::VECTOR(1536) AS d "
-            f"FROM typology_corpus ORDER BY d LIMIT 3"))).all()
+        plan_rows = (await c.execute(text("EXPLAIN " + prod_sql), {"source": SOURCE})).all()
     plan = "\n".join(r[0].encode("ascii", "replace").decode() for r in plan_rows)
-    used_vector_index = "ix_typology_corpus_embedding" in plan
-    full_scan = "FULL SCAN" in plan
-    print("[explain] query plan:", flush=True)
+    print("[explain] the plan for the REAL, source-scoped retrieval query:", flush=True)
     for line in plan.splitlines():
         print("    " + line, flush=True)
 
-    # The INDEX ITSELF, read from the catalog — this is the fact that explains the plan.
+    # The INDEX ITSELF, read from the live catalog — never inferred from a migration file, which is
+    # how the opclass defect hid for months.
     async with engine.connect() as c:
         ddl = str((await c.execute(text("SHOW CREATE TABLE typology_corpus"))).all()[0][1])
-    idx = next((l.strip() for l in ddl.splitlines() if "VECTOR INDEX" in l), "")
-    is_l2 = "vector_l2_ops" in idx
+    vector_idx = next((l.strip() for l in ddl.splitlines() if "VECTOR INDEX" in l), "")
 
-    check("the index's OPCLASS is read from the live catalog (not assumed from the migration)",
-          bool(idx), idx)
-    check("it is vector_l2_ops while the query ranks with `<=>` (cosine) — THE REAL CAUSE", is_l2,
-          "an L2 index cannot serve a cosine query, at ANY row count. NOT a small-corpus effect: "
-          "a cosine-opclass index IS selected at 4 rows (measured). See migration 0009.")
-    check("plan is therefore a FULL SCAN and the vector index is NOT used",
-          full_scan and not used_vector_index,
-          "consistent with the opclass mismatch above" if full_scan and not used_vector_index
-          else "THE PLAN CHANGED — if the opclass was fixed, retrieval is now APPROXIMATE where it "
-               "was EXACT, and Item 4's Gate 0 + Item 8's golden set must be re-measured. That is a "
-               "decision, not a drift.")
+    check("typology_corpus carries NO vector index (migration 0010 dropped the dead one)",
+          not vector_idx,
+          "the index was (embedding vector_l2_ops) — an L2 index cannot serve the `<=>` cosine "
+          "query this table exists for, at ANY row count, so it had never once been selected. "
+          "Flipping the opclass would NOT have fixed it: a vector index needs its PREFIX columns "
+          "constrained, `(embedding)` has none, and the real query filters `WHERE source = :source`."
+          if not vector_idx else
+          f"A VECTOR INDEX IS BACK ON THIS TABLE: {vector_idx}. If that is deliberate, retrieval may "
+          f"now be APPROXIMATE where it was EXACT — Item 4's Gate 0 is a set-membership test on the "
+          f"top-3 of a k=3 retrieval over 4 documents, and Item 8's golden set was built against "
+          f"exact retrieval. Re-measure with scripts/probe_vector_opclass.py. That is a decision, "
+          f"not a detail.")
+    check("and the retrieval is therefore EXACT — no `vector search` node in the plan",
+          "vector search" not in plan,
+          "the planner scans all 4 rows and top-k sorts them: at this size that is not merely "
+          "acceptable, it is the correct plan, and it is the one the planner was choosing all along.")
 
     # ---- 6. structural isolation: no FK touches typology_corpus ------------------------------
     async with engine.connect() as c:
