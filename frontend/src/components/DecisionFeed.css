@@ -229,3 +229,115 @@
   font-family: var(--font-mono);
   color: var(--bone);
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * THE BASIS — the witness outcome behind an AML decision.
+ *
+ * COLD, ALL THREE. It is deliberately NOT the --alive/--alert vocabulary: those already mean
+ * healthy/stale and fraud, and colouring the basis with them would fuse "the graph found a
+ * structure" with "this is fraud" — the oracle-boundary collapse in colour form, and the exact
+ * mistake the AML console must not make. The basis is a statement of evidentiary standing, like
+ * the honesty ledger's provenance tags, so it takes the same cold register.
+ *
+ * MATCH is the only one that carries emphasis (--bone), because it is the only one where the graph
+ * actually produced a witness. "no cycle" and "inconclusive" are BOTH approvals and must not read
+ * as the same thing — so inconclusive is ruled, not filled: it is the 65.3% that means "we could
+ * not determine", and it must never look like a clean pass.
+ * --------------------------------------------------------------------------------------------- */
+.feed__basis {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  color: var(--ash);
+  white-space: nowrap;
+}
+
+/* The graph re-derived a real ring. The one basis with a witness behind it. */
+.feed__basis--match {
+  color: var(--bone);
+  border-color: var(--ash);
+  background: var(--surface-2);
+}
+
+/* Searched (16) or structurally inert (447 self-loops) — either way, no cycle. Quiet. */
+.feed__basis--conclusive_no {
+  color: var(--ash);
+}
+
+/* "We could not determine." Dashed, because the answer is genuinely open — the search ran off the
+   edge of the extract. 65.3% of the seam, and it must never render as a clean approval. */
+.feed__basis--inconclusive {
+  color: var(--ghost);
+  border-style: dashed;
+  border-color: var(--ash);
+}
+
+/* The basis row sits under the kind row; it appears only under `kind=aml`. */
+.feed__filter--basis {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * LOAD MORE. The feed is a bounded window over the one table designed to grow, so it states how
+ * much of the match it is NOT showing. Silence here is what hid 1,300 AML decisions — and 50 of
+ * the 57 rings — behind a page that looked complete.
+ * --------------------------------------------------------------------------------------------- */
+.feed__more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+
+.feed__more-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--ash);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--bone);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.feed__more-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.feed__more-btn:disabled {
+  color: var(--ash);
+  border-color: var(--line);
+  cursor: default;
+}
+
+.feed__more-btn:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
+/* The denominator is data. Mono, tabular, like every number in this console. */
+.feed__more-n,
+.feed__more-done {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed__more-done {
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
