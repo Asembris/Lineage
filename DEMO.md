@@ -290,7 +290,9 @@ met**, seven generations up a spine of dead agents. Every hop is a real row.
 
 > **The honest limit, quoted with the decisions it belongs to** — as it must be, every time.
 > Of azure-7's 1,500 decisions the witness could **MATCH** only **57**. It returned `CONCLUSIVE_NO`
-> on **463** (searched; there is no cycle) and **`INCONCLUSIVE` on 980 — a 65.3%
+> on **463** (*there is no cycle* — though only **16** of those were actually **searched**; the other
+> **447 are self-loops**, an account paying itself, which is not a transfer and is excluded from the
+> graph's adjacency, so no search ever ran) and **`INCONCLUSIVE` on 980 — a 65.3%
 > could-not-determine rate** — because the search ran off the edge of the 1,500-edge extract.
 > `INCONCLUSIVE → approve` is a **disclosed modeling choice**, not a corner case: it silently
 > approves **252 of the extract's 300 laundering rows**. Every decision carries `witness_outcome`

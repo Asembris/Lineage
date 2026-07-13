@@ -67,7 +67,8 @@ Consequently `recompute_belief_performance` is NEVER called for this belief. Ite
 For an AML decision the real transaction reference is the `aml_transaction_id` FK, so `txn_ref`
 (NOT NULL, free-form) is redundant as a reference and free to carry the decision's BASIS:
 `aml:MATCH` | `aml:CONCLUSIVE_NO` | `aml:INCONCLUSIVE`. This matters because TWO outcomes map to
-`approve`, so the verdict alone cannot distinguish "we searched and there is no cycle" (463 edges)
+`approve`, so the verdict alone cannot distinguish "there is no cycle" (463 edges — of which only
+16 were actually SEARCHED; the other 447 are self-loops, where no search was possible at all)
 from "we could not tell" (980 edges, 65.3%, silently approving 252 of the 300 laundering rows).
 Without this, that split is recoverable only by re-running the witness — i.e. only by someone who
 already knows to look. With it, the most important caveat about this belief is one GROUP BY away:

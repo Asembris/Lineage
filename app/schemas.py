@@ -291,12 +291,31 @@ class DecisionOut(BaseModel):
 
         witness_outcome   verdict    edges   share    of which laundering
         MATCH             blocked       57    3.8%     43   a real directed cycle, re-derived
-        CONCLUSIVE_NO     approve      463   30.9%      5   searched; there is no cycle
+        CONCLUSIVE_NO     approve      463   30.9%      5   no cycle — but only 16 of these were
+                                                            SEARCHED; 447 are self-loops, where no
+                                                            search was ever possible (see below)
         INCONCLUSIVE      approve      980   65.3%    252   COULD NOT TELL — the search ran off
                                                             the edge of the 1,500-edge extract
 
     So of the belief's 1,443 approvals, **980 (65.3% of the whole extract) are not "this is clean" —
     they are "we could not determine", silently approving 252 of the extract's 300 laundering rows.**
+
+    AND `CONCLUSIVE_NO` IS NOT ONE THING. Its long-standing gloss — *"searched; there is no cycle"* —
+    is true of **16** of the 463. The other **447 are SELF-LOOPS**: an account paying itself, which is
+    not a transfer between two accounts, so `aml_graph.Graph` excludes it from adjacency by
+    construction and **no search ever ran**. The outcome count was never wrong; its description of
+    itself was. The basis is therefore FOUR-way, and the wire already carries the distinction —
+    `GET /aml/transactions/{id}/interrogate` serves a `detail` string per witness:
+
+        447x  CONCLUSIVE_NO  "self-loop is not a transfer cycle"          <- no search possible
+         16x  CONCLUSIVE_NO  "no return path; search closed inside the extract"
+        980x  INCONCLUSIVE   "search reached an account whose outgoing edges are not in this extract"
+
+    `witness_outcome` below stays THREE-valued on purpose: self-loop-vs-closed-search is a property of
+    the EVIDENCE, re-derived from the graph, not of what the agent RECORDED. Serving it here would be
+    the decision surface re-deriving a fact about the evidence layer. It belongs to /interrogate.
+    (Measured by scripts/probe_conclusive_no.py; asserted by tests/test_decision_read_surface.py::
+    test_the_conclusive_no_decomposition_is_447_selfloops_and_16_closed_searches.)
     Mapping "cannot corroborate" -> `approve` is a DISCLOSED MODELING CHOICE (a real system lets a
     payment through absent evidence), not a corner case, and this proportion must travel with every
     quote of these decisions.

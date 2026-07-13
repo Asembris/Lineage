@@ -365,6 +365,94 @@ def test_the_conclusive_no_decomposition_is_447_selfloops_and_16_closed_searches
     assert len(TXN_REF_TAGS) == 3
 
 
+def test_the_conclusive_no_decomposition_reaches_the_openapi_schema():
+    """A caller who only ever sees /openapi.json must not be told that 463 searches happened.
+
+    The sibling of test_the_disclosure_reaches_the_openapi_schema, for the same audience and the
+    same reason: the DTO docstring IS the read surface's disclosure, and it was the surface carrying
+    the false gloss furthest — straight into the machine-readable schema.
+    """
+    schema = app.openapi()["components"]["schemas"]["DecisionOut"]
+    blurb = schema.get("description", "")
+    assert str(CONCLUSIVE_NO_SELF_LOOPS) in blurb, "the 447 self-loops must be disclosed"
+    assert str(CONCLUSIVE_NO_CLOSED_SEARCHES) in blurb, "the 16 real closed searches must be named"
+    assert "self-loop" in blurb
+
+
+# The surfaces a reader meets. NOTES.md is deliberately NOT swept: it is an append-only engineering
+# log whose historical entries quote the old, wrong gloss ON PURPOSE, and rewriting history to
+# satisfy a grep would be the actual dishonesty. Same exclusion, same reason, as
+# tests/test_restore_instructions.py.
+_SWEPT = (
+    sorted((Path(__file__).resolve().parents[1] / "app").rglob("*.py"))
+    + sorted((Path(__file__).resolve().parents[1] / "seed").rglob("*.py"))
+    + sorted((Path(__file__).resolve().parents[1] / "scripts").rglob("*.py"))
+    + sorted((Path(__file__).resolve().parents[1] / "frontend" / "src").rglob("*.ts"))
+    + sorted((Path(__file__).resolve().parents[1] / "frontend" / "src").rglob("*.tsx"))
+    + [Path(__file__).resolve().parents[1] / d for d in ("README.md", "DEMO.md", "ARCHITECTURE.md")]
+)
+
+_SUBJECT = re.compile(r"CONCLUSIVE_NO|\b463\b")
+_GLOSS = re.compile(r"\bsearch(ed|es|ing)?\b|\bno cycle\b", re.I)
+_DISCLOSED = re.compile(r"self-?loop", re.I)
+# Code, not prose. A cycle-selection loop or a witness constructor mentions these tokens
+# incidentally and asserts nothing to a reader. Prose is what lies.
+_CODE = re.compile(r"^\s*(def |return |for |if |elif |else|\w+ = |\)|\()")
+
+
+def _paragraphs(path: Path):
+    """A paragraph is a run of consecutive non-blank lines, comment/quote markers stripped."""
+    buf, start = [], 0
+    for i, raw in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        line = re.sub(r'^\s*(#|//|\*|>|"""|\'\'\')?\s?', "", raw)
+        if line.strip():
+            if not buf:
+                start, first = i, raw
+            buf.append(line)
+        elif buf:
+            yield start, first, " ".join(buf)
+            buf = []
+    if buf:
+        yield start, first, " ".join(buf)
+
+
+def test_no_surface_describes_conclusive_no_as_463_searches():
+    """THE SAME-BREATH RULE, applied to the gloss. A paragraph that calls CONCLUSIVE_NO a search
+    must name the self-loops IN THAT PARAGRAPH — because 447 of the 463 never were one.
+
+    THE UNIT IS THE PARAGRAPH, AND THAT CHOICE IS THE WHOLE GUARD:
+      * a SENTENCE is too strict — it splits legitimate multi-sentence corrections;
+      * a FILE is THEATRE, and provably so: file-level containment would have PASSED the original
+        `aml_graph.py`, which glossed CONCLUSIVE_NO as a search at line 21 while naming self-loops
+        at line 31, ten lines away. A guard that cannot catch the bug it was written for is
+        decoration — this project has now caught that in itself three times (the 14-line proximity
+        window that passed its own bug; the guard that EXPLAINed a query the app never runs; and
+        `test_citations.py`, whose own docstring contained the disease it was written to cure).
+    So the invariant is the one the restore-instruction guard arrived at the hard way: the
+    disclosure must travel IN THE SAME BREATH as the claim, not merely somewhere in the building.
+
+    MADE TO TRIP: reverting any of the ten corrected sites fails here, naming the file and line.
+    """
+    violations: list[str] = []
+    for f in _SWEPT:
+        if "__pycache__" in f.parts or not f.exists():
+            continue
+        for line_no, first, prose in _paragraphs(f):
+            if _CODE.match(first):
+                continue
+            if _SUBJECT.search(prose) and _GLOSS.search(prose) and not _DISCLOSED.search(prose):
+                rel = f.relative_to(Path(__file__).resolve().parents[1]).as_posix()
+                violations.append(f"{rel}:{line_no}  {prose.strip()[:110]}")
+
+    assert not violations, (
+        "A SURFACE DESCRIBES `CONCLUSIVE_NO` AS A SEARCH THAT RAN, WITHOUT NAMING THE SELF-LOOPS.\n"
+        f"Only {CONCLUSIVE_NO_CLOSED_SEARCHES} of the 463 were searched; "
+        f"{CONCLUSIVE_NO_SELF_LOOPS} are self-loops, where no search was ever possible.\n  "
+        + "\n  ".join(violations)
+        + "\n\nName the self-loops in the SAME paragraph, or do not call it a search."
+    )
+
+
 def test_witness_outcome_projects_the_basis_through_http():
     """Each of the three outcomes survives the round trip to a caller, as a FIELD.
 

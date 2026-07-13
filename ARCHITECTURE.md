@@ -170,7 +170,10 @@ merely permitting NULLs, on purpose**: it makes a fabricated merchant and a fabr
 
 **The basis tag, and why the database defends it** (`txn_ref IN (...)`, added by **0008**). Two
 witness outcomes — `CONCLUSIVE_NO` and `INCONCLUSIVE` — both map to `approve`, so **the verdict alone
-cannot distinguish *"we searched and there is no cycle"* from *"we could not tell"*.* For an AML row
+cannot distinguish *"there is no cycle"* from *"we could not tell"*.* (And `CONCLUSIVE_NO` is itself
+two things: **447 of its 463 are self-loops**, an account paying itself, excluded from adjacency by
+construction, so **no search ever ran** — only **16** were genuinely searched and closed. Its gloss
+claimed otherwise for the whole life of the seam.) For an AML row
 the real reference is the FK, which frees `txn_ref` to carry the decision's **basis** instead. Nothing
 stopped a future backfill writing `txn_ref = str(txn_id)` — the obvious thing to write — silently
 destroying the only in-data carrier of the coverage split with no test failing. So 0008 pins the three
@@ -461,7 +464,7 @@ flowchart TD
     G1A -->|yes| GRAPH{"Gate 1b:<br/>recompute structure<br/>from UNLABELED edges"}
 
     GRAPH -->|MATCH| VER{"verify_witness_path<br/>re-derive cited path from rows"}
-    GRAPH -->|CONCLUSIVE_NO| NF["NO_FLAG<br/>(search closed, no sink)"]
+    GRAPH -->|CONCLUSIVE_NO| NF["NO_FLAG<br/>(no cycle: 16 searched-and-closed<br/>+ 447 self-loops, never searched)"]
     GRAPH -->|INCONCLUSIVE| INS3["INSUFFICIENT_COVERAGE<br/>search_reached_extract_boundary<br/>(boundary account named)"]
 
     VER -->|faithful| FLAG["FLAG ✓ witness required"]
@@ -476,7 +479,18 @@ Why three graph outcomes and not two: the evidence layer is a **bounded extract*
 cycle search found nothing" has two meanings. A negative is `CONCLUSIVE_NO` only if the search closed
 *without touching a sink*; if it hit one, the honest answer is `INSUFFICIENT_COVERAGE` and the
 boundary account is named. This — not a confidence threshold — is what genuine uncertainty means
-here.
+here. And a **third** kind of row lands in `CONCLUSIVE_NO` without any search at all — the
+**self-loop** — which is the majority of it; see immediately below.
+
+A **third** row lands in `CONCLUSIVE_NO` and is neither: a **self-loop** (an account paying itself),
+which is not a transfer between two accounts and is excluded from adjacency by construction, so no
+search runs at all. It is **447 of the 463** — the majority — and the outcome's own gloss described
+all of them as searches for the whole life of the seam. The `detail` string served by
+`/interrogate` is what tells the four apart (`"self-loop is not a transfer cycle"` ×447 ·
+`"no return path; search closed inside the extract"` ×16 · `"search reached an account whose
+outgoing edges are not in this extract"` ×980 · the three ring lengths ×57). The persisted
+`witness_outcome` stays three-valued on purpose: the self-loop split is a property of the
+**evidence**, re-derived from the graph, not of what the agent **recorded**.
 
 What the brake deliberately does **not** do:
 - **It never reads a label.** `aml_graph.py` recomputes structure from the unlabeled edge set and

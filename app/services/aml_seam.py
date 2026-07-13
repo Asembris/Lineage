@@ -24,8 +24,9 @@ The frozen `cycle_witness` returns one of three outcomes, and the payment vocabu
 (`approve|decline|blocked`) has only two useful slots. The mapping:
 
     MATCH          -> blocked   the witness re-derived a real directed cycle. Corroborated.
-    CONCLUSIVE_NO  -> approve   the search closed WITHOUT touching the edge of the extract.
-                                The absence of a cycle is a fact about the world.
+    CONCLUSIVE_NO  -> approve   there is no cycle, and that is a fact about the world rather than
+                                about our slice. BUT SEE BELOW: only 16 of these 463 were actually
+                                SEARCHED; 447 are self-loops, where no search was possible.
     INCONCLUSIVE   -> approve   the search ran into a SINK. "No cycle" and "the cycle leaves our
                                 extract" are indistinguishable, so the honest answer is
                                 "cannot determine" — and we let the payment through.
@@ -51,6 +52,26 @@ decisions — it is the single most important caveat about this belief, not a fo
 (Do NOT restate this as "728 / 48.5%". 728 is the BENIGN-ONLY inconclusive subset. That
 understated figure has now been introduced into this project twice and corrected twice; it is
 carried here, in the decider itself, precisely so it stops being easy to get wrong.)
+
+CONCLUSIVE_NO'S 463 IS ALSO NOT WHAT ITS OWN GLOSS SAID (measured by
+scripts/probe_conclusive_no.py; asserted by tests/test_decision_read_surface.py::
+test_the_conclusive_no_decomposition_is_447_selfloops_and_16_closed_searches):
+
+    self-loops                     447  (96.5% of CONCLUSIVE_NO)  NO SEARCH EVER RAN — an account
+                                                                  paying itself is not a transfer,
+                                                                  so `aml_graph.Graph` excludes it
+                                                                  from adjacency by construction
+    real transfers, search closed   16  ( 3.5%)                   the only rows for which
+                                                                  "we searched and there is no
+                                                                  cycle" is literally true
+
+For the whole life of the seam this outcome was glossed as *"searched; there is no cycle"* — in
+this docstring, in the DTO's, in README, in DEMO's Bridge beat, in the honesty ledger. **The count
+was never wrong. Its description of itself was.** That is the THIRD corruption this number has
+attracted, and it completes the set: the phantom 728 MISSTATED ITS VALUE; the phantom
+`scripts/verify_seam.py` INVENTED ITS PROVENANCE; this one MISDESCRIBED ITS OWN COMPLEMENT. Prose
+has now failed it in all three available ways, which is why the correction is a test and not a
+sentence.
 
 BECAUSE THE THIRD LINE EXISTS, THE VERDICT ALONE DOES NOT SAY WHY. So `SeamDecision` carries the
 witness outcome, and the backfill persists it in `decisions.txn_ref` — making the coverage split
@@ -126,8 +147,9 @@ class SeamDecision:
     """One label-free decision about one real AML transaction.
 
     `witness_outcome` is the BASIS, and it is not decoration: with two outcomes mapping to
-    `approve`, the verdict alone cannot distinguish "we searched and there is no cycle" from
-    "we could not tell". Persisting it is what keeps the 65.3% honest in the data itself.
+    `approve`, the verdict alone cannot distinguish "there is no cycle" (CONCLUSIVE_NO — of which
+    447 of 463 are self-loops that were never searched at all) from "we could not tell"
+    (INCONCLUSIVE, 65.3%). Persisting it is what keeps the 65.3% honest in the data itself.
     """
 
     txn_id: uuid.UUID
