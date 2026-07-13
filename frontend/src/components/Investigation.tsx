@@ -14,6 +14,7 @@ import type { UUID } from "../api/types";
 import { fragId, formatAmount, formatConfidence, formatDate, splitInstant } from "../lib/format";
 import { TimeTravel } from "./TimeTravel";
 import { InvalidateBlock, type InvalidateHandlers } from "./Invalidate";
+import { isInvalidateControl } from "../lib/invalidate";
 import "./Investigation.css";
 
 /** UI-facing view of the App's trace state (App owns the real state/animation). */
@@ -162,6 +163,9 @@ function TraceBlock({ inv, handlers }: { inv: InvestigationData; handlers: Trace
   );
 }
 
+/* The belief that drove the decision, its provenance, and the two READ interactions (Trace,
+   Time-travel). The one WRITE — Invalidate — is deliberately NOT here: it is pinned in the
+   Investigation's footer, outside this scrolling region. See `.inv__actions`. */
 function DrivingBelief({
   inv,
   handlers,
@@ -218,7 +222,13 @@ function DrivingBelief({
       <InheritedBadge inv={inv} />
       <TraceBlock inv={inv} handlers={handlers} />
       <TimeTravel inv={inv} />
-      <InvalidateBlock belief={b} handlers={invalidateHandlers} />
+      {/* The certificate outcome is a RECEIPT, not a control: once the write has happened there is
+          nothing left to reach for, so it scrolls with the evidence rather than occupying the
+          pinned footer (a sha256 + S3 key + HLC would eat half the panel to no purpose). The
+          control states render in `.inv__actions` instead. */}
+      {!isInvalidateControl(invalidateHandlers.ui, b) && (
+        <InvalidateBlock belief={b} handlers={invalidateHandlers} />
+      )}
     </>
   );
 }
@@ -236,6 +246,11 @@ export function Investigation({
 }) {
   const d = inv.decision;
   const { date, time } = splitInstant(d.decided_at);
+  // CONTROLS ARE PINNED; EVIDENCE AND RECEIPTS SCROLL. The one irreversible governed write must be
+  // reachable without a scroll at every viewport — it was below the fold at laptop heights exactly
+  // when Time-travel was OPEN, i.e. precisely when the supervisor had looked at the evidence. The
+  // console made the kill-shot easy to reach while uninformed and hard to reach while informed.
+  const pinned = inv.belief !== null && isInvalidateControl(invalidateHandlers.ui, inv.belief);
 
   return (
     <div className="inv">
@@ -246,6 +261,10 @@ export function Investigation({
         </button>
       </div>
 
+      {/* The evidence. This — NOT the panel body — is the Investigation's scroll region, so the
+          footer below is a genuine sibling that can never overlay a focused control scrolling
+          under it (the hazard a `position: sticky` footer would have introduced). */}
+      <div className="inv__scroll">
       {/* The selected decision */}
       <section className="inspector__section inv__section">
         <div className="inv__decision">
@@ -289,6 +308,15 @@ export function Investigation({
         <h3 className="inspector__heading">Driving belief</h3>
         <DrivingBelief inv={inv} handlers={handlers} invalidateHandlers={invalidateHandlers} />
       </section>
+      </div>
+
+      {/* THE PINNED CONTROL. Outside the scroll region, so it is reachable at every viewport in
+          every state — including the one that used to hide it (Time-travel open). */}
+      {pinned && inv.belief && (
+        <div className="inv__actions">
+          <InvalidateBlock belief={inv.belief} handlers={invalidateHandlers} />
+        </div>
+      )}
     </div>
   );
 }

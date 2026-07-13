@@ -88,8 +88,17 @@
   color: var(--ghost);
 }
 
+/* THE ACTIONS STACK, AND THAT IS A SAFETY MECHANISM, NOT A STYLE CHOICE.
+   With the controls pinned, the arm button and the confirm button are both bottom-anchored in the
+   same footer — so side-by-side actions would put "Confirm invalidation" directly on the footprint
+   the arm button just occupied, and a second click of muscle memory would be an irreversible
+   fleet-wide write. Stacking puts CANCEL on that footprint instead: the remembered position is now
+   the SAFE action, and Confirm sits clear of it. DOM order (Confirm, Cancel) == visual order, so
+   tab order is unchanged and focus never jumps. The disjointness of the two rects is ASSERTED in
+   verification, not eyeballed. */
 .kill__actions {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
@@ -117,8 +126,10 @@
   cursor: default;
 }
 
+/* Full-width, so it covers the arm button's footprint EXACTLY — that coverage is the mechanism. */
 .kill__cancel {
   flex: 0 0 auto;
+  width: 100%;
   padding: 0.5rem 0.9rem;
   background: transparent;
   color: var(--ghost);
