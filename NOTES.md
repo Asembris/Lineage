@@ -6746,9 +6746,19 @@ be re-derived on every rebuild is not a fix.** `scripts/` already holds four com
   the port; do not debug the app.
 
 ### RUNG 1 GATE — all green
-- **187 backend tests pass** (185 prior + the decomposition assertion + the openapi disclosure; the
-  paragraph guard is the third new test). Citation, restore-instruction and oracle-boundary guards
-  all green.
+- **188 backend tests pass** (185 prior + the decomposition assertion, the openapi disclosure, and
+  the paragraph guard). Citation, restore-instruction and oracle-boundary guards all green.
+- **THE GLOSS GUARD CAUGHT ME A SECOND TIME, and only the FULL suite did.** `DecisionFeed.tsx`'s new
+  comments explained the basis chips and described `CONCLUSIVE_NO` without naming the self-loops —
+  written after my last guard run, caught by the next. Targeted runs were green; the full suite was
+  not. *Run the guard after the last edit, not after the last edit you remember making.*
+- **And the guard's FIRST DRAFT was wrong in a way that taught something.** It also flagged the JSX
+  rendering the *corrected* label `"no cycle"` — because the pattern matched that phrase. But *"there
+  is no cycle"* is **TRUE of all 463**: a self-loop cannot form one either. The falsehood was never
+  "no cycle"; it was **"SEARCHED; no cycle"**. Tightened to search-language alone, which made the
+  guard both more precise AND more correct about what the bug actually was. Verified NOT toothless
+  afterwards rather than assumed: reverting ARCHITECTURE's mermaid node still fails at
+  `ARCHITECTURE.md:466`.
 - `tsc --noEmit`, `oxlint` (zero warnings), `vite build` — all exit 0.
 - **DRIVEN LIVE** (vite -> uvicorn -> live cluster, 1280x800 and 1440x900, **both harness traps
   cleared before any rendered result was trusted**): all 1,500 AML decisions reachable in 7 "load
