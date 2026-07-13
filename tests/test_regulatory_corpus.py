@@ -303,21 +303,36 @@ def test_the_deciding_path_never_imports_the_regulatory_corpus():
 # ==================== CATALOG TESTS — schema only, never data ====================
 
 @pytest.mark.asyncio
-async def test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_l2():
-    """THE DEFECT AND THE FIX, BOTH PINNED — read from the live catalog, not from a migration file.
+async def test_exactly_one_vector_index_exists_and_it_is_the_one_that_works():
+    """THE WHOLE VECTOR-INDEX STORY, PINNED — read from the live catalog, never from a migration.
 
-    CockroachDB's default vector opclass is `vector_l2_ops`, which accelerates `<->` ONLY. Both
-    pre-existing indexes were created with a bare `CREATE VECTOR INDEX ... (embedding)` and are
-    therefore L2 — while BOTH of their queries (`agent_brain._retrieve_beliefs`,
-    `corpus._retrieval_sql`) rank with `<=>`, COSINE. Neither index has ever been selected by the
-    planner, at ANY row count. Item 3 recorded the true FULL-SCAN observation with a false cause
-    ("only 4 rows"); a cosine-opclass index over 4 rows IS selected, measured.
+    This test used to pin the OPPOSITE state (`..._and_the_two_legacy_ones_are_still_l2`). It was
+    written to FAIL the day someone touched the two dead indexes, so that the change could not
+    happen silently. It did its job: migration 0010 is that day, and this is the decision it forced.
 
-    The two L2 indexes are pinned AS L2 deliberately. Flipping them makes retrieval APPROXIMATE
-    where it is currently EXACT, which is a live behavioural change to Item 4's Gate 0 (which three
-    of four documents come back) and to Item 8's golden set. That switch needs its own before/after
-    measurement and is DEFERRED to its own gated session. When it happens, this test fails — and it
-    should, because that is a decision, not a detail.
+    THE HISTORY, because it is the reason this project distrusts its own documents:
+      * `beliefs` (0002) and `typology_corpus` (0005) were created with a bare
+        `CREATE VECTOR INDEX ... (embedding)`. CockroachDB's default opclass is `vector_l2_ops`,
+        which accelerates the L2 operator `<->` ONLY — while BOTH of their queries rank with `<=>`,
+        COSINE. Neither index was ever selected by the planner. Not at 4 rows. Not ever.
+      * Item 3 recorded the true FULL-SCAN observation with an INVENTED cause ("only 4 rows"), and a
+        green check stood behind it for months.
+      * The correction that replaced it then claimed `typology_corpus`'s query "has no WHERE and no
+        JOIN", so an opclass flip would revive the index. That was ALSO false: every one of the 12
+        row-returning `retrieve_typology()` call sites passes `source=SOURCE`, so the real query
+        filters `WHERE source = :source`, and a vector index needs its PREFIX columns constrained.
+        `(embedding)` has none. The flip changes NO PLAN.
+
+    So neither index could be repaired by the repair everyone assumed. They were DROPPED (0010).
+    The one that could have been made to work — `typology_corpus` via a `(source, embedding
+    vector_cosine_ops)` prefix index — was rejected on purpose: it activates an APPROXIMATE C-SPANN
+    search, and Item 4's Gate 0 is a set-membership test on exactly the top-3 of a k=3 retrieval over
+    a FOUR-document corpus. Measured safe today (scripts/probe_vector_opclass.py: 0 top-3 changes
+    over 1,572 adversarial queries AND over the real agent queries) — but safe only because 4 rows
+    sit in ONE C-SPANN partition. That is luck of scale, not a property of the design.
+
+    What is left is checkable and true: THREE vector indexes were declared, TWO could never be used
+    by their own queries, they are gone, and the ONE that works remains.
     """
     async with engine.connect() as c:
         found: dict[str, str] = {}
@@ -327,11 +342,20 @@ async def test_the_new_vector_index_is_cosine_and_the_two_legacy_ones_are_still_
                 if "VECTOR INDEX" in line:
                     found[table] = line.strip()
 
-    assert "vector_l2_ops" in found["beliefs"], found["beliefs"]
-    assert "vector_l2_ops" in found["typology_corpus"], found["typology_corpus"]
-    assert "vector_cosine_ops" in found["regulatory_corpus"], (
-        "regulatory_corpus's index is NOT cosine — so it can never serve the `<=>` query it exists "
-        f"for, and it is as dead as the other two: {found.get('regulatory_corpus')}"
+    for dead in ("beliefs", "typology_corpus"):
+        assert dead not in found, (
+            f"A VECTOR INDEX IS BACK ON `{dead}`: {found.get(dead)}\n"
+            f"Migration 0010 dropped it because NO query in this system can use it — its WHERE "
+            f"clause is not a prefix constraint, so the planner cannot select it whatever the "
+            f"opclass. If you have made it selectable, you have made retrieval APPROXIMATE where it "
+            f"was EXACT. For typology_corpus that silently changes the brake's input (Item 4's "
+            f"Gate 0 reads the top-3 of a 4-document corpus) and invalidates Item 8's golden set. "
+            f"Re-measure with scripts/probe_vector_opclass.py before you accept this."
+        )
+
+    assert "vector_cosine_ops" in found.get("regulatory_corpus", ""), (
+        "regulatory_corpus's index is NOT cosine — so it cannot serve the `<=>` query it exists "
+        f"for, and this project is back to ZERO working vector indexes: {found.get('regulatory_corpus')}"
     )
 
 
