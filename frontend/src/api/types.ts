@@ -108,6 +108,11 @@ export interface LineageResponse {
  */
 export type WitnessOutcome = "MATCH" | "CONCLUSIVE_NO" | "INCONCLUSIVE";
 
+/** The two kinds of decision the fleet makes. This is a STRUCTURAL distinction, not a UI
+ *  convention: migration 0007's `ck_decisions_kind` CHECK makes a mislabelled row unwritable, and
+ *  `GET /decisions?kind=` 422s on anything else rather than serving a silent empty page. */
+export type DecisionKind = "card" | "aml";
+
 export interface Decision {
   id: UUID;
   agent_id: UUID;

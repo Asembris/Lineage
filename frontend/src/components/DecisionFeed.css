@@ -164,3 +164,68 @@
   color: var(--ghost);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- The kind filter ------------------------------------------------------------------------
+   Cold vocabulary only (--ash / --bone / --line). A filter is a lens, not a state of alarm, so it
+   spends NO signal colour: --alert stays fraud's, and the trace warmth stays Trace's. The selected
+   chip is distinguished by weight and a raised surface, the same way a selected feed row is.
+   Each chip carries its REAL cluster count, so the kind you are not looking at is still visibly
+   there — the whole reason this filter exists (see DecisionFeed.tsx). */
+.feed__filter {
+  display: flex;
+  gap: 6px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+
+.feed__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ash);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.feed__chip:hover {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+.feed__chip--on {
+  background: var(--surface-2);
+  border-color: var(--ash);
+  color: var(--bone);
+}
+
+.feed__chip:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
+/* The count is data, so it is mono like every other number in this console. */
+.feed__chip-n {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed__chip--on .feed__chip-n {
+  color: var(--bone);
+}
+
+/* Names the empty filter's kind in the same register as the chip that selected it. */
+.feed__chip-inline {
+  font-family: var(--font-mono);
+  color: var(--bone);
+}

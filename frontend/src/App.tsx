@@ -14,7 +14,7 @@ import { deriveChain } from "./lib/trace";
 import { SUPERVISOR_ACTOR } from "./lib/supervisor";
 import { ApiError, getBeliefLineage, invalidateBelief } from "./api/client";
 import { formatCount } from "./lib/format";
-import type { InvalidateResponse, LineageResponse, UUID } from "./api/types";
+import type { DecisionKind, InvalidateResponse, LineageResponse, UUID } from "./api/types";
 import "./App.css";
 
 /*
@@ -94,7 +94,11 @@ function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["a
 type View = "console" | "consistency" | "ledger";
 
 function App() {
-  const { agents, decisions, beliefs } = useConsoleData();
+  // The feed's kind filter. null = unfiltered, and that is the deliberate default: the console
+  // does not pre-filter the fleet's record for the supervisor. See DecisionFeed's header for why
+  // the filter had to exist at all (the fixed AML `decided_at` buried every card decision).
+  const [kind, setKind] = useState<DecisionKind | null>(null);
+  const { agents, decisions, beliefs, counts } = useConsoleData(kind);
   const [view, setView] = useState<View>("console");
 
   // Investigate: which decision is under investigation (null = none). Clicking a
@@ -103,6 +107,13 @@ function App() {
   const [selectedId, setSelectedId] = useState<UUID | null>(null);
   const onSelect = (id: UUID) =>
     setSelectedId((cur) => (cur === id ? null : id));
+
+  // Changing the filter can drop the investigated row out of the loaded feed, and an investigation
+  // whose decision is no longer on screen is a stale surface. Clear it with the filter.
+  const onKind = (k: DecisionKind | null) => {
+    setKind(k);
+    setSelectedId(null);
+  };
   const investigation = resolveInvestigation(selectedId, decisions, agents, beliefs);
 
   // Trace state. Changing the investigated decision resets any active trace so a
@@ -216,8 +227,10 @@ function App() {
             ? { status: "empty" }
             : { status: "idle" };
 
-  // Feed header count is honest about the bounding: loaded / cluster total. The
-  // feed shows the most-recent page (limit 200), not every row.
+  // Feed header count is honest about the bounding: loaded / total. The feed shows the most-recent
+  // page (limit 200), not every row. Under a kind filter the denominator is that kind's real total
+  // (the backend counts it), so the ratio never overstates what is on screen; the chips carry the
+  // other kinds' counts so the cluster-wide picture stays visible.
   const decisionCount =
     decisions.status === "ready"
       ? `${formatCount(decisions.data.decisions.length)} / ${formatCount(decisions.data.total)}`
@@ -270,7 +283,14 @@ function App() {
             <Panel title="Decision feed" count={decisionCount}>
               <Loaded state={decisions} loadingLabel="Loading decisions…">
                 {(data) => (
-                  <DecisionFeed data={data} selectedId={selectedId} onSelect={onSelect} />
+                  <DecisionFeed
+                    data={data}
+                    selectedId={selectedId}
+                    onSelect={onSelect}
+                    kind={kind}
+                    onKind={onKind}
+                    counts={counts}
+                  />
                 )}
               </Loaded>
             </Panel>

@@ -32,34 +32,15 @@ import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsole
 import type { ProvenanceAuditResponse, UUID, WitnessOutcome } from "../api/types";
 import { countDecisions, getBeliefPerformance, getProvenanceAudit } from "../api/client";
 import { formatCount } from "../lib/format";
+import { RestoreHint } from "./RestoreHint";
 import "./HonestyLedger.css";
 
 const DASH = "—";
 
-/** THE RESTORE PROCEDURE HAS EXACTLY ONE DEFINITION IN THIS COMPONENT, AND THIS IS IT.
- *
- * A FIFTH AND SIXTH INSTRUCTION SITE were found here by the pre-push sweep (2026-07-13), and they
- * are the worst class: **rendered in the product**, inside the honesty ledger — the one surface
- * whose entire job is to be trustworthy. Each named a SINGLE command:
- *
- *   * the `decisions` row's empty state said "run seed.backfill_decisions" — which restores the
- *     CARD world and silently leaves the grounding seam empty, so the seam census row directly
- *     ABOVE it stays `—`. That is precisely the destructive half-restore the DEMO reset note was
- *     fixed for, reproduced in the UI;
- *   * the seam row's empty state said "run seed.backfill_aml_decisions" — which, run alone,
- *     REFUSES with exit 1, because the card backfill has not gone first.
- *
- * Restore instructions in this repo have now lied FOUR times. The defence is not a better
- * sentence, it is a single definition: both empty states render THIS, and it says the same two
- * ordered commands as README's setup block, DEMO's pre-flight, DEMO's reset note, and the ledger
- * note above. There is exactly one way to rebuild this world. A seventh site is a bug.
- */
-const RestoreHint = () => (
-  <>
-    empty — run <code>seed.backfill_decisions</code> → <code>seed.backfill_aml_decisions</code>, in
-    that order (the first alone leaves the seam empty; the second alone refuses)
-  </>
-);
+/* The restore procedure's ONE definition now lives in ./RestoreHint — it moved out of this
+ * component when a SEVENTH instruction site turned up in DecisionFeed's empty state ("rerun the
+ * backfill", singular: the destructive half-restore). The ledger's two empty states render the
+ * same imported definition they always did; see RestoreHint.tsx for the full history. */
 
 /** One ledger row. `note` is prose faithful to the README. `mode` is the provenance
  *  marker; `liveKey` (present only when mode==="live") selects which computed value the
