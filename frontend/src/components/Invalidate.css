@@ -70,6 +70,21 @@
   }
 }
 
+/* THE RULE BEING DELETED — the sentence, not the hash. Set in the belief's own voice (body face,
+   --bone, quoted behind an --alert rule) so it reads as the THING under the knife, distinct from
+   the scope copy below, which is the CONSEQUENCE. Rendered in full: no line-clamp, no ellipsis,
+   no max-height. Truncating the sentence a supervisor is about to irreversibly delete would be a
+   lie of omission at the exact moment the stakes peak. */
+.kill__rule {
+  margin: 0 0 0.6rem;
+  padding: 0.4rem 0 0.4rem 0.6rem;
+  border-left: 2px solid var(--alert);
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--bone);
+}
+
 .kill__warn {
   margin: 0 0 0.6rem;
   font-size: 0.82rem;
