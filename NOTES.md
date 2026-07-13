@@ -6614,3 +6614,173 @@ Closing it properly means Playwright in frontend CI — its own plan-gated decis
 ### outcome; condensing the 96px curve (re-read "HEIGHT IS RESOLUTION" before re-proposing it); the
 ### AML console; the recorded video; `belief_performance` for the azure belief (step 4 stays CUT).
 ### Do NOT push without explicit approval — held for review of the result.
+
+## AML CONSOLE — RUNG 1: reachability, the basis, and the THIRD corruption of the 65.3% (2026-07-13)
+
+The first rung of the AML-console ladder (the investigation + the ladder proposal were the prior
+session). Scope: reachability and legibility only. **No witness pixel, no new endpoint, no
+composition guard** — that ships in Rung 2, with the first witness, and it is the most important
+thing in the whole ladder.
+
+### THE INVESTIGATION'S LOAD-BEARING FINDINGS (all measured, none inherited)
+- **85.8% of transactions have NOTHING structural to draw** (1,287 of 1,500 have zero matching
+  witnesses). The ring is the EXCEPTION, not the headline: GATHER-SCATTER BUNDLE 107 · CYCLE RING
+  57 · SCATTER-GATHER LEGS 42 · STACK BUNDLE 35. **The negative space IS the product.**
+- **All 980 INCONCLUSIVE name a boundary account (980/980).** So "we ran off the edge of the data"
+  is always renderable as a place, and CONCLUSIVE_NO never has one. The categorical difference the
+  console must not collapse is already total in the data.
+- For a non-MATCH subject, `/interrogate` returns `transactions: 1` (the subject itself) and 1-3
+  accounts. **There is no graph on the wire for 96.2% of subjects.** `aml_evidence.neighbourhood()`
+  holds the searched region (54-120 real edges) and **no route serves it.** That is the ONE place a
+  new endpoint could be justified — deferred to Rung 5, typographic-first, gated on looking at a
+  render rather than on reasoning about one (the posture that killed Items C and D).
+- **Entry needs NO new endpoint.** Every AML transaction has exactly one decision (1,500/1,500,
+  zero orphans), so the decision feed is a complete 1:1 index of the evidence layer — and it is the
+  *honest* entry, because it enters through the MOAT (where `is_fraud` legitimately lives) rather
+  than through `/aml`, whose whole discipline is that it does not go there.
+
+### ========== CONCLUSIVE_NO IS NOT ONE THING. THE THIRD CORRUPTION OF THE 65.3%. ==========
+The frozen census says `CONCLUSIVE_NO 463`, glossed everywhere as *"searched; there is no cycle"*.
+**That is true of 16 of them.** The other **447 are SELF-LOOPS** — an account paying itself, which
+is not a transfer between two accounts, so `aml_graph.Graph` excludes it from adjacency **by
+construction** and **no search ever ran**. The gloss invited a reader to picture a region that was
+explored and closed, for 96.5% of the rows where nothing was explored at all.
+
+**THE COUNT WAS NEVER WRONG. ITS DESCRIPTION OF ITSELF WAS.** And that completes the set: this
+number has now been corrupted by prose in every available way.
+
+| # | what was written | the failure |
+|---|---|---|
+| 1 | "INCONCLUSIVE is 728 / 48.5%" | **MISSTATED ITS VALUE** (728 is the benign-only subset) |
+| 2 | "measured ... (`scripts/verify_seam.py`)" | **INVENTED ITS PROVENANCE** (the script never existed) |
+| 3 | "CONCLUSIVE_NO 463 — searched; there is no cycle" | **MISDESCRIBED ITS OWN COMPLEMENT** |
+
+Prose has failed this number three times, in three different ways, and **only executable things
+have ever protected it.** So the correction is a test, not a sentence:
+`tests/test_decision_read_surface.py::test_the_conclusive_no_decomposition_is_447_selfloops_and_16_closed_searches`
+(re-derives 447/16 from the real extract), its `..._reaches_the_openapi_schema` sibling, and
+`scripts/probe_conclusive_no.py` — **committed BEFORE anything cited its number**, which is the
+four-fabricated-citations lesson applied rather than recited.
+
+**Ten sites corrected, and the sweep was run AS AN ASSERTION, NOT BY EYE** — which is the whole
+point, because it found a **TENTH site I had not listed**: `ARCHITECTURE.md`, twice (a mermaid node
+labelled `"search closed, no sink"`, and the three-outcomes section), plus `aml_seam`'s
+`SeamDecision` docstring, which my own hand-listed nine had missed. Two human sweeps of the restore
+instructions missed sites an assertion caught immediately. Same lesson, same payoff.
+
+### THE GUARD'S UNIT IS THE PARAGRAPH, AND THAT CHOICE **IS** THE GUARD
+`test_no_surface_describes_conclusive_no_as_463_searches` requires the self-loops to be named in the
+SAME PARAGRAPH as any claim that CONCLUSIVE_NO was searched.
+- **Sentence-level is too strict** — it splits legitimate multi-sentence corrections.
+- **FILE-level would be THEATRE, and provably so:** it would have **PASSED the original
+  `aml_graph.py`, which glossed CONCLUSIVE_NO as a search at line 21 while naming self-loops at
+  line 31** — ten lines away, in the same docstring. A guard that cannot catch the bug it was
+  written for is decoration, and this project has now caught that in itself three times (the
+  14-line proximity window that passed its own bug; the guard that EXPLAINed a query the
+  application never runs; and `test_citations.py`, whose own docstring carried the disease it was
+  written to cure).
+"Same breath" is the invariant the restore-instruction guard arrived at the hard way. This is it,
+applied again. **MADE TO TRIP:** reverting DEMO's Bridge beat fails with `DEMO.md:291`, by file and
+line.
+
+### THE PERSISTED BASIS STAYS THREE-WAY — the same boundary, defended twice now
+A future session WILL be tempted to "improve" the feed by serving the fourth state. **Do not.**
+Self-loop-vs-closed-search is a property of the **EVIDENCE**, re-derived from the graph. It is not
+a property of what the agent **RECORDED**. Serving `from_account_id == to_account_id` on
+`/decisions` would be the decision surface re-deriving a fact about the evidence layer — the *exact*
+conflation G5 refused when it declined to re-run the witness for `witness_outcome` (*"the persisted
+outcome is what the agent RECORDED at decision time; interrogate's outcome is a FRESH re-derivation
+from the current graph. They are different objects."*). The fourth state lives on `/interrogate`'s
+`detail` string, which already serves it, and it gets its **pixel in Rung 2**. Three-way in the feed
+(the record); four-way in the evidence pane (the re-derivation). Migration 0008's CHECK pins exactly
+three tags, and that is not an accident to route around.
+
+### REACHABILITY — 1,300 OF 1,500 WERE UNREACHABLE, INCLUDING 50 OF THE 57 RINGS
+The kind filter (last session) narrowed the feed correctly and then stopped at ONE PAGE (200, the
+backend max), with no offset paging. So the console reached **200 of 1,500** AML decisions — and
+with them 200 of the 1,500 money-flow transactions they cite 1:1. **50 of the 57 CYCLE rings were
+invisible to any user action:** the signature exhibit of the very surface being built, unreachable
+in 88% of its instances. Same shape as the bug the kind filter fixed — a surface that looks complete
+and silently is not. **Pagination is therefore load-bearing for Rung 3, not hygiene.** A signature
+animation you cannot navigate to is not a feature.
+
+**OFFSET PAGING IS ONLY SAFE BECAUSE THE SORT IS TOTAL — CHECKED, NOT ASSUMED.** All 1,500 AML rows
+share ONE `decided_at` (the base-rate-mirage guard), so `ORDER BY decided_at DESC` alone would be a
+non-total order, and LIMIT/OFFSET over it silently duplicates and skips rows — pagination that looks
+fine and loses transactions. `catalog.py` orders by `decided_at DESC, id DESC`, and `id` is unique.
+Driven: **8 pages, 1,500 rows, 1,500 distinct decision ids, 0 duplicates.**
+
+### FOUND BY DRIVING IT: 12 AML ROWS WERE VISUALLY IDENTICAL TO ANOTHER ROW
+The verification compared *rendered text* and came back **1488/1500 distinct**. That first read as a
+paging bug. **It was not** — the API returns 1,500 distinct ids. It was a real, different defect:
+**the feed never named what an AML decision was ABOUT.** `txn_ref` carries the BASIS for an AML row
+(`aml:INCONCLUSIVE`, per 0008), not a reference — the real reference is the FK — so every AML row
+rendered one shared timestamp, no merchant, no confidence, and the same basis string. Rows differing
+only in a repeated amount were indistinguishable: **12 of the 1,500.** The row now names the
+transaction (`txn 045adf`). Re-driven: **1500/1500.**
+
+*"tsc + build pass" is not "it renders" — and a check that only COUNTS is not a check that LOOKS.*
+
+### THE UVICORN LAUNCHER IS COMMITTED (`scripts/serve.py`) — it was scratchpad-only for two sessions
+`uvicorn app.main:app` creates its event loop BEFORE importing the app and re-sets the policy to
+Proactor, overriding `main.py`'s `WindowsSelectorEventLoopPolicy`. psycopg then raises
+`InterfaceError` and **every DB-backed route 500s while `/health` stays 200** — and a 500 carries no
+CORS header, so the browser blames CORS and you hunt a bug that does not exist. **MEASURED this
+session, not recited:** plain uvicorn -> `/health` **200**, `/decisions` **500**; through the
+launcher -> **200**. It lived in the gitignored scratchpad, was deleted between sessions, and was
+rediscovered from scratch each time while NOTES recorded the trap in prose. **A workaround that must
+be re-derived on every rebuild is not a fix.** `scripts/` already holds four committed probes
+(`probe_aml`, `probe_aws`, `probe_crdb`, `probe_hop_index`); this belongs beside them.
+
+### HARNESS GOTCHAS (banked — both cost real time)
+- **`git checkout -- <file>` to undo a deliberate trip ALSO destroys uncommitted legitimate work in
+  that file.** I broke `DEMO.md` to prove the gloss guard trips, reverted with `git checkout --`,
+  and silently lost my own fix to that same file — then committed with the guard RED. The guard
+  caught me immediately (it did its job on its author, which is now the fourth time this project has
+  recorded that); fixed by `--amend`. **Break a file only after its fix is staged**, or break a copy.
+- The zombie holding `:8000` was serving **current** code this session — verified with a field new
+  THIS SESSION (`447` / `self-loop` in `/openapi.json`), *not* with `witness_outcome`, which is old
+  and would have proven nothing. **A staleness check must use a field newer than the last thing you
+  believed.** A DB-backed route was separately confirmed 200 (the two traps are different failures).
+- vite silently moves to `:5174` when a stale server holds `:5173`, and CORS allows 5173 ONLY. Free
+  the port; do not debug the app.
+
+### RUNG 1 GATE — all green
+- **187 backend tests pass** (185 prior + the decomposition assertion + the openapi disclosure; the
+  paragraph guard is the third new test). Citation, restore-instruction and oracle-boundary guards
+  all green.
+- `tsc --noEmit`, `oxlint` (zero warnings), `vite build` — all exit 0.
+- **DRIVEN LIVE** (vite -> uvicorn -> live cluster, 1280x800 and 1440x900, **both harness traps
+  cleared before any rendered result was trusted**): all 1,500 AML decisions reachable in 7 "load
+  more" clicks; **1500/1500 distinct rows**; the 57 rings reachable under `basis=match`; the three
+  bases render **3 distinct** ways; **0 witness pixels** (Rung 1 ships none); a card filter hides the
+  basis chips and prints no restore hint; 0 horizontal overflow; **0 page errors**.
+- **COLOUR DISCIPLINE HELD.** The basis is COLD in all three states: MATCH filled `--bone` (the only
+  one with a witness behind it), no-cycle quiet `--ash`, INCONCLUSIVE **dashed** `--ghost` — because
+  *"we could not determine"* must never render as a clean pass. Using `--alert` would fuse "the graph
+  found a structure" with "this is fraud" — **the oracle-boundary collapse in colour form**, and
+  precisely the mistake this console exists to avoid. Warmth stays Trace's.
+- **Cluster restored** with both ordered backfills and INDEPENDENTLY re-verified with real SELECTs
+  (not a script's echo): 24 agents, 2 active beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500
+  AML), 8 crimson perf windows, `count(DISTINCT decided_at) = 1` for AML, 1,500 `aml_transactions`
+  (**NOT** re-ingested), crimson curve `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical,
+  census 57/463/980 reproduced. **The pytest suite wipes `decisions` — re-backfill after any run.**
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `feat(scripts): commit the uvicorn launcher that works around the Proactor trap`
+- `test(seam): the CONCLUSIVE_NO decomposition — 447 self-loops, 16 closed searches`
+- `feat(scripts): the probe behind the CONCLUSIVE_NO decomposition`
+- `fix(docs,api): CONCLUSIVE_NO is 447 self-loops + 16 closed searches, not 463 searches`
+- `feat(frontend): the AML feed reaches all 1,500 — offset pagination` — **carries the basis chips
+  too**: they thread the same props through the same three files, so splitting them would have
+  committed an intermediate state that does not compile. Recorded rather than faked.
+- `docs(notes): record Rung 1` (this entry)
+
+### RUNG 1 explicitly NOT done (and Rung 2's gate): the **COMPOSITION GUARD** — no component may
+### receive both an interrogation and a decision. It is the most important thing in this ladder and
+### it ships WITH the first witness pixel, never after: "the exam and the answer key are already in
+### the same component tree" (`DecisionFeed.tsx` and `Investigation.tsx` both already render
+### `is_fraud`, harmlessly, only because no witness is on screen yet). Also not done: any witness
+### rendering; the four-way basis in pixels; the `neighbourhood` endpoint (Rung 5, gated on looking
+### at a render); any change to the brake, the eval inputs, any measured constant, or the
+### invalidation flow; a second r3f use. Do NOT push without explicit approval.
