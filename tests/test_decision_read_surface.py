@@ -393,7 +393,11 @@ _SWEPT = (
 )
 
 _SUBJECT = re.compile(r"CONCLUSIVE_NO|\b463\b")
-_GLOSS = re.compile(r"\bsearch(ed|es|ing)?\b|\bno cycle\b", re.I)
+# THE FALSEHOOD IS THE CLAIM THAT A SEARCH RAN — and nothing else. "there is no cycle" is TRUE of
+# all 463 (self-loops cannot form one either), so matching that phrase would flag the corrected
+# label as if it were the bug. The first draft of this guard did exactly that, and getting it wrong
+# is what showed what the gloss actually was: not "no cycle", but "SEARCHED; no cycle".
+_GLOSS = re.compile(r"\bsearch(ed|es|ing)?\b", re.I)
 _DISCLOSED = re.compile(r"self-?loop", re.I)
 # Code, not prose. A cycle-selection loop or a witness constructor mentions these tokens
 # incidentally and asserts nothing to a reader. Prose is what lies.
