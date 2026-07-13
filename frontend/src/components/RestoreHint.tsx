@@ -21,13 +21,30 @@
  *     component renders. So the definition moved OUT of HonestyLedger and into this module, which
  *     is the only place the procedure is written down in the frontend.
  *
- * The defence is not a better sentence. It is one definition, imported. If you are about to write
- * a restore instruction anywhere in this app: import this instead.
+ *   * It was a bug again, and the EIGHTH site was the worst of all of them: the CONSISTENCY DEMO's
+ *     confirmation gate — the screen you read while agreeing to TRUNCATE AND RESEED the cluster —
+ *     said the fleet "will read empty until it is re-backfilled (`python -m seed.backfill_decisions`)".
+ *     One command, handed to the one operator GUARANTEED to need the procedure, at the moment of
+ *     maximum consequence, for a demo that destroys the AML decisions too. Following it leaves the
+ *     grounding seam dead.
+ *
+ * The defence is not a better sentence. It is one definition, imported — and now an executable
+ * assertion (`tests/test_restore_instructions.py`) that greps for the SHAPE across every doc and
+ * every component, so a ninth site fails CI instead of being found by the next sweep. If you are
+ * about to write a restore instruction anywhere in this app: import this instead.
  */
+
+/** The two ordered commands, and NOTHING else — composable into any sentence. Naming only the
+ *  first is the destructive half-restore; that is the bug this module exists to make unwritable. */
+export const RestoreCommands = () => (
+  <>
+    <code>python -m seed.backfill_decisions</code> → <code>python -m seed.backfill_aml_decisions</code>
+  </>
+);
 
 export const RestoreHint = () => (
   <>
-    empty — run <code>seed.backfill_decisions</code> → <code>seed.backfill_aml_decisions</code>, in
-    that order (the first alone leaves the seam empty; the second alone refuses)
+    empty — run <RestoreCommands />, in that order (the first alone leaves the seam empty; the
+    second alone refuses)
   </>
 );
