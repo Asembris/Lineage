@@ -135,7 +135,7 @@ const ROWS: RowSpec[] = [
       <>
         This row reads live because whether the cluster is currently populated depends on
         demo activity — the destructive invalidation demo consumes it. Restoring it is a{" "}
-        <b>three-command procedure, and the order is not free.</b>{" "}
+        <b>two-command procedure, and the order is not free.</b>{" "}
         <b>
           <code>python -m seed.backfill_decisions</code> alone is NOT a restore:
         </b>{" "}
@@ -143,27 +143,32 @@ const ROWS: RowSpec[] = [
         so on its own it repopulates the 4,000 card rows + 8 windows (curve conf 0.924 →
         0.528, byte-identical every run) <em>and silently destroys the 1,500 AML decisions
         in the grounding-seam row above.</em> Run{" "}
-        <code>backfill_decisions</code> → <code>backfill_aml_decisions</code> →{" "}
-        <code>embed_beliefs aml-cycle</code>, in that order.
+        <code>backfill_decisions</code> → <code>backfill_aml_decisions</code>, in that order.
+        (It was three commands until 2026-07-13; the third re-embedded the beliefs, and the
+        seed now plants their real vectors itself.)
       </>
     ),
   },
   {
     item: "Belief embedding vector",
-    label: "crimson: placeholder · azure: real",
+    label: "both real — a reseed can no longer undo it",
     mode: "static",
     note: (
       <>
-        Stated as it actually is on the live cluster, not as an intent. The <strong>crimson</strong>{" "}
-        belief's stored vector <strong>is still the deterministic placeholder</strong> (measured
-        cosine distance 0.000000000 from <code>seed.placeholder_embedding(1536)</code>); the{" "}
-        <strong>azure</strong> laundering belief carries a real{" "}
-        <code>text-embedding-3-small</code> vector. This is not a forgotten to-do:{" "}
-        <code>seed.seed()</code> re-plants the placeholder on every reseed, so anything{" "}
-        <code>scripts/embed_beliefs.py</code> writes is discarded by the next one — "just run
-        embed_beliefs" is not a fix, and closing it properly needs its own decision. Embeddings
-        drive vector <em>search</em>, never the staleness signal, so a placeholder is honest — but
-        the previous label ("placeholder → real") described a transition that had not happened.
+        <strong>This row was FALSE until 2026-07-13, and how it went false is the point.</strong> It
+        read <em>"crimson: placeholder · azure: real"</em> — but measured on the live cluster,{" "}
+        <strong>both</strong> beliefs sat at cosine distance <strong>0.000000000</strong> from{" "}
+        <code>seed.placeholder_embedding(1536)</code>. Both were placeholders. The cause was not
+        carelessness: <code>seed.seed()</code> re-planted the placeholder on <em>every</em> reseed,
+        and the fix was an <em>instruction</em> — "afterwards, run{" "}
+        <code>scripts/embed_beliefs.py</code>" — sitting third in a three-command restore procedure.
+        An instruction that must be remembered on every rebuild is not a fix, and this one failed
+        exactly as you would predict. <strong>The seed now plants the real</strong>{" "}
+        <code>text-embedding-3-small</code> <strong>vector itself</strong>, from a committed fixture
+        (<code>seed/belief_embeddings.json</code>), and the seed stays OpenAI-free.{" "}
+        <code>tests/test_belief_embeddings.py</code> reseeds the cluster and then <em>proves</em> the
+        stored vectors are not the placeholder — the regression is unrepresentable rather than
+        documented, and the restore procedure lost a command (three → two).
       </>
     ),
   },
@@ -212,41 +217,44 @@ const ROWS: RowSpec[] = [
     ),
   },
   {
-    item: "Vector indexes — 2 of the 3 have NEVER been used, and 2 of the 3 are STILL DEAD",
-    label: "shipped defect · 1 fixed · 2 deferred by decision, not repaired",
+    item: "Vector indexes — 2 of the 3 could never be used by their own queries. Dropped, not repaired",
+    label: "shipped defect · found, measured, corrected (migration 0010)",
     mode: "static",
     note: (
       <>
         The most damaging thing this project got wrong, and it survived every review because
         four documents agreed with each other and nobody ran the check.{" "}
         <b>
-          <code>beliefs</code> (migration 0002)
+          <code>beliefs</code> (0002)
         </b>{" "}
         and{" "}
         <b>
-          <code>typology_corpus</code> (migration 0005)
+          <code>typology_corpus</code> (0005)
         </b>{" "}
-        both declare a bare <code>CREATE VECTOR INDEX … (embedding)</code> — and CockroachDB's
-        default opclass is <code>vector_l2_ops</code>, which accelerates <code>&lt;-&gt;</code>{" "}
-        <em>only</em>. Both of their queries rank with cosine <code>&lt;=&gt;</code>. An L2 index
-        cannot serve a cosine query <em>at any row count</em>, so <b>neither has ever appeared in
-        a query plan, and neither does today</b>. The true observation ("the plan is a full scan")
-        had been recorded with a <b>false cause</b> ("only 4 rows") — in NOTES, in README, in
-        ARCHITECTURE, and in a <em>passing verification script</em>. Measured: a{" "}
-        <code>vector_cosine_ops</code> index <em>is</em> selected at 1,000 rows <em>and at 4</em>.
-        Row count was never the variable. Only{" "}
+        declared a bare <code>CREATE VECTOR INDEX … (embedding)</code>; CockroachDB's default
+        opclass is <code>vector_l2_ops</code>, which accelerates <code>&lt;-&gt;</code> <em>only</em>,
+        while both queries rank with cosine <code>&lt;=&gt;</code>. Neither index had <b>ever</b>{" "}
+        appeared in a query plan. The true observation ("the plan is a full scan") had been recorded
+        with a <b>false cause</b> ("only 4 rows") — in NOTES, in README, in ARCHITECTURE, and in a{" "}
+        <em>passing verification script</em>.{" "}
         <b>
-          <code>regulatory_corpus</code> (migration 0009)
+          The obvious repair — flip the opclass — is INERT, and believing otherwise was the second
+          false claim about this defect.
         </b>{" "}
-        is built <code>vector_cosine_ops</code>, and its index <b>is genuinely selected</b> (
-        <code>EXPLAIN</code> emits a real <code>vector search</code> node).{" "}
-        <b>Do not read this row as "fixed".</b> The other two are <b>deliberately still dead</b>:
-        switching them turns retrieval from <em>exact</em> into <em>approximate</em>, and Item 4's
-        Gate 0 depends on which three of four documents come back — a live change to the brake's
-        input and to Item 8's golden set, <b>which the whole test suite would stay green through</b>.
-        It gets its own gated session with a real before/after. Until then a test pins both as L2,
-        so it cannot happen by accident. Correctness is unaffected: every retrieval still returns
-        the right nearest neighbours, by full scan.
+        A CRDB vector index is selected only when every <em>prefix column</em> is constrained;{" "}
+        <code>(embedding)</code> has none; and both real queries carry a <code>WHERE</code>. So the
+        flip changes no plan — measured, <code>scripts/probe_vector_opclass.py</code>. The one repair
+        that <em>would</em> have worked for <code>typology_corpus</code> — a{" "}
+        <code>(source, embedding vector_cosine_ops)</code> prefix index — was <b>rejected</b>: it
+        activates an <em>approximate</em> search, and the brake's Gate 0 is a set-membership test on
+        exactly the top-3 of a <code>k=3</code> retrieval over a <em>four</em>-document corpus. It
+        measures safe today (<b>0</b> top-3 changes over 1,572 adversarial near-ties <em>and</em>{" "}
+        132 real agent queries; <b>0</b> Gate 0 flips) — but only because four rows sit in one
+        C-SPANN partition. That is luck of scale, not a property of the design. <b>So both were
+        dropped.</b> What remains is checkable and true: real <code>VECTOR(1536)</code> columns, real
+        cosine search, <em>exact</em> by scan, and <b>one</b> genuinely-exercised distributed vector
+        index (<code>regulatory_corpus</code>, 233 rows — <code>EXPLAIN</code> emits a real{" "}
+        <code>vector search</code> node). Correctness was never affected.
       </>
     ),
   },
