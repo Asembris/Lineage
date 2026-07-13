@@ -1,12 +1,16 @@
 /*
  * Invalidate — the fourth and final supervisor interaction, and the ONE governed write.
  *
- * It lives at the bottom of the Investigation take-over (after Trace + Time-travel), so the
- * console's one evolving surface ends on the consequence. Unlike the three reads, it is
- * confirmation-gated: an armed --alert button opens a confirm panel stating the real scope
- * (living holders + inheritance edges, fleet-wide, one commit) with an explicit Confirm/Cancel
- * — a deliberate act, not a casual click. App owns the state + the tree animation (two regions
- * coordinate, exactly like Trace); this component is the Inspector-side gate and result.
+ * Its CONTROL states are PINNED in the Investigation's footer (see Investigation.css), not laid
+ * out after Trace + Time-travel: opening Time-travel used to push this below the fold at laptop
+ * heights, so the kill-shot was easy to reach while uninformed and hidden once informed. The
+ * certificate outcome is a RECEIPT, not a control, and still scrolls with the evidence.
+ *
+ * Unlike the three reads, it is confirmation-gated: an armed --alert button opens a confirm panel
+ * stating the rule being deleted and the real scope (living holders + inheritance edges,
+ * fleet-wide, one commit) with an explicit Confirm/Cancel — a deliberate act, not a casual click.
+ * App owns the state + the tree animation (two regions coordinate, exactly like Trace); this
+ * component is the Inspector-side gate and result.
  *
  * On success it shows the REAL certificate outcome returned by POST /beliefs/{id}/invalidate —
  * never a generic toast: the sealed, hash-covered pre_invalidation_state (the same value the
@@ -168,6 +172,13 @@ export function InvalidateBlock({
   const busy = ui.status === "invalidating";
   return (
     <div className="kill kill--armed">
+      {/* THE SENTENCE BEING DELETED. Every number justifying the kill was already on screen at the
+          moment of confirmation — the curve, the interval, the Fisher criterion — and the thing
+          being killed was NOT: the gate named it only as `898ad0`, a hash, not a rule. A supervisor
+          about to irreversibly delete a rule fleet-wide must be able to READ THE RULE as they
+          confirm. It is rendered in FULL: no clamp, no ellipsis, no truncation — silently cutting
+          the sentence someone is about to delete would be worse than not showing it at all. */}
+      <blockquote className="kill__rule">{belief.rule_text}</blockquote>
       <p className="kill__warn">
         Invalidate belief <span className="mono">{fragId(belief.id)}</span> and its full inherited
         closure — <b>{ui.livingHolderCount} living holders</b> across{" "}
