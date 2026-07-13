@@ -234,18 +234,30 @@ async def main() -> None:
           else "the index is NOT used — check the opclass matches the operator")
     check("and it is NOT a full scan", "FULL SCAN" not in plan)
 
-    # The two legacy indexes: pinned as the KNOWN, DEFERRED defect. They are L2; their queries are
-    # cosine; they have never been selected. Fixing them makes retrieval APPROXIMATE where it is
-    # currently EXACT — a live change to Item 4's Gate 0 and Item 8's golden set. Its own session.
+    # The two dead indexes are GONE (migration 0010). This check used to pin them as `vector_l2_ops`
+    # — the KNOWN, DEFERRED defect — precisely so that touching them could not happen silently. It
+    # fired, and this is the decision it forced.
+    #
+    # They were DROPPED, not repaired, because the repair everyone assumed was INERT: a CRDB vector
+    # index is selected only when every PREFIX column is constrained, both indexes were on
+    # `(embedding)` alone, and BOTH real queries carry a WHERE (`corpus.py` filters `source`;
+    # `agent_brain.py` filters `status` + an ownership OR across a LEFT JOIN). Flipping the opclass
+    # changes no plan. The one repair that WOULD have worked for typology_corpus — a
+    # `(source, embedding vector_cosine_ops)` prefix index — activates an APPROXIMATE search over the
+    # 4-document corpus the brake's Gate 0 reads, and was rejected. See migration 0010 and
+    # scripts/probe_vector_opclass.py.
     async with engine.connect() as c:
         legacy = {}
         for t in ("beliefs", "typology_corpus"):
             ddl = str((await c.execute(text(f"SHOW CREATE TABLE {t}"))).all()[0][1])
             legacy[t] = next((l.strip() for l in ddl.splitlines() if "VECTOR INDEX" in l), "")
-    check("beliefs' index is STILL vector_l2_ops (known defect, deferred by decision)",
-          "vector_l2_ops" in legacy["beliefs"], legacy["beliefs"])
-    check("typology_corpus' index is STILL vector_l2_ops (known defect, deferred by decision)",
-          "vector_l2_ops" in legacy["typology_corpus"], legacy["typology_corpus"])
+    for t in ("beliefs", "typology_corpus"):
+        check(f"{t} carries NO vector index (0010 dropped the dead one)", not legacy[t],
+              f"A VECTOR INDEX IS BACK: {legacy[t]} — if it is now selectable, retrieval is "
+              f"APPROXIMATE where it was EXACT. Re-measure with scripts/probe_vector_opclass.py."
+              if legacy[t] else
+              "no query in this system could ever select it — its WHERE clause is not a prefix "
+              "constraint, so the planner could not use it whatever the opclass")
 
     # ---- 6. structural isolation ----------------------------------------------------------------
     async with engine.connect() as c:
