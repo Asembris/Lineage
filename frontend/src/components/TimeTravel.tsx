@@ -27,7 +27,7 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DUR, EASE } from "../lib/motion";
 import type { Investigation } from "../lib/investigation";
-import type { BeliefPerformanceWindow, UUID } from "../api/types";
+import type { BeliefPerformanceWindow, StalenessUncertainty, UUID } from "../api/types";
 import { getAgentBeliefs, getBeliefPerformance } from "../api/client";
 import { fragId, formatConfidence, formatCount, formatDate } from "../lib/format";
 import "./TimeTravel.css";
@@ -46,6 +46,7 @@ type State =
   | {
       status: "ready";
       windows: BeliefPerformanceWindow[];
+      uncertainty: StalenessUncertainty | null;
       depoPast: Depo;
       depoNow: Depo;
     };
@@ -56,9 +57,39 @@ function depoFor(beliefs: { id: UUID; status: string }[], beliefId: UUID, label:
   return { label, held: !!b, status: b?.status ?? null };
 }
 
+/** A window whose Wilson bounds are both present. The backend withholds them together (agreement
+ *  is a property of the whole curve), but this is checked per-window rather than assumed. */
+function hasBand(
+  w: BeliefPerformanceWindow,
+): w is BeliefPerformanceWindow & { confidence_ci_low: number; confidence_ci_high: number } {
+  return w.confidence_ci_low !== null && w.confidence_ci_high !== null;
+}
+
+/** Fisher's p, at the precision it is worth reading. Below 0.001 the exact digits are noise —
+ *  what matters is the order of magnitude — so it goes exponential. */
+function formatPValue(p: number): string {
+  return p < 0.001 ? p.toExponential(1) : p.toFixed(3);
+}
+
 /** SVG sparkline of the confidence curve — a fixed [0,1] domain so the decay is
  *  shown at true scale, never exaggerated by auto-fitting. Draws left→right with
- *  a --alive→--alert gradient (healthy early, stale late). */
+ *  a --alive→--alert gradient (healthy early, stale late).
+ *
+ *  THE CONFIDENCE RIBBON IS ACHROMATIC, AND THAT IS THE LOAD-BEARING DECISION. The line's
+ *  --alive→--alert gradient already means HEALTH. If the ribbon inherited it, the widest bands
+ *  (the late, stale windows) would render as a spreading red haze and WIDTH WOULD MASQUERADE AS
+ *  SEVERITY — a second alert channel, invented by accident. Uncertainty is not a state; it is a
+ *  lack of resolution. So it gets the cold provenance-grey vocabulary the honesty ledger chose
+ *  for exactly this reason (--ash, "deliberately NOT the --alive/--alert vocabulary, so it can
+ *  never read as a second alert system"). The coloured line is the MEANING; the grey corridor is
+ *  the PRECISION.
+ *
+ *  There is NO clamp and NO minimum-n gate on the band's height. A thin window (n=1, k=0) has a
+ *  Wilson interval of [0.000, 0.793] and its ribbon really does cover four-fifths of this chart.
+ *  That IS the truth, and a chart that hid it would be lying — this project has refused
+ *  hand-picked thresholds before (MARGIN_FLOOR; the disjoint-intervals rule that failed open).
+ *  Because the corridor is grey, a band that tall reads as "we do not know here" rather than
+ *  "danger here", which is the honest reading of a wide interval. */
 function Curve({
   windows,
   activeIndex,
@@ -78,13 +109,32 @@ function Curve({
   const pts = windows.map((w, i) => `${x(i)},${y(w.confidence)}`);
   const d = `M ${pts.join(" L ")}`;
 
+  // The corridor: upper bounds left→right, then lower bounds right→left, closed. Drawn only when
+  // EVERY window carries its bounds — a partial ribbon would imply the missing windows are
+  // certain, which is the one thing a withheld interval must never be able to say.
+  const banded = windows.every(hasBand);
+  const ribbon = banded
+    ? "M " +
+      windows.map((w, i) => `${x(i)},${y(w.confidence_ci_high as number)}`).join(" L ") +
+      " L " +
+      windows
+        .map((w, i) => `${x(i)},${y(w.confidence_ci_low as number)}`)
+        .reverse()
+        .join(" L ") +
+      " Z"
+    : null;
+
+  const label = banded
+    ? "confidence across generation windows, healthy to stale, with 95% Wilson confidence intervals"
+    : "confidence across generation windows, healthy to stale; confidence intervals withheld";
+
   return (
     <svg
       className="tt__curve"
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="confidence across generation windows, healthy to stale"
+      aria-label={label}
     >
       <defs>
         <linearGradient id="tt-grad" x1="0" y1="0" x2="1" y2="0">
@@ -92,6 +142,15 @@ function Curve({
           <stop offset="100%" stopColor="var(--alert)" />
         </linearGradient>
       </defs>
+      {ribbon && (
+        <motion.path
+          d={ribbon}
+          className="tt__band"
+          initial={reduce ? { opacity: 1 } : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: reduce ? 0 : DUR.sweep, ease: EASE.inOut }}
+        />
+      )}
       <motion.path
         d={d}
         className="tt__curve-line"
@@ -115,6 +174,52 @@ function Curve({
         />
       ))}
     </svg>
+  );
+}
+
+/** What the evidence will and will not support — stated in the NEUTRAL register, never in
+ *  --alive/--alert.
+ *
+ *  Colouring "decay supported" green would INVERT it: a supported decay is bad news for the belief,
+ *  and it is the finding that justifies the single irreversible governed write. Colouring it red
+ *  would make it a second alert channel next to the curve it qualifies. So it is achromatic, like
+ *  the ledger's provenance tags — a statement of evidentiary standing, not an alarm. */
+function Support({ u }: { u: StalenessUncertainty }) {
+  if (u.sample_agreement !== "agreed") {
+    const why =
+      u.sample_agreement === "disagreed"
+        ? "belief_performance no longer reproduces from the decisions it summarizes"
+        : "a window has no decisions to aggregate";
+    return (
+      <p className="tt__support">
+        <span className="tt__support-verdict">intervals withheld</span> — {why}. The point estimates
+        and counts above still stand; no interval is derivable, so none is shown.
+      </p>
+    );
+  }
+  if (u.decay_supported === null) {
+    return (
+      <p className="tt__support">
+        <span className="tt__support-verdict">decay not assertable</span> — a single measured window
+        cannot be compared against anything.
+      </p>
+    );
+  }
+  return (
+    <p className="tt__support">
+      <span className="tt__support-verdict">
+        {u.decay_supported ? "measured decay supported" : "decay not distinguishable at this sample size"}
+      </span>
+      {u.decay_p_value !== null && (
+        <>
+          {" — Fisher exact, two-sided, "}
+          <span className="tt__mono">p&nbsp;=&nbsp;{formatPValue(u.decay_p_value)}</span>
+        </>
+      )}
+      {u.decay_supported
+        ? ". The drop is real and downward — this is the evidence an invalidation rests on."
+        : ". The curve moved, but “same rate” cannot be rejected — the evidence does not support killing this belief."}
+    </p>
   );
 }
 
@@ -149,6 +254,7 @@ export function TimeTravel({ inv }: { inv: Investigation }) {
       setState({
         status: "ready",
         windows: perf.windows,
+        uncertainty: perf.uncertainty,
         depoPast: depoFor(past.beliefs, belief.id, isoPast),
         depoNow: depoFor(now.beliefs, belief.id, "present"),
       });
@@ -182,82 +288,110 @@ export function TimeTravel({ inv }: { inv: Investigation }) {
     );
   }
 
-  const { windows, depoPast, depoNow } = state;
-  if (windows.length === 0) {
-    return (
-      <div className="tt">
-        <p className="panel__note tt__note">
-          No measured performance windows for this belief yet — nothing to time-travel.
-        </p>
-      </div>
-    );
-  }
+  const { windows, uncertainty, depoPast, depoNow } = state;
+  const hasWindows = windows.length > 0;
 
-  const first = windows[0];
-  const last = windows[windows.length - 1];
+  const first = hasWindows ? windows[0] : null;
+  const last = hasWindows ? windows[windows.length - 1] : null;
   const active = toggle === "formed" ? first : last;
   const activeIndex = toggle === "formed" ? 0 : windows.length - 1;
   const tone = toggle === "formed" ? "alive" : "alert";
 
   return (
     <div className="tt">
-      {/* The toggle — WHEN FORMED (first window) vs PRESENT DAY (last window). */}
-      <div className="tt__toggle" role="group" aria-label="time-travel point">
-        <button
-          className={"tt__toggle-btn" + (toggle === "formed" ? " tt__toggle-btn--on" : "")}
-          aria-pressed={toggle === "formed"}
-          onClick={() => setToggle("formed")}
-        >
-          when formed
-        </button>
-        <button
-          className={"tt__toggle-btn" + (toggle === "present" ? " tt__toggle-btn--on" : "")}
-          aria-pressed={toggle === "present"}
-          onClick={() => setToggle("present")}
-        >
-          present day
-        </button>
-      </div>
+      {/* SIGNAL 2 — the measured staleness curve. A belief with no measured windows has no curve,
+          and says so; it does NOT lose signal 1 below, which is true for it and works. */}
+      {!hasWindows || !active || !first || !last ? (
+        <p className="panel__note tt__note">
+          No measured performance windows for this belief — it has no measured time structure, so
+          there is no staleness curve to travel. The MVCC deposition below is unaffected.
+        </p>
+      ) : (
+        <>
+          {/* The toggle — WHEN FORMED (first window) vs PRESENT DAY (last window). */}
+          <div className="tt__toggle" role="group" aria-label="time-travel point">
+            <button
+              className={"tt__toggle-btn" + (toggle === "formed" ? " tt__toggle-btn--on" : "")}
+              aria-pressed={toggle === "formed"}
+              onClick={() => setToggle("formed")}
+            >
+              when formed
+            </button>
+            <button
+              className={"tt__toggle-btn" + (toggle === "present" ? " tt__toggle-btn--on" : "")}
+              aria-pressed={toggle === "present"}
+              onClick={() => setToggle("present")}
+            >
+              present day
+            </button>
+          </div>
 
-      {/* Measured staleness readout for the selected end — the healthy→stale shift. */}
-      <motion.div
-        key={toggle}
-        className={`tt__readout tt__readout--${tone}`}
-        initial={reduce ? false : { opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: reduce ? 0 : DUR.reveal, ease: EASE.out }}
-      >
-        <div className="tt__conf">
-          <span className={`tt__conf-val tt__hot-${tone}`}>{formatConfidence(active.confidence)}</span>
-          <span className="tt__conf-label">measured confidence</span>
-        </div>
-        <div className="tt__facts">
-          <span className="tt__window">
-            {formatDate(active.window_start)} → {formatDate(active.window_end)}
-          </span>
-          <span className="tt__frauds">
-            <span className="tt__frauds-n">{formatCount(active.frauds_approved)}</span> frauds
-            approved
-          </span>
-        </div>
-      </motion.div>
+          {/* Measured staleness readout for the selected end — the healthy→stale shift.
+              The hero number keeps its scale and its tone; the interval sits UNDER it, in the cold
+              register, and is written [lo, hi] rather than ±. A Wilson interval is ASYMMETRIC
+              (0.924 → [0.884, 0.951] is −0.040/+0.027), so "0.92 ± 0.03" would assert a symmetry
+              the statistic does not have. n is shown because it is the whole point: without it a
+              reader cannot tell 250 samples from 5. */}
+          <motion.div
+            key={toggle}
+            className={`tt__readout tt__readout--${tone}`}
+            initial={reduce ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? 0 : DUR.reveal, ease: EASE.out }}
+          >
+            <div className="tt__conf">
+              <span className={`tt__conf-val tt__hot-${tone}`}>
+                {formatConfidence(active.confidence)}
+              </span>
+              <span className="tt__conf-label">measured confidence</span>
+              <span className="tt__ci">
+                {hasBand(active) ? (
+                  <>
+                    95% CI [{formatConfidence(active.confidence_ci_low)},{" "}
+                    {formatConfidence(active.confidence_ci_high)}]
+                  </>
+                ) : (
+                  <>95% CI withheld</>
+                )}
+                <span className="tt__ci-sep">·</span>n = {formatCount(active.sample_size)}
+              </span>
+            </div>
+            <div className="tt__facts">
+              <span className="tt__window">
+                {formatDate(active.window_start)} → {formatDate(active.window_end)}
+              </span>
+              <span className="tt__frauds">
+                <span className="tt__frauds-n">{formatCount(active.frauds_approved)}</span> frauds
+                approved
+              </span>
+            </div>
+          </motion.div>
 
-      <Curve windows={windows} activeIndex={activeIndex} reduce={reduce} />
+          <Curve windows={windows} activeIndex={activeIndex} reduce={reduce} />
 
-      <p className="tt__derivation">
-        confidence {formatConfidence(first.confidence)} → {formatConfidence(last.confidence)} across{" "}
-        {windows.length} measured windows — derived from decisions, not asserted.
-      </p>
+          <p className="tt__derivation">
+            confidence {formatConfidence(first.confidence)} → {formatConfidence(last.confidence)}{" "}
+            across {windows.length} measured windows — derived from decisions, not asserted.
+          </p>
 
-      {/* The MVCC deposition — proof time-travel is real, and the row is immutable. */}
+          {uncertainty && <Support u={uncertainty} />}
+        </>
+      )}
+
+      {/* SIGNAL 1 — the MVCC deposition. Proof time-travel is real, and the row is immutable.
+          It is rendered for EVERY belief, including one with no measured curve: discarding a
+          working, honest proof to show a dead end is the opposite of this project's discipline. */}
       <div className="tt__depo">
         <div className="tt__depo-head">MVCC deposition · real AS OF SYSTEM TIME</div>
         <DepoRow label={`as of ${depoPast.label.slice(0, 19)}Z`} depo={depoPast} />
         <DepoRow label="present" depo={depoNow} />
         <p className="tt__depo-note">
           Same belief <span className="tt__mono">{fragId(belief.id)}</span>, both reads — the row is
-          immutable across MVCC time (AOST reaches ~75 min; formation-era history is the measured
-          curve above, a different clock).
+          immutable across MVCC time (AOST reaches ~75 min
+          {hasWindows
+            ? "; formation-era history is the measured curve above, a different clock"
+            : ", and this belief has no measured curve on the other clock"}
+          ).
         </p>
       </div>
     </div>

@@ -169,9 +169,14 @@
 
 /* --- Confidence curve ----------------------------------------------------- */
 
+/* 42px was enough for a bare line and is NOT enough for a line that carries its interval: at that
+   height a 95% Wilson band (0.054–0.123 wide here) renders 2–5px tall and reads as a fat grey
+   outline thickening the curve, not as a corridor around it. Height is RESOLUTION, not scale —
+   the domain stays fixed at [0,1] (never auto-fitted, so the decay is never exaggerated); the
+   chart simply gets the pixels it needs for the band, and the true-scale decay, to be legible. */
 .tt__curve {
   width: 100%;
-  height: 42px;
+  height: 96px;
   display: block;
 }
 
@@ -276,4 +281,61 @@
 .tt__mono {
   font-family: var(--font-mono);
   color: var(--ghost);
+}
+
+/* --- The confidence band -------------------------------------------------------------------
+   ACHROMATIC, AND DELIBERATELY SO. The curve's --alive→--alert gradient already carries HEALTH.
+   A ribbon tinted with that gradient would make its widest stretches (the late, stale windows,
+   whose intervals really are the widest) read as a spreading red haze — width masquerading as
+   severity, a second alert channel invented by accident. Uncertainty is not a state; it is a lack
+   of resolution. So the corridor takes the cold provenance-grey the honesty ledger uses for the
+   same reason, and it can never be mistaken for an alarm.
+
+   No clamp, no minimum-n gate: a 1-sample window's Wilson interval is [0.000, 0.793] and its
+   ribbon covers four-fifths of this chart. That is the truth, and in grey it reads as "we do not
+   know here" — which is exactly what a band that wide means. */
+.tt__band {
+  fill: var(--ash);
+  fill-opacity: 0.18;
+  stroke: var(--ash);
+  stroke-opacity: 0.32;
+  stroke-width: 0.75;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+}
+
+/* The interval under the hero number. Cold, mono, subordinate — it qualifies the big number, it
+   does not compete with it. Written [lo, hi], never ±: a Wilson interval is asymmetric. */
+.tt__ci {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tt__ci-sep {
+  color: var(--line);
+}
+
+/* The support criterion — an evidentiary statement, NOT an alarm. Neutral register on purpose:
+   "decay supported" is bad news for the belief, so green would invert it, and red would make it a
+   second alert channel beside the curve it qualifies. */
+.tt__support {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  color: var(--ash);
+  font-variant-numeric: tabular-nums;
+}
+
+.tt__support-verdict {
+  color: var(--bone);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6rem;
 }
