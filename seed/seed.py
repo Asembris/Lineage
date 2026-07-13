@@ -23,12 +23,23 @@ decides — `aml_graph.MIN_CYCLE_LEN = 3`, `MAX_CYCLE_HOPS = 12`. Prose that ove
 rule would be an explanation-faithfulness defect seeded at the source, in the one project that
 built a guard against exactly that (NOTES "Roadmap Item E").
 
+EMBEDDINGS ARE REAL, AND THE SEED IS STILL OPENAI-FREE (2026-07-13). Both beliefs are planted with
+their genuine `text-embedding-3-small` vector, read from the committed `belief_embeddings.json`
+fixture. This seed previously planted a deterministic PLACEHOLDER and asked the operator to run
+`scripts/embed_beliefs.py` afterwards to overwrite it — which could never hold, because the next
+reseed re-planted the placeholder. It did not hold: both beliefs were measured at cosine distance
+0.000000000 from `placeholder_embedding(1536)` on the live cluster while the honesty ledger claimed
+one of them was real. The seed is the only writer that runs on every rebuild, so the seed is where
+the real vector has to come from. See `belief_embedding()` below.
+
 UUIDs are derived via uuid5 so re-runs produce stable ids. Run:
     PYTHONPATH=. .venv/Scripts/python.exe seed/seed.py
 """
 
 import asyncio
 import datetime as dt
+import json
+import pathlib
 import sys
 import uuid
 
@@ -80,10 +91,60 @@ def days(n: int) -> dt.datetime:
 
 
 def placeholder_embedding(dim: int) -> list[float]:
-    """Deterministic, normalized PLACEHOLDER. Real embeddings arrive in Phase 2."""
+    """The DEAD placeholder. Kept for exactly one reason: it is the value the seed must never
+    plant again, and `tests/test_belief_embeddings.py` proves it doesn't by comparing against it.
+
+    HISTORY, so nobody reinstates it. Until 2026-07-13 the seed planted THIS vector into every
+    belief on every run. `scripts/embed_beliefs.py` could overwrite it with a real
+    text-embedding-3-small vector, but the NEXT reseed re-planted the placeholder — so the fix
+    never stuck, and it demonstrably did not: on 2026-07-13 BOTH beliefs were measured at cosine
+    distance 0.000000000 from this function while the honesty ledger asserted one of them carried
+    a real vector. A seed that re-plants a placeholder cannot be fixed by a command the operator
+    is asked to remember. It is fixed by the seed planting the real vector — see
+    `belief_embedding()`.
+    """
     rng = np.random.default_rng(42)
     v = rng.standard_normal(dim)
     return (v / np.linalg.norm(v)).tolist()
+
+
+# The REAL text-embedding-3-small vectors, computed once by `python -m scripts.embed_beliefs
+# --refresh-fixture` and committed. The seed is OpenAI-FREE (CI runs it with a dummy key, and the
+# isolated `demo` database is seeded through this same path), so it cannot call the API — it plants
+# the cached vector instead. These are genuine model outputs, not a stand-in: caching an embedding
+# is not the same as inventing one.
+_FIXTURE = pathlib.Path(__file__).with_name("belief_embeddings.json")
+
+
+def belief_embedding(name: str, rule_text: str, dim: int) -> list[float]:
+    """The committed REAL embedding for a seed belief.
+
+    Refuses to plant a vector that does not belong to the text being seeded. The fixture stores the
+    `rule_text` it was computed from, and this checks it — so editing a belief's wording without
+    re-running `--refresh-fixture` fails LOUDLY at seed time instead of silently seeding a real
+    vector for the wrong sentence, which would be the subtlest possible version of this bug.
+    """
+    if not _FIXTURE.exists():
+        raise RuntimeError(
+            f"missing {_FIXTURE.name}. Regenerate it (one OpenAI call per belief):\n"
+            f"    python -m scripts.embed_beliefs --refresh-fixture"
+        )
+    data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    entry = data.get("beliefs", {}).get(name)
+    if entry is None:
+        raise RuntimeError(f"{_FIXTURE.name} has no embedding for belief {name!r}")
+    if entry["rule_text"] != rule_text:
+        raise RuntimeError(
+            f"{_FIXTURE.name}'s embedding for {name!r} was computed from DIFFERENT text than the "
+            f"seed is planting — the vector does not describe the rule.\n"
+            f"  fixture: {entry['rule_text']!r}\n"
+            f"  seed:    {rule_text!r}\n"
+            f"Re-embed:  python -m scripts.embed_beliefs --refresh-fixture"
+        )
+    vec = entry["embedding"]
+    if len(vec) != dim:
+        raise RuntimeError(f"{name!r}: fixture has {len(vec)} dims, schema wants {dim}")
+    return vec
 
 
 def build_agents() -> dict[str, Agent]:
@@ -142,7 +203,10 @@ async def seed(session_factory=None) -> None:
     unqualified DELETE/INSERTs resolve against whichever database the session is bound to.
     """
     make_session = session_factory if session_factory is not None else SessionLocal
-    embedding = placeholder_embedding(get_settings().embedding_dim)
+    dim = get_settings().embedding_dim
+    # The REAL cached vectors, not the placeholder. A reseed can no longer undo the embedding.
+    crimson_embedding = belief_embedding("origin", RULE_TEXT, dim)
+    azure_embedding = belief_embedding("aml-cycle", AML_RULE_TEXT, dim)
     agents = build_agents()
     edges = build_inheritance()
     aml_edges = build_aml_inheritance()
@@ -174,20 +238,15 @@ async def seed(session_factory=None) -> None:
             rule_text=RULE_TEXT,
             originating_agent_id=aid("crimson-0"),
             formed_at=days(780),
-            embedding=embedding,
+            embedding=crimson_embedding,
             status="active",
         )
-        # The azure laundering belief (G3). Same PLACEHOLDER embedding as crimson — the seed is
-        # deliberately OpenAI-free, and `scripts/embed_beliefs.py` replaces this with a real
-        # text-embedding-3-small vector post-seed. Note that this seed re-plants the placeholder
-        # on EVERY run, so a reseed discards whatever embed_beliefs.py wrote (true of crimson
-        # since Phase 1; now true of azure too).
         aml_belief = Belief(
             id=bid("aml-cycle"),
             rule_text=AML_RULE_TEXT,
             originating_agent_id=aid("azure-0"),
             formed_at=days(780),
-            embedding=embedding,
+            embedding=azure_embedding,
             status="active",
         )
         s.add_all([belief, aml_belief])
