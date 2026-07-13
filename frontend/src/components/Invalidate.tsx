@@ -38,6 +38,9 @@ export interface InvalidateHandlers {
   onCancel: () => void;
 }
 
+/* `isInvalidateControl` — which states are pinned controls vs. scrolling receipts — lives in
+   lib/invalidate.ts (this file exports only components). */
+
 /* The real certificate outcome — the honest end of the write. */
 function Outcome({ result }: { result: InvalidateResponse }) {
   const pre = result.pre_invalidation_state;
@@ -174,6 +177,14 @@ export function InvalidateBlock({
       <p className="kill__actor">
         acting as supervisor <span className="mono">{fragId(SUPERVISOR_ACTOR)}</span>
       </p>
+      {/* CONFIRM IS DELIBERATELY NOT WHERE THE ARM BUTTON WAS. With the controls pinned, the arm
+          button and the confirm button would both be bottom-anchored in the same footer — and two
+          clicks of muscle memory in one screen position would be an irreversible fleet-wide write.
+          A confirm gate protects against not KNOWING; it cannot protect against not MOVING YOUR
+          HAND. So the actions stack, and CANCEL takes the arm button's exact footprint: a repeated
+          click at the remembered position now CANCELS. The geometry is asserted, not assumed —
+          see the disjoint-rect check in the verification. DOM order matches visual order, so tab
+          order is unchanged. */}
       <div className="kill__actions">
         <button className="kill__confirm" onClick={onConfirm} disabled={busy}>
           {busy ? "Invalidating…" : "Confirm invalidation"}

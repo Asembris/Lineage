@@ -6,9 +6,40 @@
  * .panel__note from the shared Inspector chrome.
  */
 
+/* CONTROLS ARE PINNED; EVIDENCE AND RECEIPTS SCROLL.
+   The Investigation owns its own head/body/footer split — the SAME shape as the shared .panel
+   chrome, deliberately reused rather than reinvented. It fills the panel body (which therefore no
+   longer scrolls: this does), so the footer is a real sibling of the scroll region, not an overlay
+   on top of it. That distinction is the whole point: a `position: sticky` footer would float ABOVE
+   the evidence, and a focused control tabbed into while scrolling could slide underneath it —
+   the Phase-6 keyboard-focus hazard. A footer that never overlays cannot have that bug. */
 .inv {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.inv__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* The pinned governed-write control. Quiet at rest: it carries the SAME restrained arm button it
+   always did (transparent, --alert outline — never a filled slab), so making it permanent does not
+   make it louder. The filled --alert is still earned by arming, not given by default. */
+.inv__actions {
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem 0.9rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* The arm button's own top margin is for in-flow use; in the footer the padding provides it. */
+.inv__actions .kill__arm,
+.inv__actions .kill--armed {
+  margin-top: 0;
 }
 
 .inv__head {
@@ -18,6 +49,7 @@
   gap: 0.5rem;
   padding: 0.7rem 1rem 0.5rem;
   border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
 }
 
 .inv__heading {
