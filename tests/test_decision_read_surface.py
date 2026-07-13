@@ -49,7 +49,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db import engine
 from app.main import app
 from app.models import Decision
-from app.services.aml_graph import Outcome, load_graph
+from app.services.aml_graph import Outcome, check, load_graph
 from app.services.aml_seam import TXN_REF_TAGS, census, decide_all, txn_ref_for, witness_outcome_of
 from seed.seed import aid, bid
 from seed.seed import seed as run_seed
@@ -65,6 +65,18 @@ CRIMSON_7 = aid("crimson-7")
 CENSUS_N = {"MATCH": 57, "CONCLUSIVE_NO": 463, "INCONCLUSIVE": 980}
 CENSUS_LAUNDERING = {"MATCH": 43, "CONCLUSIVE_NO": 5, "INCONCLUSIVE": 252}
 TOTAL_EDGES = 1500
+
+# CONCLUSIVE_NO IS NOT ONE THING, and its gloss said it was for the whole life of the seam.
+# 447 of the 463 are SELF-LOOPS — an account paying itself, excluded from adjacency by construction
+# (`aml_graph.Graph`), so NO SEARCH EVER RAN. Only 16 are real transfers whose cycle search genuinely
+# closed inside the extract. Measured by scripts/probe_conclusive_no.py; asserted below.
+CONCLUSIVE_NO_SELF_LOOPS = 447
+CONCLUSIVE_NO_CLOSED_SEARCHES = 16
+
+# The `detail` strings the witness emits. THIS is the wire's four-way basis: /interrogate serves
+# `detail` on every witness, which is why the fourth state costs no schema change and no new field.
+DETAIL_SELF_LOOP = "self-loop is not a transfer cycle"
+DETAIL_CLOSED = "no return path; search closed inside the extract"
 
 _MIGRATION = (
     Path(__file__).resolve().parents[1]
@@ -287,6 +299,70 @@ def test_the_witness_census_over_the_real_extract_is_57_463_980():
     assert CENSUS_LAUNDERING["INCONCLUSIVE"] == 252
     # And it is NOT "728 / 48.5%" — the benign-only subset this project has twice mistaken for it.
     assert CENSUS_N["INCONCLUSIVE"] != 728
+
+
+def test_the_conclusive_no_decomposition_is_447_selfloops_and_16_closed_searches():
+    """THE THIRD CORRUPTION ADJACENT TO THE 65.3% — and the only thing that can prevent a fourth.
+
+    The frozen census says `CONCLUSIVE_NO 463`, and the gloss that travelled with it everywhere —
+    the decider's docstring, DecisionOut's docstring (and therefore /openapi.json), README, DEMO's
+    Bridge beat, the honesty ledger — was **"searched; there is no cycle"**.
+
+    That is true of SIXTEEN of them. The other 447 are SELF-LOOPS: an account paying itself, which
+    `aml_graph.Graph` excludes from adjacency by construction because it is not a transfer between
+    two accounts. NO SEARCH EVER RAN. The gloss invited a reader to picture a region that was
+    explored and closed, for 96.5% of the rows where nothing was explored at all.
+
+    THE COUNT WAS NEVER WRONG. ITS DESCRIPTION OF ITSELF WAS — which is the shape of every
+    corruption this number has attracted, and it has now attracted one of each available kind:
+        * the phantom "728 / 48.5%"           — MISSTATED ITS VALUE
+        * the phantom scripts/verify_seam.py  — INVENTED ITS PROVENANCE
+        * this one                            — MISDESCRIBED ITS OWN COMPLEMENT
+    Prose has failed this number in all three ways. Only executable things have ever protected it,
+    so the decomposition is ASSERTED here rather than described anywhere.
+
+    Independent of any backfill (`aml_transactions` is reference data; `seed.seed()` never touches
+    it), like the census test above. If these numbers move, the evidence layer was re-ingested or
+    re-sampled — which is separately prohibited.
+    """
+
+    async def _run():
+        async with engine.connect() as c:
+            graph = await load_graph(conn=c)  # SELECTs no label column
+            return graph, decide_all(graph)   # pure; sees no label, by type
+
+    graph, decisions = asyncio.run(_run())
+
+    conclusive = [d for d in decisions if d.witness_outcome is Outcome.CONCLUSIVE_NO]
+    assert len(conclusive) == CENSUS_N["CONCLUSIVE_NO"]
+
+    self_loops = [d for d in conclusive if graph.by_id[d.txn_id].is_self_loop]
+    closed = [d for d in conclusive if not graph.by_id[d.txn_id].is_self_loop]
+
+    assert len(self_loops) == CONCLUSIVE_NO_SELF_LOOPS, (
+        f"{len(self_loops)} self-loops among the CONCLUSIVE_NO, expected "
+        f"{CONCLUSIVE_NO_SELF_LOOPS}. The gloss 'searched; there is no cycle' is only honest for "
+        f"the ones that were actually SEARCHED."
+    )
+    assert len(closed) == CONCLUSIVE_NO_CLOSED_SEARCHES
+    assert len(self_loops) + len(closed) == CENSUS_N["CONCLUSIVE_NO"]
+
+    # The self-loop is 96.5% of CONCLUSIVE_NO — the MAJORITY case, not an edge case.
+    assert len(self_loops) / len(conclusive) > 0.96
+
+    # AND THE WIRE ALREADY TELLS THEM APART. This is why the fourth state needs no schema change:
+    # `detail` is served on every witness by GET /aml/transactions/{id}/interrogate.
+    for d in self_loops:
+        assert check(graph, graph.by_id[d.txn_id], "CYCLE").detail == DETAIL_SELF_LOOP
+    for d in closed:
+        assert check(graph, graph.by_id[d.txn_id], "CYCLE").detail == DETAIL_CLOSED
+
+    # The PERSISTED tag stays three-way, and must. Self-loop-vs-closed-search is a property of the
+    # EVIDENCE, re-derived from the graph — not of what the agent RECORDED. Serving it on the
+    # decision surface would be the decision layer re-deriving a fact about the evidence layer: the
+    # same conflation G5 refused when it declined to re-run the witness for `witness_outcome`. The
+    # fourth state belongs to /interrogate, and only there.
+    assert len(TXN_REF_TAGS) == 3
 
 
 def test_witness_outcome_projects_the_basis_through_http():
