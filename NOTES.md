@@ -6759,7 +6759,17 @@ be re-derived on every rebuild is not a fix.** `scripts/` already holds four com
   guard both more precise AND more correct about what the bug actually was. Verified NOT toothless
   afterwards rather than assumed: reverting ARCHITECTURE's mermaid node still fails at
   `ARCHITECTURE.md:466`.
-- `tsc --noEmit`, `oxlint` (zero warnings), `vite build` — all exit 0.
+- `tsc -b`, `oxlint` (zero warnings), `vite build` — all exit 0.
+- **`tsc --noEmit` IS VACUOUS IN THIS REPO, AND I SHIPPED A RED CI BELIEVING IT WAS GREEN.**
+  `frontend/tsconfig.json` is a SOLUTION file — `"files": []` plus `references` to
+  `tsconfig.app.json` / `tsconfig.node.json`. So `tsc --noEmit` typechecks **zero files** and exits
+  **0, always**. Every "tsc --noEmit clean" in this session's earlier gates was theatre. CI runs
+  `npx tsc -b` (the build, which actually descends into the referenced projects) and it caught a
+  real error immediately: `App.tsx` used `WitnessOutcome` without importing it — two occurrences,
+  `TS2304: Cannot find name`. **The verification command was itself the bug**, which is the same
+  disease as the guard that EXPLAINed a query the application never runs: a check that cannot fail
+  is not a check. **Use `npx tsc -b` in this repo. Never `--noEmit`.** (NOTES/FRONTEND already said
+  `tsc -b` throughout; I substituted a command that looked equivalent and was not.)
 - **DRIVEN LIVE** (vite -> uvicorn -> live cluster, 1280x800 and 1440x900, **both harness traps
   cleared before any rendered result was trusted**): all 1,500 AML decisions reachable in 7 "load
   more" clicks; **1500/1500 distinct rows**; the 57 rings reachable under `basis=match`; the three

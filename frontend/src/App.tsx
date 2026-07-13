@@ -14,7 +14,13 @@ import { deriveChain } from "./lib/trace";
 import { SUPERVISOR_ACTOR } from "./lib/supervisor";
 import { ApiError, getBeliefLineage, invalidateBelief } from "./api/client";
 import { formatCount } from "./lib/format";
-import type { DecisionKind, InvalidateResponse, LineageResponse, UUID } from "./api/types";
+import type {
+  DecisionKind,
+  InvalidateResponse,
+  LineageResponse,
+  UUID,
+  WitnessOutcome,
+} from "./api/types";
 import "./App.css";
 
 /*
