@@ -4515,6 +4515,24 @@ python -m scripts.embed_beliefs aml-cycle   # the reseed re-plants the PLACEHOLD
 > setup block, DEMO's pre-flight, and DEMO's reset note — **there is exactly one way to build this
 > world, and all four sites say the same three commands.** See *RESTORE INSTRUCTIONS HAVE NOW LIED
 > TWICE* (it was three).
+
+> ### ⛔ SUPERSEDED (2026-07-14, Rung 2) — THIS BLOCK IS HISTORY, NOT AN INSTRUCTION. IT IS **TWO**
+> ### COMMANDS NOW, AND THE THIRD ONE HERE WILL REFUSE TO RUN.
+> The third command is **gone**: `seed.seed()` now plants the **real** vectors itself from the
+> committed fixture (`seed/belief_embeddings.json`), so there is no placeholder left to repair.
+> Running `python -m scripts.embed_beliefs aml-cycle` today exits with *"nothing to do... Refusing to
+> guess"* — it needs `--update-live`, and even that is a no-op against a correctly seeded world.
+>
+> **THE CANONICAL RESTORE IS README's [Getting started] BLOCK — TWO COMMANDS.** This NOTES block is
+> an append-only log entry from the G3/G4 session and is deliberately not rewritten (the same
+> precedent as the nine gates that cite the vacuous typecheck on purpose).
+>
+> **AND I FOLLOWED IT ANYWAY.** Rung 2 read this block as the restore procedure, ran three commands,
+> and hit the refusal. It cost only minutes — but the restore-instruction hazard class has now bitten
+> this project **ten times**, and the tenth bite came from a NOTES block that was *correct when
+> written* and became an instruction-shaped fossil. `test_restore_instructions.py` deliberately does
+> not sweep NOTES (it is a log), so nothing could have caught this but a pointer. Here is the pointer.
+> **A superseded procedure in an append-only log is still a procedure someone will run.**
 `backfill_aml_decisions` **REFUSES TO RUN** (loudly, **exit code 1**, verified) if the card backfill
 has not run — rather than silently producing a half-populated world, the failure mode hardest to
 notice and easiest to demo by accident.
@@ -6919,3 +6937,236 @@ CI-vs-LOCAL collision and the first where I caused it by misreading which workfl
   `audit_log = 0`, `count(DISTINCT decided_at) = 1` for AML, 1,500 `aml_transactions` (NOT
   re-ingested), crimson curve `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical, census
   57/463/980 reproduced.
+
+## AML CONSOLE — RUNG 2: THE EVIDENCE PANE, AND THE GUARD THAT KEEPS IT HONEST (2026-07-14)
+
+The first witness pixel in this project, and the composition guard shipped **with it**, never after.
+**199 backend tests pass** (192 + 7). Scope: the interrogation surface — subject, four witness
+verdicts, the named boundary account, competing structure, the four-way basis. **No geometry** (the
+ring, the legs and the bundle are Rung 3).
+
+### ============ THE MOST IMPORTANT FINDING: PYTEST CANNOT RUN THE GUARD ============
+### The oracle boundary's guard was ONE WORKFLOW-FILE READ away from being theatre.
+
+The obvious home for the composition guard was the pytest suite. **It cannot live there, and finding
+out why is the whole finding.** Two facts, both read from the workflow rather than assumed:
+
+1. **`ci.yml` has NO Node step.** setup-python -> pip install -> pytest. There is no `node_modules`,
+   so a pytest test shelling out to `tsc` would ERROR in CI, not detect anything.
+2. **FAR WORSE: `ci.yml` declares `paths-ignore: ['frontend/**']`.** A push that changes only
+   frontend files **does not run the backend suite at all.** So a pytest composition guard would have
+   been **SKIPPED BY EXACTLY THE PUSHES THAT CAN VIOLATE IT.** Someone adds the offending component
+   in a frontend-only push; the guard never executes; the build is green.
+
+**A CHECK THAT CANNOT FAIL ON THE CHANGE IT PROTECTS AGAINST IS NOT A CHECK.** That is the vacuous-
+typecheck disease (cited by nine gates, green for its entire life, checking zero files) — and this
+would have been the same disease **one layer up**, guarding the most important invariant in the
+project. It was caught before shipping only because the workflow was READ instead of assumed.
+
+**THE SPLIT, and each half covers the other's blind spot:**
+
+    frontend-ci.yml            RUNS the guard       (triggers on frontend/**, and it has Node)
+    test_composition_guard.py  GUARDS THAT IT RUNS  (workflow files are NOT in ci.yml's
+                                                     paths-ignore, so deleting the step fails
+                                                     the backend suite)
+
+The meta-guard also **PINS THE PREMISE** — `paths-ignore` present, `setup-node` absent — so if a
+future session changes either, the reasoning is re-derived as a DECISION rather than drifting.
+(Pinning the cause, not the symptom: the correction `test_frontend_typecheck.py` had to make.)
+**MADE TO TRIP:** deleting the CI step fails `test_frontend_ci_actually_invokes_the_guard`.
+
+### THE GUARD'S MECHANISM — a TYPE walk, because every text-level option is a proxy
+`frontend/scripts/composition-guard.mjs`, TypeScript compiler API, symbols compared **by declaration
+site**. Rejected explicitly, and each for a reason that would have bitten:
+- **grep `is_fraud` in .tsx** — misses `d.verdict` (still the audit layer), trips on an honest
+  comment. A proxy guard passes while the thing it protects is broken (the 14-line proximity window
+  that passed its own bug).
+- **grep the type NAMES** — misses `import type { Decision as Answer }`.
+- **both are blind to the shape that will actually happen**: a component taking an `Investigation`,
+  which CONTAINS a `Decision`. **The word "Decision" appears nowhere in that file.** The checker
+  walks `Investigation.decision.is_fraud` and sees the answer key on the prop surface.
+- **oxlint `no-restricted-imports`** — module-granular; cannot see through a wrapper type.
+- **a TS type-level opt-in helper** — a guard you must remember to apply is not a guard.
+
+**THREE CHECKS, because props are not the only channel:**
+- **A/composition** — no prop surface may reach BOTH layers.
+- **B/channel** — no evidence module may IMPORT a symbol reaching the audit layer. A zero-prop
+  component could just call `listDecisions()` itself; check A has nothing to inspect.
+- **C/adjacency** — no audit component may be mounted in the evidence surface's JSX subtree. **Two
+  individually-legal siblings still put the answer key beside the exam.** Whitespace is not the
+  mechanism; SEQUENCE is.
+
+`App.tsx` is exempt from A **BY STRUCTURE, not by allowlist**: it takes no props, so it has no prop
+surface to violate. It is the composition root, holds both layers, and hands the evidence surface a
+**bare `UUID`**. An id carries no verdict and no ground truth.
+
+### ===== AND CHECK C WAS BROKEN AND GREEN UNTIL IT WAS DEMONSTRATED =====
+The guard's first draft fixtured A and B but **not C** — and C did not work.
+
+Colour came only from **PROPS**. The evidence surface (`AmlConsole`) takes `{ txnId: UUID }` —
+**colourless by design, because the join between the layers is a bare id**. The EVIDENCE colour sat
+on the inner `EvidencePane`, so the check never looked at the surface's real mount site. Mounting
+`<AmlConsole>` directly beside `<DecisionFeed>` produced **NOTHING**.
+
+I found it only by doing the demonstration the brief demanded — writing the violation and watching.
+Reasoning about the guard would never have found it; the guard *looked* right. Fixed by propagating
+colour through the **RENDER GRAPH** (fixpoint over the mount map), and `violation-adjacency.tsx` is
+what keeps it fixed. **The guard's own fixtures not covering check C is EXACTLY how it stayed green.**
+
+### THE DEMONSTRATION SHIPS INSIDE THE GUARD
+Four committed fixtures, re-analyzed on **every run**, asserted to still trip at their known lines. A
+gutted analyzer fails its own fixtures. Proving a guard trips once, in a session, proves it about a
+build nobody will run again. **MADE TO TRIP on real code** (each reverted byte-identical):
+- a real `EvidencePane` taking a `Decision` -> fails **A, B and C** at `AmlConsole.tsx:205/:46/:286`
+- `<AmlConsole>` beside `<DecisionFeed>` -> fails **C** at `App.tsx:347`, naming both offenders
+
+### THE EVIDENCE SURFACE IS A VIEW, NOT A PANE — adjacency designed out, not avoided
+`DecisionFeed` and `Investigation` render `is_fraud` today, **legitimately** (the label attached to a
+decision already made without it — the one place it may be served). That was harmless only because no
+witness was on screen. The body now mounts **exactly one arm**; the `aml` arm mounts the evidence
+alone. `is_fraud` was NOT stripped from the feed — the feed IS an audit surface, and gutting it would
+destroy the moat's Phase-3 story. **What must never happen is CO-VISIBILITY WITH A WITNESS**, and the
+view split makes that structurally impossible rather than carefully avoided. The audit layer for a
+subject (verdict, witness_outcome, is_fraud, belief, lineage) is **Rung 4**, and it arrives as the
+SCORE of what the reader just watched, never as an input to it.
+
+### THE FOUR-WAY BASIS RE-DERIVES FROM ACCOUNT IDENTITY, NOT FROM PROSE
+The brief said to read the fourth state from the `detail` string on `/interrogate`. **Parsing prose
+in the client is a proxy**: a backend reword and the console silently renders a self-loop as a closed
+search — corrupting IN PIXELS the exact distinction Rung 1 was corrected to make, with nothing
+failing. So the console re-derives it the way `aml_graph.Edge` itself does:
+`from_account_id === to_account_id`.
+`test_the_console_four_way_basis_re_derives_from_account_identity_not_from_prose` pins the
+equivalence over all **1,500** edges (wire predicate <=> graph predicate <=> prose) and the four
+buckets **57 / 980 / 447 / 16**. **MADE TO TRIP:** rewording the detail string fails at a named txn
+id. A reword now fails a test instead of corrupting a pixel.
+
+### ============ RAVEN: IT WORKS, AND ITS MCP TOOLS WERE **NOT** LIVE IN-SESSION ============
+**Do not let a later session read "we used Raven's MCP tools" and believe it.** `claude mcp add raven`
+registered it and it health-checks Connected — but **MCP servers are enumerated at session start**, so
+its tools were NOT in this session's registry (`ToolSearch` found nothing). **I spoke JSON-RPC to the
+server directly over stdio.** Same server, same tools, same numbers — but it was not the MCP tool
+surface, and a future session should expect the tools to be natively callable instead.
+
+Verified before being trusted (this project has shipped five checks that were green for their entire
+lives while proving nothing): **raven-mcp v1.17.0, 78 tools**, renders real pages in headless
+chromium. Against a fixture with a KNOWN answer it returned `--ash #5A6678` on `--void` = **3.32:1**
+and `--bone #C4CDD8` on `--void` = **12.04:1**, and caught a 20x20 button (deficit 24x24) while
+passing a 48x48. `audit_url` takes viewports as `{w, h}` — **HEIGHT is a first-class input**, which is
+the variable every prior audit let float.
+
+**The evidence surface is reached by a CLICK-THROUGH, so `audit_url` cannot reach it.** Raven's tools
+also accept a snapshot instead of a URL — so the console was driven with Playwright to each exhibit
+and the REAL rendered DOM was fed to `audit_contrast` / `audit_tap_targets` / `audit_typography`.
+That is the instrument doing its job: measuring the thing, not a mock of it.
+
+### ===== THE DEFECT I WOULD HAVE DEFENDED AS "DELIBERATE RESTRAINT" =====
+Raven measured `h2.aml__basis-label` at **3.06:1** — below WCAG AA. That is the **HEADLINE OF THE
+WHOLE SURFACE** (the words *"CONCLUSIVE_NO · self-loop"*), rendered in `--ash` because I had reached
+for the quiet token to say *"this one is unremarkable"*.
+
+**Dimming a headline to signal that it is unremarkable does not make it quiet. It makes it hard to
+read.** The four bases must be DISTINGUISHABLE, not ILLEGIBLE — and they already were, by border
+style, label text, headline, detail and count. None of that needed the contrast.
+
+Had I not measured, I would have cited FRONTEND.md's restraint discipline and shipped it. **The rule
+that came out of it, and it is the durable part:**
+
+> **IF THE READER MUST READ IT TO UNDERSTAND THE EVIDENCE, IT IS LEGIBLE (>= AA). Quiet is for
+> chrome, never for a fact.**
+
+Same for the witness size/shape, the census count, and the provenance line (*"No model was called. No
+ground truth was read."* — the surface's integrity claim, at 3.32:1; **a claim nobody can read is not
+a claim**). And `flag-capable` was **asymmetric**: the positive passed at 5.83:1 while *"not
+flag-capable"* sat at 3.06:1 — a legibility gradient on a binary fact, where the negative case was
+quietly harder to read than the positive one.
+
+**MEASURED: 10 of 26 text elements below AA -> 3.** The surviving 3 are the deliberate FRONTEND.md
+chrome, and they are REPORTED WITH THEIR RATIOS rather than dismissed: the section eyebrow
+(`--ash`, 3.06:1), the decorative arrow (3.06:1), and the `dt` key labels (3.06:1) whose **values**
+measure 11.09:1. FRONTEND.md wins those — they carry no fact.
+
+**TAP TARGETS: 0 failures across all 20 renders** (44px floor). **TYPOGRAPHY: `off_scale_sizes: []`.**
+The line-height "outliers" are the prose paragraphs at 1.5-1.6 against a *"dominant"* 1.2 skewed by
+the many single-line chips — **an artifact of the element mix, not a defect.** Reported, not obeyed.
+
+### FOUND BY DRIVING IT: THE FOUR WITNESS CARDS COULD NOT BE READ ACROSS
+With typology + capability + outcome on one wrapping flex row, the outcome chip landed on line 1 for
+STACK and wrapped to line 2 for GATHER-SCATTER — **the same fact in a different place on each card.**
+The four witnesses exist to be COMPARED; a layout that moves the comparison key per card defeats
+that. Fixed head: typology left, outcome right, capability below. *A screenshot at one viewport would
+not have shown this; four cards side by side did.*
+
+### RUNG 2 GATE — all green
+- **199 backend tests pass.** Citation, restore-instruction, gloss, oracle-boundary and typecheck
+  guards all green.
+- **BOTH THE GLOSS GUARD AND THE TYPECHECK GUARD CAUGHT ME** — the fifth and sixth times this project
+  has recorded a guard tripping on its author. The gloss guard: `basis.ts` named the self-loops only
+  as the IDENTIFIER `SELF_LOOP` (an underscore), and `self-?loop` does not match `self_loop` — **and
+  it should not: an identifier is not an explanation.** The typecheck guard: the new frontend-ci
+  comment CITED the vacuous command by name while explaining that the composition guard must not
+  repeat its disease. **Prose is a surface.** Both fixed by complying, never by widening the guard.
+- `tsc -b`, `oxlint`, `vite build`, `node scripts/composition-guard.mjs` — all exit 0.
+- **DRIVEN LIVE** (vite -> uvicorn -> live cluster; both harness traps cleared first): **20 renders** —
+  5 exhibits x {1280x800, 1280x900} x {motion, reduced-motion}. **0 page errors, 0 horizontal
+  overflow, 0 tap-target failures, and `is_fraud` ABSENT from the rendered surface in all 20** —
+  asserted against the real `innerText`, not grepped from source.
+- **THE FOUR-WAY IS LEGIBLE AND NO TWO STATES RENDER ALIKE.** MATCH (`--bone`, solid) · INCONCLUSIVE
+  (`--ghost`, **dashed** — *"we could not determine"* must never render as a clean pass) ·
+  CONCLUSIVE_NO/self-loop (**dotted**, a `SAME ACCOUNT` chip on the subject, *"447 of 1,500"*, *"The
+  account paid itself. No search was possible."*) · CONCLUSIVE_NO/closed-search (solid, *"16 of
+  1,500"*, *"The search ran, closed inside the extract, and found no return path."*). A self-loop and
+  a closed search are unmistakable at a glance — which was the entire point of Rung 1's correction.
+- **COLOUR DISCIPLINE HELD. NO `--alert` ANYWHERE ON THE SURFACE.** Painting a witness red would fuse
+  *"the graph found a structure"* with *"this is fraud"* — the oracle-boundary collapse in colour
+  form. `--bone` marks what the system points at, and nothing else. No `--trace`/`--origin`. No
+  second r3f use.
+- **THE COST EXHIBIT IS THE HONEST FACE OF 75.4% PRECISION, AND IT LANDS.** `3cda6d1d` is BENIGN by
+  the oracle, yet CYCLE **and** GATHER-SCATTER **and** STACK all witness it (`competing structure ·
+  CYCLE · GATHER-SCATTER · STACK`), and **the reader cannot tell it is benign** — because the label is
+  not there. That is the exam without the answer key, which is the only way the 75.4% means anything.
+- **Cluster restored** (two ordered backfills) and INDEPENDENTLY re-verified with real SELECTs: 24
+  agents, 2 active beliefs (**both** with real 1536-dim vectors), 15 edges, 5,500 decisions
+  (4,000 card / 1,500 AML), 1,500 `aml_transactions`, 8 perf windows, `count(DISTINCT decided_at)=1`
+  for AML, census **57/463/980**, crimson curve `.924 .952 .876 .852 .724 .556 .624 .528`
+  byte-identical.
+
+### HARNESS GOTCHAS (banked — all four cost real time)
+- **THE RATE LIMITER LOOKS EXACTLY LIKE A UI BUG — AGAIN, and it cost the most.** 60 req/60s per
+  (ip, route). Each console drive paginates `/decisions` 8 times; bursting 20 renders blows the
+  budget, and **a 429 mid-pagination is indistinguishable from a missing row** — the driver reported
+  *"row never appeared"* and I nearly went hunting for a pagination bug that did not exist. The tell
+  was that the SAME case passed standalone and failed in a batch. **Pace the runs (32s apart).**
+- **`git checkout --` DESTROYED MY OWN UNCOMMITTED WORK — the banked lesson, and I walked into it
+  anyway.** I deleted the CI step to prove the meta-guard trips, then restored the file — and the
+  restore took the workflow back to HEAD, **erasing the CI step I had just written and never
+  committed.** `git status` stopped listing the file at all, which is how I noticed. The banked rule
+  is *"break a file only after its fix is staged"*; I staged, then stashed, and the stash pop reset
+  the index. **COMMIT the fix, THEN break it.** Not stage. Commit.
+- **A DRIVER BUG READS AS AN APP BUG.** My Playwright helper matched `/load more/i`; the real button
+  says **`load 200 more`**, so it "found no pages" and I briefly suspected Rung 1's pagination had
+  regressed. Separately, the feed's row ids looked non-monotonic — because the feed sorts on
+  `decisions.id` but DISPLAYS `aml_transaction_id`. **Two different UUIDs; no ordering is implied.**
+- **`scripts/serve.py` must be run as `python -m scripts.serve`** (`python scripts/serve.py` cannot
+  import `app`). And a zombie held `:8000` — verified it was serving CURRENT code with a field newer
+  than the last thing I believed (`447` / `self-loop` in `/openapi.json`, Rung 1's newest fact), plus
+  a DB-backed route at 200, before trusting a single rendered result.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `test(seam): the console's four-way basis re-derives from account identity, not prose`
+- `feat(frontend): the evidence pane — the first witness pixel, on its own surface`
+- `test(frontend): the composition guard — the exam and the answer key, kept apart by type`
+- `fix(frontend,ci): the gloss guard and the typecheck guard each caught this session`
+- `fix(frontend): the evidence pane, as measured — legibility is for facts, quiet is for chrome`
+- `docs(notes): record Rung 2` (this entry)
+
+### RUNG 2 explicitly NOT done (and Rung 3's gate): **the GEOMETRY** — the ring, the legs and the
+### bundle, DRAWN. Rung 2 states each witness's SIZE and SHAPE typographically and draws none of it.
+### Also not done: the **AUDIT / ORDERED-REVEAL surface** (Rung 4 — where `is_fraud` may appear for a
+### subject, and ONLY there); the `neighbourhood` endpoint (Rung 5, still gated on looking at a
+### render); **PLAYWRIGHT IN FRONTEND CI — STILL OPEN, and it is now the gap that matters most.** The
+### composition guard closes the TYPE and MOUNT invariants; the Confirm-not-in-arm's-footprint
+### GEOMETRY invariant still has no committed guard, and **Raven is a MEASUREMENT, not a guard** — it
+### runs in a session, not on someone else's push, and must never be cited as if it were a test.
+### Also not done: any change to the brake, the eval inputs, any measured constant, or the
+### invalidation flow; a second r3f use. Do NOT push without explicit approval.
