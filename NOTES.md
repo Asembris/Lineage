@@ -7647,3 +7647,36 @@ under is another way to silently under-run.
 > **A GUARD THAT CAN SILENTLY UNDER-RUN IS A GUARD THAT CAN SILENTLY STOP COVERING A STATE.** Green
 > is not the same as complete: **read the test COUNT, not just the exit code.** Nothing in this
 > project would have caught "9 passed" — I only saw it because the number looked wrong.
+
+### ===== AND THEN CI FAILED ON `npm ci` — I VERIFIED WITH A DIFFERENT COMMAND THAN CI RUNS =====
+The push went green on the BACKEND suite (7m — the pin, the coverage guard and both meta-guards all
+passed on a real runner) and **frontend-ci FAILED in 8 seconds, at `npm ci`:**
+
+```
+npm error `npm ci` can only install packages when your package.json and package-lock.json
+npm error  are in sync. Please update your lock file with `npm install` before continuing.
+npm error Missing: @emnapi/core@1.11.1 from lock file
+npm error Missing: @emnapi/runtime@1.11.1 from lock file
+```
+
+I added `@playwright/test` with **`npm install`**, ran the guard, the typecheck, the lint and the
+build — and **never once ran `npm ci`, which is the command frontend-ci actually runs.** The lockfile
+`npm install` wrote was missing 23 lines of transitive entries, and `npm ci` — which installs from
+the lockfile ALONE and refuses when it disagrees with `package.json` — rejected it.
+
+**THIS IS THE `tsc -b` / `tsc --noEmit` DISEASE, COMMITTED BY ME, IN THE SESSION WHOSE ENTIRE SUBJECT
+WAS THAT FAILURE MODE.** The shape is identical: *a local check that resembles the CI check, passes,
+and is not the same command.* `npm install` mutates the lockfile to make itself succeed; `npm ci`
+asserts against it. One of those is a check and the other is a repair, and I ran the repair.
+
+> **VERIFY WITH THE COMMAND CI RUNS, NOT THE ONE THAT LOOKS EQUIVALENT.** For this repo that means
+> **`npm ci`, never `npm install`**, before believing a dependency change is done — exactly as it
+> means `tsc -b`, never `tsc --noEmit`.
+
+**NO NEW GUARD FOR THIS, DELIBERATELY.** `npm ci` in frontend-ci IS the guard, it fired on the first
+push, and it named the cause in 8 seconds. A lockfile change is a `frontend/**` change, so the
+workflow that checks it always runs on the pushes that can break it. Adding a pytest lockfile-sync
+check would be a PROXY for a real check that already works — and this project does not add guards for
+things already guarded. **The gap was my local verification, not CI's coverage.** Fixed by
+regenerating the lockfile and re-running the full frontend-ci sequence from a clean `npm ci`:
+`tsc -b` 0 · `guard:composition` 0 · `oxlint` 0 · `vite build` 0 · **geometry guard 12/12**.
