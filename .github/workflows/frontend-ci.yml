@@ -46,6 +46,20 @@ jobs:
       - name: Typecheck (tsc -b)
         run: npx tsc -b
 
+      # THE COMPOSITION GUARD — no component may hold both the evidence layer and the audit layer.
+      #
+      # IT RUNS HERE AND NOT IN PYTEST, and that is load-bearing rather than a convenience. The
+      # backend workflow (ci.yml) has no Node step, and — far worse — it declares
+      # `paths-ignore: ['frontend/**']`, so a frontend-only push does not run the backend suite AT
+      # ALL. A pytest composition guard would have been skipped by exactly the pushes that can
+      # violate it: a check that cannot fail on the change it protects against. That is the
+      # `tsc --noEmit` disease one layer up, and this project has paid for it once already.
+      #
+      # tests/test_composition_guard.py asserts that THIS STEP EXISTS. Workflow files are not in
+      # ci.yml's paths-ignore, so deleting it fails the backend suite.
+      - name: Composition guard (the oracle boundary, in the component tree)
+        run: npm run guard:composition
+
       - name: Lint (oxlint)
         run: npm run lint
 
