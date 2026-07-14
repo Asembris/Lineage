@@ -55,8 +55,15 @@
  *
  * The cause is `MIN_FANOUT` truncation in `aml_graph.py`. So a GATHER-SCATTER drawn from
  * `transaction_ids` alone renders a 2-in/2-out fan directly beside a sentence saying "gathers from
- * 12 sources" — a picture contradicting the prose next to it, with nothing failing anywhere. That
- * is this project's signature defect ("CONCLUSIVE_NO: 463 searched") committed in PIXELS.
+ * 12 sources" — a picture contradicting the prose next to it, with nothing failing anywhere.
+ *
+ * That is this project's signature defect, committed in PIXELS rather than in prose. Its original
+ * form was the gloss that called all 463 `CONCLUSIVE_NO` rows searched regions — when 447 of them
+ * are SELF-LOOPS, an account paying itself, excluded from adjacency by construction, where no
+ * search was ever possible and nothing was explored; only 16 were ever really searched. The COUNT
+ * was never wrong. Its DESCRIPTION OF ITSELF was. A drawing is a description too, and it is the one
+ * surface with no test — which is why the two invariants a picture can silently break are guarded
+ * in a real browser on every push.
  *
  * TWO THINGS FOLLOW, and they are the whole design:
  *
