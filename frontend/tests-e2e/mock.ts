@@ -56,11 +56,60 @@ const FIXTURES = JSON.parse(
     decision_id: string;
     agent_id: string;
     aml_transaction_id: string;
+    /** A CYCLE witness: the drawing is the whole cycle, and the subject is cited. */
+    aml_ring_txn_id: string;
+    /** A witness citing TWO transactions on ONE account pair — the multigraph. */
+    aml_parallel_txn_id: string;
+    /** A witness that does NOT cite the subject (75 of 107 GATHER-SCATTER matches). */
+    aml_omits_subject_txn_id: string;
   };
   responses: Record<string, unknown>;
 };
 
 export const SUBJECTS = FIXTURES.subjects;
+
+interface CapturedWitness {
+  typology: string;
+  outcome: string;
+  kind: string;
+  transaction_ids: string[];
+}
+
+/**
+ * What the WIRE says a subject's geometry must contain — read from the captured interrogation, and
+ * never written down here.
+ *
+ * THIS IS THE POINT OF THE WHOLE GUARD. The browser assertion compares the RENDER against the
+ * RESPONSE, both taken from the same captured payload. Hardcoding "the ring has 10 edges" would
+ * make the fixture and the expectation two copies of one belief, able to drift together and stay
+ * green — the co-author problem that blinded check C of the composition guard. So the expected edge
+ * count IS the witness's `transaction_ids.length`, straight off the wire, and the expected
+ * subject-marker count IS whether that list contains the subject. If the renderer collapses two
+ * parallel transactions into one line, or invents a subject marker on a witness that never cited
+ * one, the render and the wire disagree and the guard fails.
+ */
+export function expectedGeometry(txnId: string): {
+  typology: string;
+  edges: number;
+  citesSubject: boolean;
+}[] {
+  const r = FIXTURES.responses[`GET /aml/transactions/${txnId}/interrogate`] as
+    | { witnesses: CapturedWitness[] }
+    | undefined;
+  if (!r) {
+    throw new Error(
+      `no captured interrogation for ${txnId} — re-capture with ` +
+        "`python -m scripts.capture_console_fixtures`",
+    );
+  }
+  return r.witnesses
+    .filter((w) => w.outcome === "MATCH" && w.kind !== "NONE")
+    .map((w) => ({
+      typology: w.typology,
+      edges: w.transaction_ids.length,
+      citesSubject: w.transaction_ids.includes(txnId),
+    }));
+}
 
 /**
  * The subject decision's `txn_ref`, resolved FROM the captured feed — never hardcoded.

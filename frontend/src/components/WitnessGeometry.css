@@ -191,6 +191,18 @@
   overflow: visible;
 }
 
+/* Styled like an edge, but deliberately NOT classed as one — see WitnessGeometry.tsx. */
+.geo__swatch-line {
+  fill: none;
+  stroke: var(--ghost);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.geo__swatch-line--gather {
+  stroke-dasharray: 5 3;
+}
+
 .geo__legend-note {
   margin-top: 2px;
   color: var(--ghost);

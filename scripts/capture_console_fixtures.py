@@ -40,6 +40,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
@@ -52,6 +53,8 @@ from sqlalchemy import text
 
 from app.db import engine
 from app.main import app
+from app.services.aml_graph import Outcome, load_graph
+from app.services.aml_interrogate import TraversalKind, interrogate
 
 OUT = Path(__file__).resolve().parents[1] / "frontend" / "tests-e2e" / "fixtures" / "console.json"
 
@@ -69,14 +72,82 @@ def key(path: str, params: dict[str, object] | None = None) -> str:
     return f"GET {path}?{urlencode(items)}" if items else f"GET {path}"
 
 
+async def pick_geometry_subjects(c) -> dict[str, str]:
+    """The three AML subjects whose GEOMETRY the browser guard measures.
+
+    ============ THE OLD PICK WAS AN ACCIDENT, AND IT WOULD HAVE MADE THE GUARD VACUOUS ============
+
+    `aml_transaction_id` below is chosen by `ORDER BY decided_at DESC, id DESC LIMIT 1`. But ALL
+    1,500 AML rows share ONE `decided_at` (the base-rate-mirage guard put it there deliberately), so
+    that ORDER BY collapses to "whatever has the max id" — and the row it lands on witnesses NOTHING.
+    All four of its witnesses are NONE.
+
+    THE GUARD'S SUBSTRATE WAS NEVER CHOSEN. It was a side effect of a different invariant. A geometry
+    guard written against that fixture would render ZERO GEOMETRY and pass — green for its whole life,
+    measuring nothing, which is the ninth time this project has come within one step of shipping
+    exactly that. So the geometry subjects are picked ON PURPOSE, by running the real witness against
+    the real graph, and each one is picked to make a SPECIFIC invariant observable:
+
+      ring      — a CYCLE witness. The drawing is the whole cycle, and the subject is cited.
+      parallel  — a witness citing TWO TRANSACTIONS ON ONE ACCOUNT PAIR. The money-flow graph is a
+                  MULTIGRAPH; a layout keying edges by (from,to) would draw 3 lines where the
+                  evidence has 4. Without this subject the edge-count assertion cannot fail.
+      omits     — a witness that does NOT cite the subject (75 of 107 GATHER-SCATTER matches). Without
+                  it, "the subject is marked only when cited" cannot fail either.
+
+    ALL THREE MUST BE ON THE FEED'S FIRST PAGE, because the guard clicks through the feed to reach
+    them and cannot page. That is asserted, not hoped for: if the extract ever changes so that one is
+    unreachable, this raises instead of silently capturing a subject the guard cannot navigate to.
+    """
+    rows = (
+        await c.execute(
+            text(
+                "SELECT aml_transaction_id FROM decisions WHERE aml_transaction_id IS NOT NULL "
+                f"ORDER BY decided_at DESC, id DESC LIMIT {PAGE}"
+            )
+        )
+    ).scalars().all()
+
+    g = await load_graph(c)
+    picked: dict[str, str] = {}
+    for txn_id in rows:
+        edge = g.by_id.get(txn_id)
+        if edge is None:
+            continue
+        witnesses, _ = interrogate(g, edge)
+        for w in witnesses:
+            if w.outcome is not Outcome.MATCH:
+                continue
+            ids = list(w.transaction_ids)
+            if w.kind is TraversalKind.RING:
+                picked.setdefault("aml_ring_txn_id", str(txn_id))
+            pairs = Counter((g.by_id[i].src, g.by_id[i].dst) for i in ids if i in g.by_id)
+            if any(n > 1 for n in pairs.values()):
+                picked.setdefault("aml_parallel_txn_id", str(txn_id))
+            if edge.id not in ids:
+                picked.setdefault("aml_omits_subject_txn_id", str(txn_id))
+
+    missing = {"aml_ring_txn_id", "aml_parallel_txn_id", "aml_omits_subject_txn_id"} - picked.keys()
+    if missing:
+        raise SystemExit(
+            f"no subject on the feed's FIRST PAGE exhibits: {sorted(missing)}.\n"
+            "The geometry guard clicks through the feed and cannot page, so it could not reach one.\n"
+            "Do NOT weaken the guard to accept this — the invariant it would stop covering is the\n"
+            "one that keeps the drawing from understating the evidence."
+        )
+    return picked
+
+
 async def pick_subjects() -> dict[str, str]:
-    """The three real subjects the guard drives, chosen FROM THE CLUSTER — never hardcoded.
+    """The real subjects the guard drives, chosen FROM THE CLUSTER — never hardcoded.
 
     - the crimson belief: the one with a measured `belief_performance` curve (Time-travel has
       nothing to draw without it, and the armed footer is only reachable through Time-travel being
       open — that is the whole point of the Inspector-fold fix).
     - a card decision it drove: the Investigation subject.
     - an AML transaction: the evidence surface, for the `is_fraud`-absent check.
+    - three AML transactions with real GEOMETRY — see pick_geometry_subjects, and read it before
+      touching any of this: the obvious pick renders nothing and the guard passes anyway.
     """
     async with engine.connect() as c:
         belief_id = (
@@ -113,11 +184,14 @@ async def pick_subjects() -> dict[str, str]:
             )
         ).scalar_one()
 
+        geometry = await pick_geometry_subjects(c)
+
     return {
         "belief_id": str(belief_id),
         "decision_id": str(decision.id),
         "agent_id": str(decision.agent_id),
         "aml_transaction_id": str(txn_id),
+        **geometry,
     }
 
 
@@ -162,6 +236,11 @@ async def main() -> None:
         (f"/beliefs/{belief}/lineage", None),
         # --- the evidence surface (for the `is_fraud`-absent-from-innerText check) ---
         (f"/aml/transactions/{txn}/interrogate", None),
+        # --- the GEOMETRY subjects. Each makes one invariant OBSERVABLE; without them the geometry
+        #     guard renders nothing and passes. See pick_geometry_subjects. ---
+        (f"/aml/transactions/{subjects['aml_ring_txn_id']}/interrogate", None),
+        (f"/aml/transactions/{subjects['aml_parallel_txn_id']}/interrogate", None),
+        (f"/aml/transactions/{subjects['aml_omits_subject_txn_id']}/interrogate", None),
     ]
 
     captured: dict[str, object] = {}
