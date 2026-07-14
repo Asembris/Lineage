@@ -1,0 +1,36 @@
+/* The browser guard's OWN typecheck project — because it had none, and that is how this repo has
+   been bitten before.
+ *
+ * `tsconfig.app.json` includes `src` and `tsconfig.node.json` includes `vite.config.ts`. The e2e
+ * guard (playwright.config.ts, tests-e2e/) was in NEITHER, so `tsc -b` typechecked ZERO of it — and
+ * Playwright's own transpiler STRIPS types without checking them. A misspelled property on the
+ * fixture object would have read as `undefined` at runtime, and a guard measuring `undefined` is a
+ * guard that passes while measuring nothing.
+ *
+ * That is the `tsc --noEmit` disease (zero files, exit 0, cited by nine gates) aimed squarely at
+ * the thing meant to cure it. Referenced from tsconfig.json, so plain `npm run typecheck` covers it.
+ *
+ * DOM is in `lib` because `page.evaluate()` callbacks are typechecked as BROWSER code — they run in
+ * the page, not in Node. */
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["playwright.config.ts", "tests-e2e"]
+}
