@@ -7732,3 +7732,227 @@ named the cause both times in under 15 seconds, and a lockfile change is always 
 so it always runs. A pytest lockfile-shape assertion would be a brittle proxy for a check that
 already works — the failure was in my verification, not in CI's coverage, and **the correct response
 to a check that caught you is to obey it, never to widen it.**
+
+## AML CONSOLE — RUNG 3: THE WITNESS GEOMETRY, AND THE FIXTURE THAT WAS NEVER CHOSEN (2026-07-14)
+
+The money-flow idiom, DRAWN. **211 backend tests pass.** The geometry guard is now **28 tests across
+4 projects** (was 12). Frontend + the fixture capture + one pytest module; **no endpoint, no
+migration, no change to the brake, the eval inputs, any measured constant, or the invalidation
+flow.** No second r3f use.
+
+### ============ THE LOAD-BEARING FINDING: ONLY THE RING IS COMPLETE EVIDENCE ============
+### Everything else the graph witnesses is a BOUNDED CITATION, and drawing it as a structure would
+### have been this project's signature defect committed in PIXELS.
+
+Measured over all 1,500 edges, comparing each witness's own `detail` prose against the edge set it
+actually serves on the wire:
+
+| witness | its prose claims | it serves | verdict |
+|---|---|---|---|
+| **CYCLE** (57) | "cycle of length 10" | **10 edges** | **57/57 FAITHFUL — the drawing IS the whole cycle** |
+| SCATTER-GATHER (42) | "**15** intermediaries scatter…" | 2 intermediaries | **39 of 42 understate** |
+| GATHER-SCATTER (107) | "gathers from **12** sources then scatters to **12**" | 2 in, 2 out | **107 of 107 understate** |
+| STACK (35) | "two bipartite layers" (no number) | srcs[:2] + subject + dsts[:2] | truncated, but claims no number |
+
+The cause is `MIN_FANOUT` truncation in `aml_graph.py` (`in_ids[:2] + out_ids[:2]`). So a
+GATHER-SCATTER drawn from `transaction_ids` alone renders a 2-in/2-out fan **directly beside a
+sentence saying "gathers from 12 sources"** — a picture contradicting the prose next to it, with
+**nothing failing anywhere.**
+
+That is the same disease as the gloss that called all 463 `CONCLUSIVE_NO` rows searched regions,
+when 447 of them are **SELF-LOOPS** — an account paying itself, excluded from adjacency by
+construction, where no search was ever possible and nothing was explored — and only 16 were ever
+really searched. **The COUNT was never wrong. Its DESCRIPTION OF ITSELF was.** A drawing is a
+description too, and it is the one surface that had no test.
+
+**THE RULING: DRAW IT, LABELLED PARTIAL, IN THE PIXELS.** A blank where evidence exists is a lie of
+omission; a truthful partial citation that says it is partial is honest. Each figure carries
+`partial · the 4 transactions this witness cites`, a caveat paragraph, and the SAME caveat in its
+accessible description. **The prose and the picture differ in magnitude and the picture SAYS SO** —
+it is never reconciled by parsing `detail` (`lib/basis.ts` bans exactly that, with a test, because a
+backend reword would then silently corrupt the pixel) and never by inventing the missing edges.
+
+> **THE TRUNCATION IS A WIRE PROBLEM, NOT A RENDERING PROBLEM.** `aml_evidence.neighbourhood()` holds
+> the searched region (54–120 real edges) and **no route serves it.** This is now the strongest
+> argument the project has produced for the `neighbourhood` endpoint (**Rung 5**). Do not "fix" it in
+> the renderer by drawing edges nobody served.
+
+### THREE PAYLOAD FACTS, EACH OF WHICH WOULD HAVE PRODUCED A PLAUSIBLE, SILENTLY-WRONG PICTURE
+All three are commented **at the source** in `lib/witnessGeometry.ts`, not only here — the next
+person to touch that file must hit them where they bite, not find them in a 7,000-line log.
+
+1. **THE SUBJECT IS OFTEN ABSENT FROM ITS OWN WITNESS.** CYCLE cites it 57/57 and STACK 35/35 — but
+   **GATHER-SCATTER omits it in 75 of 107**, and SCATTER-GATHER in 1 of 42. Two different causes:
+   GATHER-SCATTER truncates to `MIN_FANOUT`, so a subject outside the first two by id-sort is
+   dropped; SCATTER-GATHER cites `g.succ(u)[v]`, and **`succ()` keys ONE edge per (src,dst) PAIR**,
+   so when the subject has a parallel twin the witness cites **the twin**. On `c98de429` the witness
+   cites `586a923b` — same two accounts, different amount. Marking `edges[0]` would point the reader
+   at a transaction they did not click, in three cases out of four.
+2. **THE MONEY-FLOW GRAPH IS A MULTIGRAPH.** 41 witnesses (27 GS, 14 STACK) carry **two distinct
+   transactions between the same pair of accounts.** A layout keying edges by (from,to) — the natural
+   thing to write — draws **three lines where the evidence has four.** Edge identity is the
+   TRANSACTION id; parallel twins bow apart.
+3. **A NAMED BOUNDARY ACCOUNT IS A NODE WITH NO LINE.** In 730 witness-instances the boundary account
+   is an endpoint of **no served transaction.** Drawing a line to it would be **fabrication** —
+   inventing an edge to make a picture look finished.
+
+### ========== THE NINTH CHECK THAT PROVED NOTHING — AND ITS CAUSE IS NEW ==========
+### The guard's SUBSTRATE was never chosen. It was a side effect of a DIFFERENT invariant.
+
+`capture_console_fixtures.py` picked its AML subject with `ORDER BY decided_at DESC, id DESC LIMIT 1`.
+But **all 1,500 AML rows share ONE `decided_at`** — the base-rate-mirage guard put it there
+deliberately — so that ORDER BY **collapses to "whatever has the max id"**, and the row it landed on
+(`e7d0f02c`) **witnesses NOTHING.** All four of its witnesses are `NONE`.
+
+**A geometry guard written against that fixture RENDERS NO GEOMETRY AND PASSES.** Green for its
+entire life, measuring nothing.
+
+| # | the check | why it could not fail |
+|---|-----------|------------------------|
+| 1 | the two dead **vector indexes** | never appeared in a plan |
+| 2 | `verify_corpus.py`'s **EXPLAIN** | EXPLAINed a query the application never runs |
+| 3 | the restore guard's **14-line proximity window** | passed its own bug |
+| 4 | `test_citations.py`'s **docstring** | carried the disease it was written to cure |
+| 5 | **`tsc --noEmit`** | typechecks ZERO files; cited by NINE gates |
+| 6 | the composition guard's **CHECK C** | blinded by the property that makes the design safe |
+| 7 | the console pin's **first draft** | read a table the suite empties |
+| 8 | the geometry guard's **reduced-motion dimension** | an unknown key JS silently ignores |
+| **9** | **the geometry guard's FIXTURE** | **its subject witnesses nothing — the guard would draw an empty page and report success** |
+
+**THE NEW SHAPE, and it is worth naming:** 1–8 were checks whose *logic* could not fail. This is the
+first whose **INPUT** could not fail. *A guard is only as falsifiable as the data you point it at* —
+and the data was chosen by an ORDER BY that was answering a different question.
+
+**THE FIX IS STRUCTURAL, NOT A BETTER PICK.** Three subjects are now selected ON PURPOSE, by running
+the real witness against the real graph, **each chosen to make a SPECIFIC invariant observable**, and
+all asserted to be on the feed's FIRST PAGE (the guard clicks through the feed and cannot page):
+
+    ring     045adfd2   a CYCLE — the whole cycle drawn, the subject cited
+    parallel 37ebc195   TWO transactions on ONE account pair — the multigraph
+    omits    b1983536   a witness that does NOT cite its own subject
+
+And `test_the_geometry_fixtures_still_exhibit_the_invariants_they_were_chosen_for` **pins that they
+still do** — in the backend suite, which runs on every backend change. Without the `parallel` subject
+the edge-count assertion is **UNFALSIFIABLE** (a layout that merges parallel edges would pass it);
+without `omits`, the subject-marker assertion cannot fail either. **MADE TO TRIP:** pointing
+`aml_ring_txn_id` back at the old accidental pick fails with *"now witnesses NO structure, so the
+geometry guard would render an empty page and pass."* The fixture was then **RE-CAPTURED, never
+hand-edited back.**
+
+### WHAT EARNED A GUARD, AND WHAT DID NOT
+**Landed** — both compare the RENDER against the WIRE. `expectedGeometry()` reads the witness's own
+`transaction_ids` out of the captured interrogation; a hardcoded "10" would be a second copy of the
+same belief, free to drift with the fixture and stay green:
+- **`.geo__edge` count === `witness.transaction_ids.length`.** Catches the multigraph collapse.
+- **subject-marked edges === (the witness cites it ? 1 : 0).** Catches a fabricated subject marker.
+- The **oracle-boundary sweep now also runs on a subject whose RING is DRAWN.** It previously ran only
+  on the zero-witness subject, which renders no geometry — and **the drawing is a NEW TEXT SURFACE**
+  (an `aria-label` on every figure, a `<title>` on every edge and node). A leak there would be
+  announced to a screen reader and invisible on screen.
+
+**Cut, deliberately — "does the ring close?"** It is the money shot, and it is *not* guarded. Each edge
+is drawn between the real account ids on its own row, so **it closes BY CONSTRUCTION**; the data
+property is already pinned in the backend suite (57/57 contiguous and closed); and the one bug that
+could break it in pixels — collapsing two accounts into one node — **cannot manifest: nodes are keyed
+by account UUID, and account numbers are 648/648 unique in this extract.** A per-push cost for a
+property designed out rather than observed is exactly what the sticky-focus guard was cut for.
+
+### THE GUARD CAUGHT ITS AUTHOR ON ITS FIRST RUN
+The LEGS legend drew its key swatches with `class="geo__edge"` — for the stroke styling. The guard
+counted **6 edges where the witness cites 4**: two legend keys counted as money. **The guard was right
+and the markup was wrong.** A class that names a thing must not be worn by something that is not that
+thing. Fixed by complying (`geo__swatch-line`), never by widening the guard.
+
+### AND THE GLOSS GUARD CAUGHT ME — the SEVENTH time a guard has tripped on its author here
+`witnessGeometry.ts` **QUOTED** the false gloss as a rhetorical reference to the project's signature
+defect, without naming the self-loops in the same paragraph. **A quotation is still a surface.** Fixed
+by complying. And it was caught **only by the FULL suite** — the targeted run was green.
+
+### FOUND BY DRIVING IT: THE DIRECTION OF THE MONEY WAS INVISIBLE
+Edges drawn centre-to-centre put the arrowhead's tip exactly on the node's centre, and **the account
+disc painted straight over it** — so **nine of the hero ring's ten hops showed no arrow at all.**
+Direction is a FACT about the evidence (Rung 2 was corrected for dimming that very fact), and it was
+carried by nothing. Edges now stop clear of both discs. Two more, same origin: **ring labels collided
+with the ring's own stroke** (they are now radial), and **the legs were not LABELLED** — scatter vs
+gather was carried by a dash with no key, and a fact readable only by someone who already knows the
+convention is not readable. *`tsc` + a passing guard is not "it renders".*
+
+### MOTION — SEQUENCE IS A CLAIM, SO ONLY THE RING GETS ONE
+`pathLength` + opacity on the shared `DUR`/`EASE`. The ring's hops draw one after another and the last
+one lands back on the account the first one left. **LEGS and BUNDLE fade in TOGETHER** —
+`predecessor_of` returns `NO_LINEAR_ORDER` for them, and staggering them would animate an order the
+evidence does not have. `prefers-reduced-motion` collapses to the **IDENTICAL FINAL FRAME, instantly**
+— every hop drawn, the ring already closed — never a faster animation.
+
+### TOKEN DISCIPLINE HELD
+`--bone` for the subject transaction and the accounts it runs between; `--ghost` for every other edge,
+node and label. **`--ash` is NOT used for edges**: it measures 3.06:1, and a transaction is a graphical
+object essential to understanding (WCAG 1.4.11 wants >= 3:1) — clearing the bar by 0.06 is not clearing
+it. **NO `--alert` on a witness** (that fuses "the graph found a structure" with "this is fraud" — the
+oracle-boundary collapse in colour form). No `--trace`/`--origin`: a ring closing is not a trace
+igniting. The **dashed idiom means INCOMPLETE**, reused from INCONCLUSIVE onto the partial-citation chip.
+
+### RUNG 3 GATE — all green
+- **211 backend tests pass.** Citation, restore-instruction, gloss, oracle-boundary, composition,
+  typecheck and console-fixture guards all green.
+- `tsc -b` · `oxlint` · `vite build` · `guard:composition` · **`guard:geometry` 28 passed / 4 projects**
+  (7 tests × 4 — **the COUNT was read, not just the exit code**).
+- **MADE TO TRIP, twice, ON REAL CODE — each reverted byte-identical (`git diff` empty):**
+  1. collapse parallel edges by (from,to) → *"STACK: the witness cites 5 transactions and the drawing
+     does not have 5 edges"* (received 4).
+  2. `isSubject: step === 0` → *"GATHER-SCATTER: the witness DOES NOT CITE the subject, so exactly 0
+     edge(s) must be marked"* (received 1).
+- **DRIVEN LIVE** (vite → uvicorn → live cluster; both harness traps cleared first): **24 renders** —
+  6 exhibits × {1280×800, 1280×900} × {motion, reduced-motion}. **0 page errors, 0 horizontal overflow,
+  0 rate-limit hits, and `is_fraud` ABSENT from the rendered surface in all 24.**
+- **RAVEN: 0 of 772 text elements below AA**, across 10 real renders at both heights — including all
+  **78 SVG account labels**, which are scored on `fill` (an audit reading only `color` would have
+  skipped every one of them). Raven's MCP tools were **NOT live in-session** (MCP servers enumerate at
+  session start); it was spoken to over **stdio JSON-RPC**, exactly as Rung 2 recorded. **raven-mcp
+  1.17.0, 78 tools.**
+- **THE COST EXHIBIT STILL LANDS.** `3cda6d1d` is BENIGN by the oracle, and CYCLE **and**
+  GATHER-SCATTER **and** STACK each witness it — now as **three separate drawings**, never one merged
+  picture (they share edges, and merging would invent a structure no witness claims). The reader still
+  cannot tell it is benign, because the label is not there.
+- **Cluster restored** (both ordered backfills) and INDEPENDENTLY re-verified with real SELECTs: 24
+  agents, 2 active beliefs (both with real vectors), 15 edges, 5,500 decisions (4,000 card / 1,500 AML),
+  1,500 `aml_transactions`, 8 perf windows, `audit_log = 0`, `count(DISTINCT decided_at) = 1` for AML,
+  crimson curve `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical.
+
+### HARNESS GOTCHAS (banked — all four cost real time)
+- **`vite preview` SERVES `dist/`, SO A LOCAL GUARD RUN TESTS A STALE BUILD.** I planted the first
+  deliberate break, ran the guard, and it **PASSED** — because `dist/` did not contain it. CI is safe
+  (`npx vite build` runs before `guard:geometry`), but **locally you must rebuild before you trust a
+  guard run, green OR red.** A guard run against a stale build is a guard run against a different
+  program.
+- **MY OWN RAVEN SCRIPT WAS A VACUOUS CHECK.** It read `failures` / `violations`; the tool returns
+  **`aa_failures` / `aa_fail_count`**. It printed **"0 BELOW AA"** from a key that does not exist — and
+  the first ten calls had *errored outright* and still printed 0. Caught by **probing the instrument
+  with a known-bad value first** (`--ash` on `--surface`, which it flagged at exactly 3.06:1, matching
+  Rung 2's number). The script now **throws if `aa_fail_count` is absent.** *An instrument you have not
+  seen fail is not a measurement.*
+- **THE RATE LIMITER LOOKED LIKE A BROKEN FEED — the same trap, a new disguise.** 60 req/60s per
+  (ip, route); one console drive costs ~10 calls to `/decisions` alone. The feed simply never rendered
+  and my driver reported a Playwright timeout, **not a 429** — because it recorded the 429s and then
+  never printed them on that failure path. The driver now names it. **Pace the runs (20s apart).**
+- **`splunkd` HOLDS `0.0.0.0:8000` ON THIS MACHINE.** My uvicorn bound `127.0.0.1:8000` and won by
+  specificity — but a later launch **failed to bind (`Errno 10048`) and I did not notice**, because
+  curl kept returning 200 from the earlier process. **"Is :8000 in use?" is ambiguous here.** What
+  proved I was talking to the right server was the content check (`self-loop` in `/openapi.json`),
+  never the port. Also: **`python` on PATH is the SYSTEM interpreter, not `.venv`** — run the suite with
+  `.venv/Scripts/python.exe`, or 28 tests error on `NoSuchModuleError: cockroachdb.psycopg`.
+
+### Commits (Conventional Commits, each its own; on main; held for review before push)
+- `fix(aml): the scatter-gather docstring was false — the subject is not always a leg`
+- `feat(frontend): the witness geometry — the ring closes, and the rest say they are partial`
+- `fix(frontend): the geometry, as looked at — direction was invisible and the legs unlabelled`
+- `test(frontend,scripts): the geometry guard — and the fixture that was never chosen`
+- `test(fixtures): pin that the geometry fixtures still exhibit what they were chosen for`
+- `docs(notes): record Rung 3` (this entry)
+
+### RUNG 3 explicitly NOT done (still gated): the **`neighbourhood` endpoint (Rung 5)** — and this rung
+### is the strongest argument for it yet: the partial citations are a WIRE problem, and the honest fix
+### is to serve the searched region, never to draw edges nobody served. The **AUDIT / ORDERED-REVEAL
+### surface (Rung 4)** — the ONE place `is_fraud` may appear for a subject, arriving as the SCORE of
+### what the reader just watched, never as an input to it. Any change to the brake, the eval inputs, any
+### measured constant, or the invalidation flow. A second r3f use.
