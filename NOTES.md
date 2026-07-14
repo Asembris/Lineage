@@ -7332,3 +7332,172 @@ using the design system as an excuse rather than a constraint.
 > **IF THE READER MUST READ IT TO UNDERSTAND THE EVIDENCE, IT IS LEGIBLE (>= AA).**
 > **Quiet is for BORDERS, not for WORDS. And "chrome" is not a category — it is an excuse until you
 > have enumerated its members one by one.**
+
+## PLAYWRIGHT IN FRONTEND CI — THE GEOMETRY INVARIANT NOW HAS A GUARD (2026-07-14)
+
+The last unguarded invariant, closed before Rung 3 draws geometry that would widen the gap further.
+**208 backend tests pass** (199 + 9). Frontend-only + CI + one new pytest module; **no backend
+change, no endpoint, no migration, no change to the invalidation flow's behaviour, copy, or
+certificate outcome.**
+
+### WHAT WAS UNGUARDED, AND WHY A GREP WOULD HAVE BEEN THEATRE
+`.kill__actions` stacks (`flex-direction: column`, Cancel the full-width last child) so **CANCEL
+takes the arm button's exact footprint and CONFIRM sits clear above it**. That is a SAFETY MECHANISM
+wearing the clothes of a style rule: with the governed write pinned in a footer, arm and confirm
+share one bottom-anchored region, and **two clicks of muscle memory in one screen position would be
+an irreversible fleet-wide write.** A confirm gate protects against not KNOWING; it cannot protect
+against not MOVING YOUR HAND.
+
+A pytest grep for `flex-direction: column` asserts the **CSS TEXT, not the geometry** — it would pass
+a `.kill__cancel { position: absolute }` without blinking. The Inspector-fold session refused to ship
+one, correctly. **The invariant is only provable by rendering, so the guard renders.**
+
+### THE SPLIT — the composition guard's asymmetry, mirrored
+
+    frontend-ci.yml                 RUNS the geometry guard          (it has Node; fires on frontend/**)
+    tests/test_console_fixtures.py  PINS the mock + guards the step  (it has DATABASE_URL; fires on
+                                                                      ANY backend change, because
+                                                                      paths-ignore skips only
+                                                                      frontend-ONLY pushes)
+
+A **frontend** change (the CSS flip) fires frontend-ci. A **backend** change — the only thing that can
+make the mock a lie — fires ci.yml. **Neither workflow is the one that misses.**
+
+### THE MOCK IS A REPLAY, AND IT REPRODUCES THE LIVE CONSOLE TO THE PIXEL
+Fixtures are **CAPTURED** from the live cluster through the real FastAPI app
+(`scripts/capture_console_fixtures.py`, 16 requests), never hand-written — hand-written fixtures are
+the co-author problem that blinded check C. Every network call in the console goes through `API_BASE`
+(checked: `client.ts`'s `request()` plus one fetch in `consistencyStream.ts`, nothing else), so
+`page.route()` intercepts 100% of it, and **an unmocked request FAILS the guard** — the fixture set is
+asserted to cover the call surface, not assumed to.
+
+**AND THE MOCKED, HEADLESS RENDER REPRODUCES THE INSPECTOR-FOLD SESSION'S LIVE-CLUSTER MEASUREMENTS
+EXACTLY**, all three rects, at 1280x800 — `arm y749..786 x912..1264` · `confirm y694..729 x926..1250`
+· `cancel y737..772 x926..1250`; 1440x900 is the same, +100 in y. That is the strongest available
+evidence that this is a replay of the console and not an imitation of it.
+
+**THE HONEST LIMIT:** the pin covers SHAPE, not SEMANTICS. A field that keeps its name and type while
+changing meaning would pass. It cannot affect geometry, which is what this guard measures.
+
+### ===== THE PIN'S FIRST DRAFT WAS A PERFECT SIXTH PROXY, AND THE FULL SUITE CAUGHT IT =====
+The pin originally **replayed each request against the live cluster and compared shapes**. It passed
+standalone and **FAILED in the full suite** — because the suite calls `seed()`, which DELETEs every
+decision and every `belief_performance` row. By the time it ran, `/decisions` returned `[]`.
+
+**The tempting fix was to treat an empty list as a wildcard.** That would have been the sixth proxy,
+and a flawless one: **in backend CI the suite ALWAYS reseeds**, so the rows would ALWAYS have been
+empty by the time the pin ran, and **the row shape — the only shape the console renders — would have
+been checked NEVER.** Green for its entire life, checking nothing. Exactly `tsc --noEmit`.
+
+The pin is now a **ROUND-TRIP through the route's real `response_model`** (resolved from the live
+app's route table, never a hand-copied path-to-model list). Deterministic, cluster-independent, and it
+catches strictly more — including the case plain `model_validate` **misses**, since Pydantic ignores
+extra keys: **a field REMOVED from the model.** **MADE TO TRIP on real code:** deleting
+`is_fraud: bool` from `DecisionOut` fails it, naming the field. A separate liveness test covers what
+the round-trip cannot (route still exists, still 200) and is deliberately cluster-state-independent.
+
+*Found only because the FULL suite was run instead of the one file. That rule is now paid for twice.*
+
+### ===== THE SEVENTH CHECK THAT PROVED NOTHING — THE GUARD'S OWN REDUCED-MOTION DIMENSION =====
+`playwright.config.ts` set `reducedMotion: "reduce"` at the top level of `use`. **It belongs under
+`contextOptions`.** At the top level it is an unknown key that **JavaScript silently ignores** — so the
+two "reduced-motion" projects were **byte-identical duplicates** of the normal-motion ones. The
+guard's first green run reported **12 passed** across 4 projects; **it was really 2 projects run
+twice.** That dimension was FAKE AND GREEN.
+
+**What caught it was giving the guard's own source a typecheck — which it did not have.** `tsc -b`
+covers `src` (via `tsconfig.app.json`) and `vite.config.ts` (via `tsconfig.node.json`).
+`playwright.config.ts` and `tests-e2e/` were in **NEITHER**, and **Playwright's transpiler STRIPS types
+without checking them** — so a misspelled property would read as `undefined` at runtime, and a guard
+measuring `undefined` is a guard that passes while measuring nothing. Measured, not reasoned:
+
+```
+npx tsc -p tsconfig.app.json  --listFiles | grep -c tests-e2e   ->  0
+npx tsc -p tsconfig.node.json --listFiles | grep -c tests-e2e   ->  0
+```
+
+`tsconfig.e2e.json` now exists and is referenced from the solution file, so `npm run typecheck` covers
+the guard. It found the bug on its first run.
+
+> **THE VACUOUS-TYPECHECK DISEASE POINTED ITSELF AT THE CURE.** The guard written to close the last
+> unverifiable invariant was itself unverified, in exactly the way this project has recorded five
+> times. **A new check is not exempt from the discipline it was written to enforce.**
+
+### RAVEN — RESTATED, AND IT MUST NOT BE CITED AS A GUARD
+**Raven is a MEASUREMENT INSTRUMENT, not a guard.** It runs in a session, on my invocation, on my
+machine. **It cannot trip on someone else's push.** It did not close this gap and must never be
+written up as if it had. It stays the right tool for the screenshot-and-critique gates (contrast, tap
+targets, typography), where the READING is the product. **The geometry invariant needed a TEST, not a
+reading** — and now it has one.
+
+### AN UNDECLARED DEPENDENCY EXISTS ONLY ON THE MACHINE THAT INSTALLED IT
+Rung 2 drove the console with Playwright (to feed Raven real DOM) after installing it **ad-hoc**:
+`playwright@1.61.1` sat in `node_modules` marked **EXTRANEOUS**, absent from `package.json` and the
+lockfile. **`npm ci` in CI would have erased it.** So Rung 2's measurements were taken with a transport
+CI does not have, and any future session doing a clean install would have silently lost it. Now a
+declared devDependency (`@playwright/test`), locked, and asserted by the meta-guard.
+
+### WHAT EARNED A GUARD, AND WHAT DID NOT
+**Landed** (all three run on every frontend push, 4 projects = {1280x800, 1440x900} x {motion,
+reduced-motion}):
+- **the geometry invariant** — `Confirm ∩ arm = ∅`, `Cancel ∩ arm ≠ ∅`. **THE PROPERTY, NEVER THE
+  PIXELS**: `y=749` is an artifact of one rule-text length and one font metric, and *a guard that
+  cries wolf on innocent change teaches people to weaken it.* A pytest guard asserts the spec does not
+  hardcode the measured coordinates.
+- **the Inspector fold** — the kill-shot reachable without a scroll with **Time-travel OPEN** (the
+  inverted defect: reachable while uninformed, hidden once informed).
+- **`is_fraud` absent from the evidence surface's RENDERED output.** The composition guard closes TYPE
+  and MOUNT; its text scan concedes in its own docstring that alone it "would be a proxy" (it greps
+  three source files and cannot see a rendered string). This is the invariant itself. **AND NOT
+  `innerText` ALONE:** the feed marks fraud with an **`aria-label` and NO TEXT** (`feed__fraud-dot`,
+  `role="img"`), so an innerText-only check would be blind **exactly where a leak would hide** —
+  announced to a screen reader, invisible to the guard. `aria-label`/`title`/`alt` are swept too.
+
+**Cut, deliberately:**
+- **the sticky-focus hazard.** The footer is a flex **SIBLING** of the scroller, so overlap is
+  *structurally impossible*; it regresses only if someone introduces `position: sticky|absolute`. **A
+  per-push cost for a property that is designed out rather than observed.** Adding it would be the
+  opposite of this project's discipline.
+- **contrast / tap targets / typography.** *A contrast audit measures the pixels you rendered, not the
+  states you have* — a CI sweep would manufacture exactly the false confidence Raven exists to prevent.
+  These stay one-time readings at the screenshot-and-critique gates.
+
+### THE LIVE CLUSTER IN FRONTEND CI WAS CONSIDERED AND REJECTED — IT WOULD HAVE BEEN A REGRESSION
+It would mean `DATABASE_URL` in frontend-ci and a uvicorn process. **Today frontend pushes are the ONLY
+pushes that do not wipe the cluster.** Every CSS tweak would reseed, DELETE decisions and race backend
+CI (a collision recorded FOUR times), and it would import the Proactor trap and the 60-req/60s rate
+limiter into a job whose own header says *"fully OFFLINE — so it can never collide."* **The guard stays
+offline; nothing listens on :8000 in CI, so even an escaped request fails closed.**
+
+### GATE — all green
+- **208 backend tests pass** (~3m13s). Citation, restore-instruction, gloss, oracle-boundary,
+  composition and typecheck guards all green.
+- `npm run typecheck` (`tsc -b`, now covering the guard itself) · `oxlint` zero warnings ·
+  `vite build` · `guard:composition` · `guard:geometry` (12 tests, 4 projects) — all exit 0.
+- **MADE TO TRIP, three times, ON REAL CODE — each reverted byte-identical (`git diff --stat` empty):**
+  1. `.kill__actions` -> `flex-direction: row` — the geometry guard fails in **all 4 projects** with
+     the real rects: `arm y749..786 x912..1264` · **`confirm y720..772 x926..1028`** (now overlapping
+     the arm's footprint in both axes) · `cancel y720..772 x1036..1360`.
+  2. Deleting the CI step — `test_frontend_ci_actually_invokes_the_geometry_guard` fails.
+  3. Removing `is_fraud: bool` from `DecisionOut` — the round-trip pin fails, naming the field.
+- **NO `data-testid` WAS ADDED ANYWHERE.** The console is already addressable by the roles and text a
+  supervisor actually sees. The one magic string the spec did carry (the subject's `txn_ref`) is now
+  **resolved from the fixture** — card decision ids are uuid4 and regenerate on every backfill, so a
+  re-capture would have rotted the selector silently.
+- **Cluster restored** (two ordered backfills) and INDEPENDENTLY re-verified with real SELECTs: 24
+  agents, 2 active beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500 AML), 8 perf windows, 1,500
+  `aml_transactions`, `audit_log = 0`, `count(DISTINCT decided_at) = 1` for AML, census **57/463/980**,
+  crimson curve `.924 .952 .876 .852 .724 .556 .624 .528` byte-identical.
+
+### CI COST — stated, not buried
+Chromium is ~130MB. `npx playwright install --with-deps chromium` is roughly 40-80s cold; the download
+is cached on the lockfile hash, so warm runs restore instead. Plus `vite preview` boot and ~30s of
+drives. **Net: roughly +60-100s cold, +30-50s warm on a job that was ~1-2 min** — close to a doubling of
+frontend CI. The backend suite (~3 min) is untouched. That is a real tax for one invariant, and it is
+the invariant standing over the only irreversible write in the product.
+
+### EXPLICITLY NOT DONE (still gated): **Rung 3** — the ring, the legs and the bundle, DRAWN. The
+### sticky-focus guard (cut, with reasons, above). Contrast/tap-target/typography in CI (cut). The
+### `neighbourhood` endpoint (Rung 5, still gated on looking at a render). The AUDIT/ordered-reveal
+### surface (Rung 4 — the only place `is_fraud` may appear for a subject). Any change to the brake, the
+### eval inputs, any measured constant, or the invalidation flow. A second r3f use.
