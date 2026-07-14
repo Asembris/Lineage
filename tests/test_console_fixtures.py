@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode
@@ -268,13 +269,101 @@ def test_the_fixtures_cover_the_states_the_guard_actually_drives():
     # THE ORACLE BOUNDARY, ON THE WIRE. The browser guard asserts the label is absent from the
     # rendered PIXELS; this asserts it was never even served. Both, because they fail differently:
     # a component could render a label the API never sent, and an API could send one no component
-    # renders today (and something would render it tomorrow).
-    interrogation = json.dumps(r[f"GET /aml/transactions/{s['aml_transaction_id']}/interrogate"])
-    for label in ("is_fraud", "is_laundering"):
-        assert label not in interrogation, (
-            f"/interrogate now serves `{label}`. The evidence layer must be renderable WITHOUT the "
-            "ground truth — that is the whole meaning of the precision exhibit."
+    # renders today (and something would render it tomorrow). Every interrogation is swept, not just
+    # the original one — the geometry subjects are three more served payloads.
+    for txn in (
+        s["aml_transaction_id"],
+        s["aml_ring_txn_id"],
+        s["aml_parallel_txn_id"],
+        s["aml_omits_subject_txn_id"],
+    ):
+        interrogation = json.dumps(r[f"GET /aml/transactions/{txn}/interrogate"])
+        for label in ("is_fraud", "is_laundering"):
+            assert label not in interrogation, (
+                f"/interrogate now serves `{label}` for {txn}. The evidence layer must be renderable "
+                "WITHOUT the ground truth — that is the whole meaning of the precision exhibit."
+            )
+
+
+def _matches(response: dict) -> list[dict]:
+    return [w for w in response["witnesses"] if w["outcome"] == "MATCH" and w["kind"] != "NONE"]
+
+
+def test_the_geometry_fixtures_still_exhibit_the_invariants_they_were_chosen_for():
+    """THE GEOMETRY GUARD'S SUBSTRATE MUST NOT SILENTLY GO BLANK.
+
+    ============ THE FIXTURE WAS NEVER CHOSEN. IT WAS A SIDE EFFECT. ============
+
+    Before Rung 3, `capture_console_fixtures.py` picked its AML subject with
+    `ORDER BY decided_at DESC, id DESC LIMIT 1`. All 1,500 AML rows share ONE `decided_at` (the
+    base-rate-mirage guard put it there on purpose), so that ORDER BY collapses to "whatever has the
+    max id" — and the row it landed on witnesses NOTHING. All four of its witnesses are NONE.
+
+    A geometry guard written against that fixture RENDERS NO GEOMETRY AND PASSES. Green forever,
+    measuring nothing — the `tsc --noEmit` disease, arriving through the back door of a fixture
+    rather than a command.
+
+    So this asserts the three geometry subjects still EXHIBIT the properties they were picked for. A
+    re-capture that quietly lands on witness-less rows fails HERE, in the backend suite, instead of
+    leaving a browser guard that renders an empty page and reports success.
+
+    THIS IS NOT A DUPLICATE OF THE BROWSER ASSERTION. The browser compares the RENDER to the WIRE;
+    this asserts the WIRE still has something worth comparing. A guard and its substrate fail
+    differently, and only one of them is checked by the other.
+    """
+    fx = _load()
+    s, r = fx["subjects"], fx["responses"]
+
+    aml_feed = {
+        d["aml_transaction_id"] for d in r["GET /decisions?kind=aml&limit=200&offset=0"]["decisions"]
+    }
+
+    for key in ("aml_ring_txn_id", "aml_parallel_txn_id", "aml_omits_subject_txn_id"):
+        txn = s[key]
+        assert txn in aml_feed, (
+            f"{key} ({txn}) is not on the AML feed's FIRST PAGE. The geometry guard clicks through "
+            "the feed and cannot page, so it could never reach this subject."
         )
+        assert _matches(r[f"GET /aml/transactions/{txn}/interrogate"]), (
+            f"{key} ({txn}) now witnesses NO structure, so the geometry guard would render an empty "
+            "page and pass. Re-capture with `python -m scripts.capture_console_fixtures`, which "
+            "picks these subjects on purpose."
+        )
+
+    # THE RING: a CYCLE whose drawing is the WHOLE cycle, and which cites its own subject.
+    ring = _matches(r[f"GET /aml/transactions/{s['aml_ring_txn_id']}/interrogate"])
+    cycle = next((w for w in ring if w["kind"] == "RING"), None)
+    assert cycle is not None, "the ring subject no longer has a RING witness."
+    assert s["aml_ring_txn_id"] in cycle["transaction_ids"], (
+        "the ring witness no longer cites its own subject, so the guard's subject-marker assertion "
+        "would be asserting 0 where it means to assert 1."
+    )
+
+    # THE MULTIGRAPH: two DISTINCT transactions on ONE account pair. Without this the edge-count
+    # assertion cannot fail — a layout keying edges by (from,to) would pass it.
+    par = r[f"GET /aml/transactions/{s['aml_parallel_txn_id']}/interrogate"]
+    txns = par["transactions"]
+    assert any(
+        Counter(
+            (txns[i]["from_account_id"], txns[i]["to_account_id"]) for i in w["transaction_ids"]
+        ).most_common(1)[0][1]
+        > 1
+        for w in _matches(par)
+    ), (
+        "no witness of the `parallel` subject cites two transactions on one account pair any more. "
+        "The edge-count assertion is now UNFALSIFIABLE: a layout that merges parallel edges would "
+        "pass it. Re-pick a subject that exhibits the multigraph."
+    )
+
+    # THE OMITTED SUBJECT: 75 of 107 GATHER-SCATTER witnesses do not cite the subject at all.
+    # Without this, "mark the subject only when cited" cannot fail either.
+    omits = r[f"GET /aml/transactions/{s['aml_omits_subject_txn_id']}/interrogate"]
+    assert any(
+        s["aml_omits_subject_txn_id"] not in w["transaction_ids"] for w in _matches(omits)
+    ), (
+        "every witness of the `omits` subject now cites the subject. The subject-marker assertion "
+        "can no longer catch a renderer that marks an edge the witness never cited."
+    )
 
 
 def test_frontend_ci_actually_invokes_the_geometry_guard():
