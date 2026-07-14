@@ -7020,6 +7020,12 @@ build nobody will run again. **MADE TO TRIP on real code** (each reverted byte-i
 - a real `EvidencePane` taking a `Decision` -> fails **A, B and C** at `AmlConsole.tsx:205/:46/:286`
 - `<AmlConsole>` beside `<DecisionFeed>` -> fails **C** at `App.tsx:347`, naming both offenders
 
+**AND THE FIXTURES THEMSELVES ARE NOW PROVEN COMPLETE W.R.T. C:** gutting the render-graph
+propagation makes `violation-adjacency.tsx:40` DISAPPEAR from the guard's findings and the guard
+exits 1. Before that fixture existed, the identical gutting exited 0. See *THE SIXTH CHECK THAT
+PROVED NOTHING* for why the fixtures could not have found this bug on their own — they were its
+co-author.
+
 ### THE EVIDENCE SURFACE IS A VIEW, NOT A PANE — adjacency designed out, not avoided
 `DecisionFeed` and `Investigation` render `is_fraud` today, **legitimately** (the label attached to a
 decision already made without it — the one place it may be served). That was harmless only because no
@@ -7081,10 +7087,16 @@ a claim**). And `flag-capable` was **asymmetric**: the positive passed at 5.83:1
 flag-capable"* sat at 3.06:1 — a legibility gradient on a binary fact, where the negative case was
 quietly harder to read than the positive one.
 
-**MEASURED: 10 of 26 text elements below AA -> 3.** The surviving 3 are the deliberate FRONTEND.md
-chrome, and they are REPORTED WITH THEIR RATIOS rather than dismissed: the section eyebrow
-(`--ash`, 3.06:1), the decorative arrow (3.06:1), and the `dt` key labels (3.06:1) whose **values**
-measure 11.09:1. FRONTEND.md wins those — they carry no fact.
+**MEASURED: 10 of 26 text elements below AA -> 3 -> 0.**
+
+> ⛔ **THIS PARAGRAPH ORIGINALLY STOPPED AT 3, and called the survivors "the deliberate FRONTEND.md
+> chrome — they carry no fact." THAT WAS FALSE, and it is corrected below rather than rewritten.**
+> Every one of the three was a fact: `.aml__label` carries *"basis · CYCLE"* (which typology the
+> belief decided on — said NOWHERE else), the `dt` labels say what "ACH" is a value OF, and the
+> arrow is the DIRECTION of the money flow. **"Chrome" was a category I invented, and it contained
+> facts — the same shape as 447 self-loops inside "CONCLUSIVE_NO".** See
+> *"CHROME" WAS A CATEGORY I INVENTED, AND IT CONTAINED FACTS*. **26 of 26 now pass AA; `--ash`
+> carries no text on this surface at all.**
 
 **TAP TARGETS: 0 failures across all 20 renders** (44px floor). **TYPOGRAPHY: `off_scale_sizes: []`.**
 The line-height "outliers" are the prose paragraphs at 1.5-1.6 against a *"dominant"* 1.2 skewed by
@@ -7170,3 +7182,153 @@ not have shown this; four cards side by side did.*
 ### runs in a session, not on someone else's push, and must never be cited as if it were a test.
 ### Also not done: any change to the brake, the eval inputs, any measured constant, or the
 ### invalidation flow; a second r3f use. Do NOT push without explicit approval.
+
+## ====== THE SIXTH CHECK THAT PROVED NOTHING — AND THE FIRST CAUGHT BEFORE SHIPPING ======
+### (2026-07-14, Rung 2) — check C of the composition guard was GREEN AND BLIND, and what found it
+### was not the fixtures. It was the mandated break-on-real-code.
+
+This project has now shipped **five** checks that were green for their entire lives while proving
+nothing, and has recorded each one:
+
+| # | the check | why it could not fail |
+|---|-----------|------------------------|
+| 1 | the two dead **vector indexes** | never appeared in a plan; the opclass could not serve the query |
+| 2 | `verify_corpus.py`'s **EXPLAIN** | EXPLAINed a query the application never runs |
+| 3 | the restore guard's **14-line proximity window** | passed its own bug |
+| 4 | `test_citations.py`'s **docstring** | carried the disease it was written to cure |
+| 5 | **`tsc --noEmit`** | typechecks ZERO files; exits 0 unconditionally; cited by NINE gates |
+| **6** | **the composition guard's CHECK C** | **blinded by the very property that makes the design safe** |
+
+**Number 6 is the first one caught BEFORE it shipped.** That is the only thing new about it, and it
+is worth understanding exactly why, because the reason generalises.
+
+### THE MECHANISM — the guard was blinded by the thing that makes the design correct
+Check C forbids ADJACENCY: no audit-coloured component may be mounted in the evidence surface's JSX
+subtree. Two components, each individually legal, still put the answer key beside the exam.
+
+Colour, in the first draft, was computed **from a component's PROPS**. And the whole point of the
+Rung 2 design is that **the join between the two layers is a bare `UUID`** — App holds both, and
+hands the evidence surface a transaction id and nothing else, because *an id carries no verdict and
+no ground truth*. That is the safety property. It is the best thing about the design.
+
+**It is also what blinded the guard.** `AmlConsole` — the evidence SURFACE, the thing that actually
+gets mounted — takes `{ txnId: UUID; onClose }`. Its props reach NEITHER layer. It is **colourless**.
+The EVIDENCE colour lived one level down, on the inner `EvidencePane`, which receives the
+interrogation. So check C, scanning for mounts of EVIDENCE-coloured components, **never looked at the
+mount site at all** — the only place the adjacency it forbids can actually occur.
+
+Mounting `<AmlConsole>` directly beside `<DecisionFeed>` — the exact violation, the answer key beside
+the exam, in the real App — produced **NOTHING**. Exit 0. Green.
+
+**A guard whose blind spot is created by the safety property it protects is the worst possible
+blind spot**, because every reason the design is right is also a reason the guard sees nothing. It
+does not look broken. It looks *correct*.
+
+The fix: colour propagates through the **RENDER GRAPH** (a fixpoint over the mount map), not just
+through props. A component is EVIDENCE if it renders evidence, however deep. Check A still uses PROP
+colours only — a component that merely renders a child holding a `Decision` has not itself received
+one, and conflating those would make check A fire on the composition root.
+
+### ========== WHAT CAUGHT IT WAS NOT THE FIXTURES ==========
+The guard shipped with committed fixtures precisely so its demonstration could not rot — and **the
+fixtures did not catch this.** They covered A (direct), A (indirect, via a wrapper type) and B
+(channel). They did not cover C.
+
+**They did not cover C because I wrote them, and I wrote the guard.** A fixture suite authored by the
+person who authored the checker tests the cases that person THOUGHT OF. The blind spot in the guard
+and the blind spot in its fixtures have the same author and therefore the same shape. That is not a
+lapse in diligence; it is a structural property of self-authored test suites, and no amount of care
+removes it. **The fixtures could not have found this bug. They were its co-author.**
+
+What found it was **the brief's mandate to break real code and watch** — writing the violation into
+the actual `App.tsx` and observing the guard's real output. Reasoning about the guard would never
+have found it: the code reads correctly, the intent is right, and every fixture was green. Only
+running the violation the guard exists to stop, against the real component tree, exposed that it
+stopped nothing.
+
+> **A GUARD MUST BE BROKEN AGAINST THE REAL CODE, NOT AGAINST ITS OWN FIXTURES.** Its fixtures are
+> the author's imagination; the real code is the world. This is now the single most valuable line in
+> this project's verification discipline, and it was arrived at by having it pay off.
+
+### AND NOW THE FIXTURES DO COVER C — PROVEN BY GUTTING THE FIX
+`scripts/fixtures/violation-adjacency.tsx` reproduces the exact shape: `Surface` takes `{ txnId }`
+(colourless props, EVIDENCE only by what it renders), `AuditFeed` takes decisions, and they are
+mounted as siblings. Neither prop surface holds both layers, so **check A is correctly silent**.
+
+**MADE TO TRIP — the fix was reverted and the guard re-run** (render-graph propagation removed,
+everything else byte-identical):
+
+```
+=== THE GUARD FAILED ITS OWN FIXTURES ===
+expected: [ {C/adjacency, violation-adjacency.tsx:40}, {B/channel, violation-channel.tsx:14},
+            {A/composition, violation-direct.tsx:14},  {A/composition, violation-indirect.tsx:17} ]
+found:    [ {B/channel, violation-channel.tsx:14},
+            {A/composition, violation-direct.tsx:14},  {A/composition, violation-indirect.tsx:17} ]
+EXIT=1
+```
+
+`violation-adjacency.tsx:40` **disappears from `found`** and the guard fails. Before that fixture
+existed, this identical gutting produced **exit 0**. The fixture suite is now complete with respect
+to C — and that completeness is itself demonstrated, not asserted. Restored byte-identical
+afterwards (`git diff --stat` empty); guard green, exit 0.
+
+**The residual risk is stated rather than papered over:** the fixtures now cover the three failure
+modes I know about. A seventh blind spot, if it exists, has the same author as these fixtures and
+will be caught the same way this one was — by breaking real code, not by adding a fixture I already
+thought of.
+
+## ====== "CHROME" WAS A CATEGORY I INVENTED, AND IT CONTAINED FACTS ======
+### (2026-07-14, Rung 2) — the same shape as 447 self-loops sitting inside "CONCLUSIVE_NO"
+
+The contrast fix left **3 of 26** text elements below WCAG AA, and I defended them in the Rung 2
+gate as *"the deliberate FRONTEND.md chrome — they carry no fact."* Pressed to NAME each one and
+say what a reader loses by not reading it, the defence collapsed. **Every one of them was a fact.**
+
+| element | measured | what it actually says | verdict |
+|---|---|---|---|
+| `.aml__label` → **"basis · CYCLE"** | **3.06:1** | names WHICH of the four typologies the belief decided on — **said nowhere else on the surface.** Without it the entire verdict block is unowned | **FACT** |
+| `.aml__label` → "the search stopped here" | 3.06:1 | the only thing identifying the account chip beside it | **FACT** |
+| `.aml__label` → "all four witnesses, run against this subject" | 3.06:1 | carries that **ALL FOUR RAN**, not just the one that hit. **The negative space IS the product** (85.8% of subjects witness nothing) | **FACT** |
+| `.aml__kv dt` → "amount" / "format" / "observed" | 3.06:1 | **labels for values. "ACH" alone does not say what it is a value OF** | **FACT** |
+| `.aml__arrow` → "→" | 3.06:1 | the **DIRECTION of the money flow** — the one thing a money-flow graph is about | **FACT** |
+
+The arrow had a real defence available: it is a non-text glyph, and WCAG 1.4.11 sets the floor for
+graphical objects at **3:1**, which 3.06 clears — **by 0.06.** Taking that defence would have meant
+resting the legibility of *the direction of the money* on six hundredths of a ratio point. Declined.
+
+**The failure mode is exactly the one this project has already been burned by.** "CONCLUSIVE_NO" was
+a category that contained 447 self-loops; "chrome" was a category that contained the name of the
+deciding typology. **A category is not a measurement.** Both times, the count/the token was never
+wrong — the DESCRIPTION of what it contained was. And both times the correction only came from
+enumerating the members one by one instead of reasoning about the label.
+
+### AND MEASUREMENT ONLY COVERS THE STATES YOU RENDER
+Auditing the fix turned up two more `--ash` TEXT rules that **never appeared in any contrast report**:
+`.aml__note--error` (the request-failure message) and `.aml__acct--unresolved` (an account id that
+did not resolve to a row). They were invisible to Raven because **neither state occurred in the five
+exhibits** — no request failed, every account resolved. An error message the reader cannot read is
+absurd, and an unresolved id the reader cannot see defeats its own purpose. Both fixed.
+
+> **A contrast audit measures the pixels you rendered, not the states you have.** Sweep the
+> stylesheet for the token as well as the surface for the pixels — the audit cannot see a branch
+> that did not execute.
+
+### THE RESULT — MEASURED, NOT CLAIMED
+**26 of 26 text elements now pass WCAG AA. ZERO below.** (Worst: `--ghost` at 5.22:1 on `--surface-2`;
+best: `--bone` at 12.04:1 on `--void`.)
+
+**`--ash` now carries NO TEXT AT ALL on the evidence surface.** It survives as a BORDER and hover
+token — the dotted self-loop rule, the flag-capable outline, the hover state — where it carries no
+words and its 3.06:1 is a deliberate quietness rather than an unreadable fact.
+
+**AND FRONTEND.md IS NOT WEAKENED BY THIS — the conflict was never real.** Its discipline is
+*"the world is cold blue-grey and dead by default; warmth is EARNED by interaction, not given"*.
+That is a rule about **WARMTH**, not about **ILLEGIBILITY**. `--ghost` is still cold, still
+blue-grey, still dead. Nothing on this surface became warm; things became readable. Restraint and
+legibility were never in tension, and hiding behind "restraint" to ship sub-AA facts would have been
+using the design system as an excuse rather than a constraint.
+
+### THE RULE, FINAL FORM
+> **IF THE READER MUST READ IT TO UNDERSTAND THE EVIDENCE, IT IS LEGIBLE (>= AA).**
+> **Quiet is for BORDERS, not for WORDS. And "chrome" is not a category — it is an excuse until you
+> have enumerated its members one by one.**
