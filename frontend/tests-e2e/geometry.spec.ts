@@ -37,7 +37,7 @@
  */
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { installMock, SUBJECTS } from "./mock.js";
+import { installMock, SUBJECT_TXN_REF, SUBJECTS } from "./mock.js";
 
 interface Rect {
   x: number;
@@ -90,7 +90,7 @@ async function driveToArmed(page: Page): Promise<{ armRect: Rect; confirm: Locat
   // The decision the crimson belief drove. Selected by its real txn_ref from the captured feed —
   // no data-testid was needed anywhere in this guard; the console is already addressable by the
   // text and roles a supervisor actually sees.
-  await page.locator(".feed__row", { hasText: "txn-w7-p0207" }).first().click();
+  await page.locator(".feed__row", { hasText: SUBJECT_TXN_REF }).first().click();
 
   // Time-travel OPEN. This is not optional set-dressing: with it CLOSED the whole Investigation
   // fits at every viewport, and the defect only appears once the evidence is on screen.
@@ -159,7 +159,7 @@ test.describe("the governed write", () => {
 
     const filter = page.getByRole("group", { name: "Filter decisions by kind" });
     await filter.getByRole("button", { name: /^card/ }).click();
-    await page.locator(".feed__row", { hasText: "txn-w7-p0207" }).first().click();
+    await page.locator(".feed__row", { hasText: SUBJECT_TXN_REF }).first().click();
     await page.getByRole("button", { name: /Time-travel/ }).click();
     await page.waitForSelector(".tt__depo", { state: "visible" });
 

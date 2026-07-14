@@ -63,6 +63,29 @@ const FIXTURES = JSON.parse(
 export const SUBJECTS = FIXTURES.subjects;
 
 /**
+ * The subject decision's `txn_ref`, resolved FROM the captured feed — never hardcoded.
+ *
+ * The feed row shows `txn_ref` for a card decision, so that is what the guard clicks. Writing the
+ * literal into the spec would plant a magic string that a re-capture could silently invalidate:
+ * card decision ids are uuid4 and regenerate on every backfill, so a future session re-capturing
+ * these fixtures could leave the spec hunting a row that no longer exists. The fixture is the one
+ * source of truth for its own subjects, and this reads it.
+ */
+export const SUBJECT_TXN_REF: string = (() => {
+  const feed = FIXTURES.responses["GET /decisions?kind=card&limit=200&offset=0"] as {
+    decisions: { id: string; txn_ref: string }[];
+  };
+  const row = feed.decisions.find((d) => d.id === FIXTURES.subjects.decision_id);
+  if (!row) {
+    throw new Error(
+      "the captured subject decision is not on the card feed's first page — re-capture with " +
+        "`python -m scripts.capture_console_fixtures`",
+    );
+  }
+  return row.txn_ref;
+})();
+
+/**
  * The canonical request key. Query params SORTED; `as_of` normalized to `<ANY>`.
  *
  * `as_of` cannot be keyed on its value: TimeTravel computes `new Date(Date.now() - 20_000)` at
