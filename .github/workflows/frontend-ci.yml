@@ -52,8 +52,9 @@ jobs:
       # backend workflow (ci.yml) has no Node step, and — far worse — it declares
       # `paths-ignore: ['frontend/**']`, so a frontend-only push does not run the backend suite AT
       # ALL. A pytest composition guard would have been skipped by exactly the pushes that can
-      # violate it: a check that cannot fail on the change it protects against. That is the
-      # `tsc --noEmit` disease one layer up, and this project has paid for it once already.
+      # violate it: a check that cannot fail on the change it protects against — the same disease
+      # as the vacuous typecheck (tests/test_frontend_typecheck.py), one layer up. This project has
+      # paid for that once already.
       #
       # tests/test_composition_guard.py asserts that THIS STEP EXISTS. Workflow files are not in
       # ci.yml's paths-ignore, so deleting it fails the backend suite.
