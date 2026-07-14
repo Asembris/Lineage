@@ -7680,3 +7680,55 @@ check would be a PROXY for a real check that already works — and this project 
 things already guarded. **The gap was my local verification, not CI's coverage.** Fixed by
 regenerating the lockfile and re-running the full frontend-ci sequence from a clean `npm ci`:
 `tsc -b` 0 · `guard:composition` 0 · `oxlint` 0 · `vite build` 0 · **geometry guard 12/12**.
+
+### ⛔ THE ENTRY ABOVE'S FIX WAS WRONG, AND CI FAILED A SECOND TIME. THE VARIABLE IS THE **PLATFORM**.
+I "fixed" the lockfile by re-running `npm install` on **Windows**, then verified with `npm ci` on
+**Windows** (exit 0) and declared it done. **frontend-ci failed again in 13 seconds** — same error,
+but a different version:
+
+```
+npm error Missing: @emnapi/core@1.11.2 from lock file     <-- 1.11.2, not the 1.11.1 I had locally
+```
+
+**THE MECHANISM, and it is not npm being capricious.** `@rolldown/binding-wasm32-wasi` (Vite 8's WASM
+fallback binding) pins `@emnapi/core@1.11.1` exactly. In the pre-session lockfile those two packages
+were **HOISTED TO TOP LEVEL**. My `npm install`, run on Windows — where that WASM binding is not
+installed — **DELETED the top-level entries** and nested them under the binding instead. On Linux, npm
+then has no top-level entry to install from, **re-resolves the range against the registry, gets the
+newly-published 1.11.2**, and `npm ci` correctly refuses a lockfile that disagrees with the tree it
+needs. Measured, by diffing the two lockfiles:
+
+```
+REMOVED by my npm install:  node_modules/@emnapi/core        <-- the whole bug
+                            node_modules/@emnapi/runtime
+```
+
+**`npm install --package-lock-only --os=linux --cpu=x64` DID NOT FIX IT.** Tried, and npm pruned the
+top-level entries anyway. Recorded so nobody burns an hour re-trying it.
+
+> **MY OWN RULE FROM THE ENTRY ABOVE WAS TOO WEAK.** *"Verify with the command CI runs"* is not
+> enough. **A LOCKFILE'S CORRECTNESS IS PLATFORM-DEPENDENT, so `npm ci` passing on Windows PROVES
+> NOTHING ABOUT `npm ci` ON LINUX.** It must be the same command **on the same platform**. I wrote the
+> rule and it still did not save me, because the rule named the command and the variable was the OS.
+
+**THE FIX, AND IT WAS VERIFIED WHERE IT MATTERS:** the lockfile is now generated **and checked inside
+`node:24` (Docker) — the same image family CI uses.**
+
+```
+docker run --rm -v <dir>:/w -w /w node:24 sh -c 'npm install && rm -rf node_modules && npm ci'
+  npm install ok (lockfile regenerated on linux)
+  npm ci EXIT=0                       <-- the exact CI command, on the exact CI platform
+  top-level @emnapi/core   : true 1.11.1     <-- preserved, not pruned
+  top-level @emnapi/runtime: true 1.11.1
+  @playwright/test         : 1.61.1
+```
+Then re-verified on Windows too (`npm ci` exit 0) and through the full frontend-ci sequence:
+`tsc -b` 0 · `guard:composition` 0 · `oxlint` 0 · `vite build` 0 · **geometry guard 12/12**.
+
+**THE STANDING RULE FOR THIS REPO — do not regenerate `frontend/package-lock.json` on Windows.**
+Any dependency change must have its lockfile produced in the `node:24` container and proved with
+`npm ci` THERE. Still **no new guard**: `npm ci` in frontend-ci is the real check, it fired twice and
+named the cause both times in under 15 seconds, and a lockfile change is always a `frontend/**` change
+so it always runs. A pytest lockfile-shape assertion would be a brittle proxy for a check that
+already works — the failure was in my verification, not in CI's coverage, and **the correct response
+to a check that caught you is to obey it, never to widen it.**
