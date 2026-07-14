@@ -371,3 +371,75 @@ def test_flag_capable_membership_is_what_the_interrogation_reports():
         assert {w.typology for w in witnesses if w.flag_capable} == set(FLAG_CAPABLE)
 
     asyncio.run(_run())
+
+
+# The four-way basis, EXACTLY as the AML console re-derives it from the wire. See the test below.
+DETAIL_SELF_LOOP = "self-loop is not a transfer cycle"
+DETAIL_CLOSED = "no return path; search closed inside the extract"
+FOUR_WAY = {"MATCH": 57, "INCONCLUSIVE": 980, "SELF_LOOP": 447, "CLOSED_SEARCH": 16}
+
+
+def test_the_console_four_way_basis_re_derives_from_account_identity_not_from_prose():
+    """THE CONSOLE'S PREDICATE IS THE GRAPH'S PREDICATE — asserted over all 1,500 edges.
+
+    Rung 2 renders FOUR bases, not three: MATCH / INCONCLUSIVE / CONCLUSIVE_NO-self-loop /
+    CONCLUSIVE_NO-closed-search. The fourth state is a property of the EVIDENCE (re-derived from
+    the graph), never of what the agent RECORDED — which is why the persisted `txn_ref` tag stays
+    three-way and this distinction lives on /interrogate. All of that is settled.
+
+    WHAT THIS TEST EXISTS FOR is HOW the console reads it. `detail` carries the distinction as
+    PROSE ("self-loop is not a transfer cycle" vs "no return path; search closed inside the
+    extract"), and a client that string-matches that prose is a PROXY: reword the sentence in
+    aml_graph and the console silently renders a self-loop as a closed search — corrupting, in
+    pixels, the exact distinction Rung 1 was corrected to make, with nothing failing.
+
+    So the console re-derives the self-loop the way `aml_graph.Edge` itself does — from the SUBJECT
+    ROW ON THE WIRE, `from_account_id == to_account_id` — and this test pins the equivalence:
+
+        (subject.from_account_id == subject.to_account_id)   [what the console can see]
+                          <==>  edge.is_self_loop            [what the graph decides on]
+                          <==>  CYCLE detail is DETAIL_SELF_LOOP
+
+    A reword now FAILS A TEST instead of corrupting a pixel. The wire fact and the prose fact are
+    checked against each other, so neither can drift alone.
+    """
+
+    async def _run():
+        g = await load_graph()
+        result_of = {}
+        for e in g.by_id.values():
+            chk = aml_graph.check(g, e, "CYCLE")
+            # The two fields the console actually has: the subject row's two account ids.
+            wire_self_loop = e.src == e.dst
+            result_of[e.id] = (wire_self_loop, e.is_self_loop, chk.outcome, chk.detail)
+        return result_of
+
+    result_of = asyncio.run(_run())
+    assert len(result_of) == 1500, len(result_of)
+
+    counts = {k: 0 for k in FOUR_WAY}
+    for txn_id, (wire, graph_says, outcome, detail) in result_of.items():
+        # 1. The wire predicate and the graph predicate are the SAME predicate.
+        assert wire == graph_says, f"{txn_id}: wire says self-loop={wire}, graph says {graph_says}"
+
+        # 2. A self-loop is ALWAYS CONCLUSIVE_NO, and always for the self-loop reason. It can never
+        #    be MATCH (it is not a transfer between two accounts, so it is not in adjacency at all)
+        #    and never INCONCLUSIVE (no search ran, so no search could reach a boundary).
+        if wire:
+            assert outcome is Outcome.CONCLUSIVE_NO, f"{txn_id}: self-loop decided {outcome}"
+            assert detail == DETAIL_SELF_LOOP, f"{txn_id}: {detail!r}"
+            counts["SELF_LOOP"] += 1
+        elif outcome is Outcome.CONCLUSIVE_NO:
+            # 3. And the converse: a CONCLUSIVE_NO that is NOT a self-loop is a REAL closed search.
+            #    These are the only 16 rows the old "searched; there is no cycle" gloss ever described.
+            assert detail == DETAIL_CLOSED, f"{txn_id}: {detail!r}"
+            counts["CLOSED_SEARCH"] += 1
+        elif outcome is Outcome.MATCH:
+            counts["MATCH"] += 1
+        else:
+            counts["INCONCLUSIVE"] += 1
+
+    # 4. The partition the console renders IS the partition the decider computes. Four buckets,
+    #    summing to the whole extract — so a self-loop and a closed search can never render alike.
+    assert counts == FOUR_WAY, counts
+    assert sum(counts.values()) == 1500
