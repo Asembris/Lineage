@@ -1,0 +1,199 @@
+/*
+ * The money-flow geometry. Cold, clinical, dense — the world stays dead by default.
+ *
+ * TOKEN DISCIPLINE (the same rules the rest of the evidence surface holds, applied to lines):
+ *   --bone   the ONE emphasis: "the system is pointing at this" — the subject transaction, and the
+ *            accounts it runs between. 12.04:1 on --void. Nothing else earns it.
+ *   --ghost  every other edge, every node, every label. 5.83:1 on --surface — passes WCAG AA.
+ *   --ash    NOT USED FOR EDGES. It measures 3.06:1 on --surface, and a transaction is a GRAPHICAL
+ *            OBJECT ESSENTIAL TO UNDERSTANDING (WCAG 1.4.11 wants >= 3:1) — clearing the bar by
+ *            0.06 is not clearing it. The edges ARE the evidence; they are drawn to be seen.
+ *   NO --alert. Painting a witness red fuses "the graph found a structure" with "this is fraud".
+ *            Those are different claims and this console exists to keep them apart.
+ *   NO --trace / --origin. Warmth is Trace's. A ring closing is not a trace igniting.
+ *
+ * THE DASHED IDIOM MEANS "INCOMPLETE", AND IT IS REUSED ON PURPOSE. Rung 2 drew INCONCLUSIVE
+ * dashed, because "we could not determine" must never render as a clean pass. A PARTIAL CITATION is
+ * the same category of thing — a picture that is not the whole structure — so it carries the same
+ * dashed border. One idiom, one meaning, learned once.
+ *
+ * Motion: transforms/opacity/pathLength only, and `prefers-reduced-motion` is honoured in the
+ * component (framer-motion's useReducedMotion), which collapses to the identical FINAL FRAME.
+ */
+
+.geo__section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.geo__section-head {
+  margin-bottom: 14px;
+}
+
+/* The shared arrowhead defs. Present in the DOM, occupying nothing. */
+.geo__defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Competing witnesses render as SEPARATE figures, side by side where there is room. They share
+   edges, and merging them into one picture would invent a structure no witness claims. */
+.geo__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.geo {
+  margin: 0;
+  padding: 14px 16px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  max-width: 100%;
+}
+
+.geo__cap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.geo__typology {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--bone);
+}
+
+/* WHOLE vs PARTIAL — a fact about the drawing, on the drawing. Both legible (AA); the difference is
+   carried by the border and the word, never by dimming one of them. A legibility gradient on a
+   binary fact makes one case quietly harder to read than the other. */
+.geo__scope {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 2px;
+}
+
+.geo__scope--whole {
+  color: var(--bone);
+  border: 1px solid var(--ash);
+}
+
+.geo__scope--partial {
+  color: var(--ghost);
+  border: 1px dashed var(--ghost);
+}
+
+.geo__svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* --- edges: the transactions ------------------------------------------------------------- */
+
+.geo__edge {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.geo__edge--quiet {
+  stroke: var(--ghost);
+}
+
+/* The subject: the transaction the reader actually clicked. The one thing the system points at. */
+.geo__edge--subject {
+  stroke: var(--bone);
+  stroke-width: 2.25;
+}
+
+/* The two SCATTER-GATHER legs are labelled, and they are distinguished by DASH, not by hue — a
+   second colour here would start a vocabulary this palette does not have. They are two parallel
+   routes, not a path, and nothing about the styling implies an order between them. */
+.geo__edge--gather {
+  stroke-dasharray: 5 3;
+}
+
+.geo__head {
+  stroke: none;
+}
+
+.geo__head--quiet {
+  fill: var(--ghost);
+}
+
+.geo__head--subject {
+  fill: var(--bone);
+}
+
+/* --- nodes: the accounts ----------------------------------------------------------------- */
+
+.geo__dot {
+  fill: var(--void);
+  stroke: var(--ghost);
+  stroke-width: 1.5;
+}
+
+.geo__acct {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--ghost);
+  letter-spacing: 0.02em;
+}
+
+/* An endpoint of the subject transaction. On a RING the subject leaves this account AND the closing
+   hop returns to it — which is the whole claim, and it is why it is marked. */
+.geo__node--on-subject .geo__dot {
+  fill: var(--bone);
+  stroke: var(--bone);
+}
+
+.geo__node--on-subject .geo__acct {
+  fill: var(--bone);
+}
+
+/* --- the caveats, and the dominant view -------------------------------------------------- */
+
+.geo__caveat {
+  margin: 10px 0 0;
+  max-width: 42ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ghost);
+}
+
+.geo__caveat strong {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+/* 1,287 of 1,500 subjects land here. It is the most common thing this component renders, and it is
+   a FINDING, not an empty state — so it is typeset as one. */
+.geo__none {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ghost);
+}
+
+.geo__none strong {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.geo__none em {
+  font-style: normal;
+  color: var(--bone);
+}

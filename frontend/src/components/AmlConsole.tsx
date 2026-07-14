@@ -31,9 +31,11 @@
  * module imports the audit layer through any channel, or if an audit component is ever mounted in
  * the same JSX subtree as this one.
  *
- * NO GEOMETRY. The ring, the legs and the bundle are Rung 3. What ships here is typographic: the
- * subject, the four verdicts, the named boundary account, the competing structures, and the size
- * and SHAPE of each witness — never its drawing.
+ * THE GEOMETRY IS DRAWN (Rung 3), in `WitnessGeometry.tsx`. This file still owns the typographic
+ * evidence — the subject, the four verdicts, the named boundary account, the competing structures,
+ * and the size and shape of each witness — and it states each witness's shape in words whether or
+ * not that shape can be drawn. The drawing is an addition to the record, never a replacement for
+ * it: 1,287 of the 1,500 subjects have no structure to draw at all.
  *
  * COLOUR. `--bone` marks what the system is pointing at, and nothing else. There is deliberately no
  * `--alert` anywhere on this surface: "the graph found a structure" and "this is fraud" are
@@ -55,6 +57,7 @@ import {
   isSelfLoop,
 } from "../lib/basis";
 import { formatAmount, formatCount, fragId, splitInstant } from "../lib/format";
+import { WitnessGeometrySection } from "./WitnessGeometry";
 import "./AmlConsole.css";
 
 /** An account, named. Node identity in this graph is the compound (bank, account) — never the
@@ -149,7 +152,8 @@ function BasisBlock({ r }: { r: AmlInterrogationResponse }) {
   );
 }
 
-/** The SHAPE of a witness, stated — never drawn. The drawing is Rung 3. */
+/** The SHAPE of a witness, stated in words. `WitnessGeometry` draws it; this still says it, because
+ *  the sentence is the thing a reader can carry away and a picture is not always available. */
 const KIND_NOTE: Record<string, string> = {
   RING: "a closed ring — contiguous, and it returns to its source",
   LEGS: "two parallel routes — not one path",
@@ -224,6 +228,17 @@ export function EvidencePane({ interrogation }: { interrogation: AmlInterrogatio
     <motion.div className="aml__evidence" {...rise}>
       <SubjectRow r={interrogation} />
       <BasisBlock r={interrogation} />
+
+      {/* THE GEOMETRY LANDS DIRECTLY UNDER THE SENTENCE IT PROVES. The basis block above says "A
+          directed cycle was re-derived from the rows"; this draws that cycle, and the reader watches
+          the last hop return to the account the first one left. It is the one claim on this surface
+          a reader can check without trusting a word of the prose.
+
+          It renders every MATCHING witness — so the competing case (CYCLE and GATHER-SCATTER and
+          STACK on one subject) draws three separate figures, never one merged picture. And for the
+          1,287 subjects of 1,500 that witness nothing, it says so: the negative space is the
+          product, and the ring is the exception. */}
+      <WitnessGeometrySection r={interrogation} />
 
       <section className="aml__witnesses">
         <div className="aml__witnesses-head">
