@@ -62,3 +62,18 @@ FRONTEND.md
 data/*
 !data/corpus/
 !data/corpus/*.md
+
+# Frontend measurement scratch — NEVER committed, and now it cannot be committed by accident.
+#
+# `shots/` is screenshot + DOM-snapshot output from driving the console for a Raven audit
+# (regenerable, binary, per-session). `drive.mjs` is the Playwright harness that produces it.
+#
+# THESE WERE UNTRACKED ONLY BECAUSE I REMEMBERED TO DELETE THEM, and that is exactly the failure
+# `scripts/serve.py` recorded: a workaround that must be re-derived on every rebuild is not a fix.
+# The driver was re-derived TWICE in the Rung 2 session alone. If a later session wants it
+# permanently, promote it to `frontend/scripts/` AND declare `playwright` as a devDependency —
+# it is currently present only transitively, so a fresh `npm ci` would not have it. That is a
+# dependency change and a plan-gated decision, not a drive-by.
+frontend/shots/
+frontend/drive.mjs
+frontend/dbg.mjs

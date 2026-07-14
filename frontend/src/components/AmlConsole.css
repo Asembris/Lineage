@@ -5,11 +5,10 @@
  *   --bone   the ONE emphasis: "the system is pointing at this". MEASURED 12.04:1 on --void — the
  *            strongest contrast in the palette, which is why it is the right token for it.
  *   --ghost  legible secondary. MEASURED 5.83:1 on --surface / 6.32:1 on --void — passes WCAG AA.
- *   --ash    DELIBERATELY QUIET CHROME, and nothing else. MEASURED 3.06:1 on --surface / 3.32:1 on
- *            --void: BELOW WCAG AA (4.5:1). That is a FRONTEND.md choice ("warmth is earned; the
- *            world is quiet by default") and FRONTEND.md wins — but it is only defensible for text
- *            that carries NO FACT: the section eyebrows, the key labels of a key/value pair whose
- *            VALUE is legible, and the decorative arrow. See the rule below.
+ *   --ash    MEASURED 3.06:1 on --surface / 3.32:1 on --void: BELOW WCAG AA. It therefore carries
+ *            NO TEXT ON THIS SURFACE AT ALL. It survives here as a BORDER and hover token only.
+ *            See "THE CATEGORY THAT CONTAINED FACTS" below — the second correction, and the one
+ *            that shows the first was still half-wrong.
  *   NO --alert ANYWHERE. Painting a witness red would fuse "the graph found a structure" with
  *            "this is fraud". Those are different claims, and fusing them in colour is the
  *            oracle-boundary collapse. A MATCH is emphasis, not alarm.
@@ -27,6 +26,26 @@
  * distinguished by border style, by label text, by headline, by detail and by count, none of which
  * needed the contrast. Same for the witness size/shape, the census count, the flag-capable state
  * and the provenance line: all facts, all now >= AA.
+ *
+ * ===== THE CATEGORY THAT CONTAINED FACTS (the second correction) =====
+ * The fix above left three elements below AA and I defended them as "chrome carrying no fact".
+ * CHROME WAS A CATEGORY I INVENTED, NOT A MEASUREMENT — and it contained facts, which is the exact
+ * shape of the 447 self-loops sitting inside "CONCLUSIVE_NO". Reading them one by one:
+ *
+ *   .aml__label "basis · CYCLE"  — names WHICH of the four typologies the belief decided on. It is
+ *                                  said NOWHERE ELSE. Without it the big verdict block is unowned.
+ *   .aml__label "the search stopped here" — the only thing identifying the account chip beside it.
+ *   .aml__label "all four witnesses…"     — carries that ALL FOUR ran, not just the one that hit.
+ *                                  The negative space IS the product (85.8% witness nothing).
+ *   dt  "amount" / "format" / "observed"  — labels for values. "ACH" alone does not say what it is
+ *                                  a value OF. A label for a number is a fact.
+ *   .aml__arrow "→"               — the DIRECTION of the money flow. Defensible as a non-text glyph
+ *                                  under WCAG 1.4.11's 3:1 floor — which it clears by 0.06. That
+ *                                  defence is too thin for the one thing a money-flow graph is about.
+ *
+ * All are now --ghost. NO TEXT ON THIS SURFACE IS BELOW AA. This does not weaken FRONTEND.md:
+ * restraint is about WARMTH, not about illegibility, and --ghost is still cold blue-grey. --ash
+ * remains, as a border and hover token, where it carries no words.
  */
 
 .aml {
@@ -88,8 +107,12 @@
   color: var(--ghost);
   font-size: 13px;
 }
+/* NEITHER THIS NOR .aml__acct--unresolved APPEARED IN THE CONTRAST AUDIT — because neither STATE
+   rendered in the five exhibits (no request failed; every account resolved). MEASUREMENT ONLY
+   COVERS THE STATES YOU RENDER, and an error message the reader cannot read is absurd. Both are
+   facts, and both are legible. */
 .aml__note--error {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .aml__evidence {
@@ -98,11 +121,12 @@
   gap: 20px;
 }
 
+/* Every one of these labels names something the reader cannot recover elsewhere. See the header. */
 .aml__label {
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .aml__mono {
@@ -153,8 +177,9 @@
   padding: 6px 10px;
   border-radius: 2px;
 }
+/* An account id that did not resolve to a row. The reader must SEE that it did not resolve. */
 .aml__acct--unresolved {
-  color: var(--ash);
+  color: var(--ghost);
 }
 .aml__bank {
   color: var(--ghost);
@@ -164,8 +189,9 @@
   color: var(--bone);
 }
 
+/* The direction of the money flow — the one thing this graph is ABOUT. Not decoration. */
 .aml__arrow {
-  color: var(--ash);
+  color: var(--ghost);
   font-size: 14px;
 }
 
@@ -191,11 +217,12 @@
   flex-direction: column;
   gap: 4px;
 }
+/* A label for a number is a fact: "ACH" alone does not say what it is a value OF. */
 .aml__kv dt {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ash);
+  color: var(--ghost);
 }
 .aml__kv dd {
   margin: 0;
