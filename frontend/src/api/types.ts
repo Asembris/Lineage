@@ -230,6 +230,81 @@ export interface InvalidateResponse {
   content_hash: string | null;
 }
 
+/* --- The EVIDENCE layer: GET /aml/transactions/{id}/interrogate ------------
+ *
+ * THE ORACLE BOUNDARY, IN TYPES. Nothing below carries a label, and nothing below reaches a
+ * `Decision`. That separation is not a convention — `frontend/scripts/composition-guard.mjs`
+ * walks the TYPE GRAPH and fails the build if any component's prop surface reaches BOTH this
+ * family and the `Decision` family. The two layers are joined by an ORDERED REVEAL (the evidence
+ * surface takes over the body; the audit layer is not mounted beside it), and the join is carried
+ * by a bare `UUID` — an id carries no verdict and no ground truth.
+ *
+ * The label is never readable by the DECIDER; never served as EVIDENCE on the evidence layer; and
+ * served only where it is an AUDIT fact, attached to a decision that was already made without it.
+ * `Decision.is_fraud` is that audit fact. It has no counterpart here, and must never gain one.
+ */
+
+/** How to read `AmlWitness.transaction_ids` as an ORDER. Rung 2 renders none of these as geometry
+ *  (the ring, the legs and the bundle are Rung 3) — it reports the SHAPE and the SIZE only. */
+export type TraversalKind = "RING" | "LEGS" | "BUNDLE" | "NONE";
+
+/** A node of the money-flow graph. Identity is the compound (bank, account), never account alone. */
+export interface AmlAccount {
+  id: UUID;
+  bank: string;
+  account: string;
+}
+
+/** An EDGE of the money-flow graph — a transaction runs BETWEEN two accounts.
+ *
+ *  `from_account_id === to_account_id` is a SELF-LOOP: an account paying itself, which is not a
+ *  transfer, so `aml_graph.Graph` excludes it from adjacency by construction. This is the one field
+ *  pair the console re-derives the fourth basis from — see `basisOf()`. */
+export interface AmlTransaction {
+  id: UUID;
+  ts: ISODateTime;
+  from_account_id: UUID;
+  to_account_id: UUID;
+  amount_paid: number;
+  payment_currency: string;
+  amount_received: number;
+  receiving_currency: string;
+  payment_format: string;
+}
+
+/** One typology's structural verdict on the subject, re-derived FRESH from the current graph.
+ *
+ *  `outcome` reuses the `WitnessOutcome` union because it is the same VALUE DOMAIN (aml_graph's
+ *  three-way `Outcome`). It is emphatically NOT the same OBJECT as `Decision.witness_outcome`:
+ *  that one is what the agent RECORDED at decision time, this one is a fresh re-derivation from
+ *  the graph as it stands now. G5 drew that line and it holds here.
+ *
+ *  `boundary_account_id` is non-null EXACTLY on INCONCLUSIVE (measured: 980/980 name one) and null
+ *  everywhere else — so "we ran off the edge of the data" is always renderable as a PLACE. */
+export interface AmlWitness {
+  typology: string;
+  flag_capable: boolean;
+  outcome: WitnessOutcome;
+  kind: TraversalKind;
+  transaction_ids: UUID[];
+  legs: Record<string, UUID[]> | null;
+  boundary_account_id: UUID | null;
+  detail: string;
+}
+
+/** Everything a click on one transaction resolves to. Deterministic; no model call; no label. */
+export interface AmlInterrogationResponse {
+  transaction_id: UUID;
+  subject: AmlTransaction;
+  witnesses: AmlWitness[];
+  competing_typologies: string[];
+  has_competing_structure: boolean;
+  /** Every transaction/account referenced above, resolved to a real row — no per-id round-trip. */
+  transactions: Record<UUID, AmlTransaction>;
+  accounts: Record<UUID, AmlAccount>;
+  as_of: string | null;
+}
+
 /* --- SSE: GET /demo/consistency/stream event payloads --------------------- */
 
 /** Which invalidation the stream runs (the `?strategy=` query param, echoed in `start`).

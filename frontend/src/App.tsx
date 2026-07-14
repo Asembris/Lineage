@@ -6,6 +6,7 @@ import { GenealogyTree } from "./components/GenealogyTree";
 import { Inspector } from "./components/Inspector";
 import { ConsistencyDemo } from "./components/ConsistencyDemo";
 import { HonestyLedger } from "./components/HonestyLedger";
+import { AmlConsole } from "./components/AmlConsole";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -96,8 +97,25 @@ function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["a
  *  (Frontend Phase 4); "ledger" is the honesty ledger (Item 9). Both take over the whole body
  *  rather than hanging off a selected row, because they are fleet-scoped, not per-decision/
  *  per-agent like the four supervisor interactions — the same "fleet-scoped ⇒ header mode"
- *  reasoning Phase 4 used. A plain view flag (no router, no new dep). */
-type View = "console" | "consistency" | "ledger";
+ *  reasoning Phase 4 used. A plain view flag (no router, no new dep).
+ *
+ * `aml` — the EVIDENCE surface (Rung 2). It takes over the body for the same structural reason,
+ * but a far more important one: the audit layer must NOT be on screen beside a witness. The feed
+ * and the Inspector legitimately render `is_fraud` (the label attached to a decision that was
+ * already made without it — an AUDIT fact, which is the one place it may be served), and drawing
+ * the witness next to them would put the answer key beside the exam. A discriminated union is what
+ * makes that impossible rather than merely avoided: exactly one body arm is ever mounted, and the
+ * `aml` arm carries only a transaction id.
+ *
+ * THE JOIN IS AN ID. App is the composition root — it is the one place that legitimately holds both
+ * layers, and it is exempt from the composition guard BY STRUCTURE (it takes no props, so it has no
+ * prop surface to violate). What it hands down is a `UUID`. An id carries no verdict and no ground
+ * truth, and the guard proves nothing downstream of it can reach one. */
+type View =
+  | { kind: "console" }
+  | { kind: "consistency" }
+  | { kind: "ledger" }
+  | { kind: "aml"; txnId: UUID };
 
 function App() {
   // The feed's kind filter. null = unfiltered, and that is the deliberate default: the console
@@ -110,7 +128,7 @@ function App() {
   const [witness, setWitness] = useState<WitnessOutcome | null>(null);
   const { agents, decisions, beliefs, counts, witnessCounts, loadMore, loadingMore } =
     useConsoleData(kind, witness);
-  const [view, setView] = useState<View>("console");
+  const [view, setView] = useState<View>({ kind: "console" });
 
   // Investigate: which decision is under investigation (null = none). Clicking a
   // selected row again clears it. State lives here because the feed (left) and the
@@ -268,22 +286,22 @@ function App() {
         <nav className="console__views" aria-label="Console view">
           <button
             className="console__view"
-            aria-pressed={view === "console"}
-            onClick={() => setView("console")}
+            aria-pressed={view.kind === "console"}
+            onClick={() => setView({ kind: "console" })}
           >
             Console
           </button>
           <button
             className="console__view"
-            aria-pressed={view === "consistency"}
-            onClick={() => setView("consistency")}
+            aria-pressed={view.kind === "consistency"}
+            onClick={() => setView({ kind: "consistency" })}
           >
             Consistency demo
           </button>
           <button
             className="console__view"
-            aria-pressed={view === "ledger"}
-            onClick={() => setView("ledger")}
+            aria-pressed={view.kind === "ledger"}
+            onClick={() => setView({ kind: "ledger" })}
           >
             Ledger
           </button>
@@ -291,9 +309,15 @@ function App() {
         <FleetSummary agents={agents} />
       </header>
 
-      {view === "consistency" ? (
+      {/* EXACTLY ONE BODY ARM IS MOUNTED. The `aml` arm renders the evidence surface ALONE — no
+          feed, no Inspector, no audit component anywhere in its subtree. That is not a layout
+          preference; it is the oracle boundary in pixels, and `frontend/scripts/composition-guard.mjs`
+          fails the build if an audit-coloured component ever appears inside this arm. */}
+      {view.kind === "aml" ? (
+        <AmlConsole txnId={view.txnId} onClose={() => setView({ kind: "console" })} />
+      ) : view.kind === "consistency" ? (
         <ConsistencyDemo />
-      ) : view === "ledger" ? (
+      ) : view.kind === "ledger" ? (
         <HonestyLedger agents={agents} decisions={decisions} beliefs={beliefs} />
       ) : (
         <div className="console__body">
@@ -343,6 +367,7 @@ function App() {
                   onReplay: replayTrace,
                 }}
                 invalidateHandlers={invalidateHandlers}
+                onInterrogate={(txnId) => setView({ kind: "aml", txnId })}
               />
             </Panel>
           </div>

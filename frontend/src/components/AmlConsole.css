@@ -1,0 +1,400 @@
+/*
+ * The evidence surface. Cold, dense, clinical — the world stays dead by default.
+ *
+ * TOKEN DISCIPLINE, and it is load-bearing rather than aesthetic:
+ *   --bone   the ONE emphasis: "the system is pointing at this". Measured 12.04:1 on --void,
+ *            the strongest contrast in the palette — which is why it is the right token for it.
+ *   --ash    quiet provenance text. Measured 3.32:1 on --void: below WCAG AA (4.5:1) by 1.18, and
+ *            that is a DELIBERATE FRONTEND.md choice, not an oversight — this text is meant to
+ *            recede. It is never the only carrier of a fact; every reading is also stated in
+ *            --bone or --ghost body copy.
+ *   --ghost  the honest "we could not determine" — DASHED, never a clean filled pass.
+ *   NO --alert ANYWHERE. Painting a witness red would fuse "the graph found a structure" with
+ *            "this is fraud". Those are different claims, and fusing them in colour is the
+ *            oracle-boundary collapse. A MATCH is emphasis, not alarm.
+ *   NO --trace / --origin. Warmth is earned on the trace path and nowhere else.
+ */
+
+.aml {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px 40px;
+  overflow: auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.aml__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.aml__title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--bone);
+  margin: 0;
+}
+
+.aml__sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ghost);
+  max-width: 62ch;
+}
+
+.aml__close {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ghost);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 10px 14px; /* >= 44px tall with the line-height — the tap-target floor. */
+  min-height: 44px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.aml__close:hover,
+.aml__close:focus-visible {
+  border-color: var(--ash);
+  color: var(--bone);
+}
+
+.aml__note {
+  color: var(--ghost);
+  font-size: 13px;
+}
+.aml__note--error {
+  color: var(--ash);
+}
+
+.aml__evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.aml__label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ash);
+}
+
+.aml__mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bone);
+}
+
+/* --- subject -------------------------------------------------------------- */
+
+.aml__subject {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 16px 18px;
+}
+
+.aml__subject-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.aml__txn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ghost);
+}
+
+.aml__flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.aml__acct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--bone);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  border-radius: 2px;
+}
+.aml__acct--unresolved {
+  color: var(--ash);
+}
+.aml__bank {
+  color: var(--ghost);
+  font-size: 11px;
+}
+.aml__acct-no {
+  color: var(--bone);
+}
+
+.aml__arrow {
+  color: var(--ash);
+  font-size: 14px;
+}
+
+/* The self-loop, named where the two ids are shown — because that IS what a self-loop is. */
+.aml__selfloop {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone);
+  border: 1px dashed var(--ash);
+  padding: 5px 8px;
+  border-radius: 2px;
+}
+
+.aml__kv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 14px 0 0;
+}
+.aml__kv div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aml__kv dt {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ash);
+}
+.aml__kv dd {
+  margin: 0;
+}
+
+/* --- the basis (four states, and no two of them look alike) ---------------- */
+
+.aml__basis {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line);
+  background: var(--surface);
+  border-radius: 2px;
+  padding: 18px 20px;
+}
+
+/* MATCH — the system is pointing at this. Emphasis, NOT alarm: --bone, never --alert. */
+.aml__basis--match {
+  border-left-color: var(--bone);
+}
+.aml__basis--match .aml__basis-label {
+  color: var(--bone);
+}
+
+/* INCONCLUSIVE — "we could not determine" must never render as a clean pass. Dashed, --ghost. */
+.aml__basis--inconclusive {
+  border-left: 2px dashed var(--ghost);
+}
+.aml__basis--inconclusive .aml__basis-label {
+  color: var(--ghost);
+}
+
+/* THE TWO CONCLUSIVE_NO STATES ARE VISUALLY DISTINCT, AND THAT IS THE WHOLE POINT.
+   A self-loop is 447 rows where nothing was ever explored; a closed search is the 16 where a
+   traversal actually ran and closed. They share one persisted tag and they must not share a look. */
+.aml__basis--self_loop {
+  border-left-color: var(--ash);
+  border-left-style: dotted;
+}
+.aml__basis--self_loop .aml__basis-label {
+  color: var(--ash);
+}
+.aml__basis--closed_search {
+  border-left-color: var(--ash);
+}
+.aml__basis--closed_search .aml__basis-label {
+  color: var(--ghost);
+}
+
+.aml__basis-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aml__basis-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ash);
+}
+
+.aml__basis-label {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin: 10px 0 0;
+}
+
+.aml__basis-headline {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--bone);
+  max-width: 70ch;
+}
+
+.aml__basis-detail {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 74ch;
+}
+
+.aml__boundary {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.aml__boundary-note {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ghost);
+  max-width: 70ch;
+}
+
+/* --- the four witnesses ---------------------------------------------------- */
+
+.aml__witnesses-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.aml__competing {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bone);
+  border: 1px solid var(--ash);
+  padding: 4px 8px;
+  border-radius: 2px;
+}
+
+.aml__witness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.aml__witness {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--line);
+  border-radius: 2px;
+  padding: 14px 16px;
+}
+.aml__witness--match {
+  border-top-color: var(--bone);
+}
+.aml__witness--inconclusive {
+  border-top: 2px dashed var(--ghost);
+}
+
+.aml__witness-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.aml__typology {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--bone);
+  letter-spacing: 0.04em;
+}
+
+.aml__capable {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ash);
+  border: 1px solid var(--line);
+  padding: 3px 6px;
+  border-radius: 2px;
+}
+.aml__capable--yes {
+  color: var(--ghost);
+  border-color: var(--ash);
+}
+
+.aml__outcome {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ghost);
+}
+.aml__witness--match .aml__outcome {
+  color: var(--bone);
+}
+
+.aml__witness-detail {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ghost);
+}
+
+.aml__witness-foot {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ash);
+}
+.aml__witness-kind {
+  color: var(--ash);
+}
+.aml__witness-boundary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.aml__provenance {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ash);
+  max-width: 84ch;
+}

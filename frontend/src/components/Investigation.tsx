@@ -238,11 +238,19 @@ export function Investigation({
   onClear,
   handlers,
   invalidateHandlers,
+  onInterrogate,
 }: {
   inv: InvestigationData;
   onClear: () => void;
   handlers: TraceHandlers;
   invalidateHandlers: InvalidateHandlers;
+  /* THE ENTRY TO THE EVIDENCE LAYER, AND IT CARRIES AN ID — NOTHING ELSE.
+     This is the seam between the two layers, and its type IS the boundary: a `UUID` in, and the
+     evidence surface takes over the body. It cannot hand the interrogation a verdict, a belief or
+     a label because it does not hand it anything but an id. Note what does NOT happen here — this
+     component does not render a witness, and the interrogation does not render a decision. They
+     are never on screen together, so the answer key never sits beside the exam. */
+  onInterrogate: (txnId: UUID) => void;
 }) {
   const d = inv.decision;
   const { date, time } = splitInstant(d.decided_at);
@@ -300,6 +308,20 @@ export function Investigation({
               </dd>
             </div>
           </dl>
+
+          {/* An AML decision cites a REAL money-flow edge (the grounding seam's FK, 1:1 over all
+              1,500). This is the door to the evidence layer: what did the graph actually WITNESS
+              around that transaction? It hands over an id and leaves — the interrogation opens as
+              its own surface, and this one, with everything it knows about the outcome, unmounts. */}
+          {d.aml_transaction_id && (
+            <button
+              type="button"
+              className="inv__interrogate"
+              onClick={() => onInterrogate(d.aml_transaction_id as UUID)}
+            >
+              Interrogate the transaction →
+            </button>
+          )}
         </div>
       </section>
 

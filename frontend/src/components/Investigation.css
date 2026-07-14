@@ -390,3 +390,28 @@
 .inv__hot-origin {
   color: var(--origin);
 }
+
+/* THE DOOR TO THE EVIDENCE LAYER.
+   Quiet at rest and cold — it is a navigation, not an alarm and not a governed write. It carries
+   no warmth (Trace's) and no --alert (the invalidate control's), because what lies behind it is
+   neither: it is the graph's own work, shown without its score. */
+.inv__interrogate {
+  margin-top: 14px;
+  width: 100%;
+  min-height: 44px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--ghost);
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.inv__interrogate:hover,
+.inv__interrogate:focus-visible {
+  border-color: var(--ash);
+  color: var(--bone);
+}

@@ -16,7 +16,7 @@
 
 import type { Loadable } from "../hooks/useConsoleData";
 import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsoleData";
-import type { Belief } from "../api/types";
+import type { Belief, UUID } from "../api/types";
 import type { Investigation as InvestigationData } from "../lib/investigation";
 import { Loaded } from "./Panel";
 import { Investigation, type TraceHandlers } from "./Investigation";
@@ -108,6 +108,8 @@ export function Inspector(props: {
   onClear: () => void;
   traceHandlers: TraceHandlers;
   invalidateHandlers: InvalidateHandlers;
+  /* Passed straight through to Investigation. A `UUID` in, the evidence surface out. */
+  onInterrogate: (txnId: UUID) => void;
 }) {
   // A selected decision takes over the whole Inspector surface.
   if (props.investigation) {
@@ -117,6 +119,7 @@ export function Inspector(props: {
         onClear={props.onClear}
         handlers={props.traceHandlers}
         invalidateHandlers={props.invalidateHandlers}
+        onInterrogate={props.onInterrogate}
       />
     );
   }
