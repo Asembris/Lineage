@@ -89,6 +89,12 @@ export interface GeoNode {
   account: string;
   /** An endpoint of the subject transaction — true whether or not the witness cites the subject. */
   onSubject: boolean;
+  /** Label offset from the node, and its text-anchor. On a RING the label is pushed RADIALLY
+   *  OUTWARD: a label sitting above every node collides with the ring's own stroke on the left and
+   *  right of the circle, which hides the edge it is meant to annotate. Found by looking at it. */
+  labelDx: number;
+  labelDy: number;
+  labelAnchor: "start" | "middle" | "end";
 }
 
 /** A transaction: an EDGE. Identity is `id` — NEVER the (from, to) pair (fact 2 above). */
@@ -130,13 +136,24 @@ export interface WitnessGeometry {
 
 // Sized against the REAL labels, not a guess: accounts are 9-character identifiers ("80F93F560"),
 // so a 10-hop ring needs ~85px of arc per node to seat one without collision.
-const R_PAD = 52; // room for the account label outside the ring
+// Radial labels extend OUTWARD from the ring, so the padding must seat a 9-character mono label
+// lying flat against the circle's left and right, not merely the label's height.
+const R_PAD = 76;
 const RING_MIN_R = 100;
 const RING_STEP_R = 9; // a 10-hop ring needs more circumference than a 6-hop one
 const COL_W = 150;
 const ROW_H = 74;
 const MARGIN = 44;
 const BOW = 13; // how far parallel twins bow apart, so N transactions read as N lines
+
+/** How far short of the account an edge stops.
+ *
+ *  THE DIRECTION OF THE MONEY IS A FACT, AND IT WAS INVISIBLE. Drawn centre-to-centre, the
+ *  arrowhead's tip lands exactly on the node's centre and the node disc paints straight over it —
+ *  so nine of a ring's ten hops showed no arrow at all and the flow had no readable direction.
+ *  Found by looking at the render, not by reasoning about it. Edges now stop clear of the disc, so
+ *  every arrowhead sits in open space. */
+const NODE_GAP = 11;
 
 /** The edges of a witness, resolved to rows. Ids the response did not resolve are dropped —
  *  they cannot be drawn, and inventing a placeholder node for one would be fabrication. */
@@ -185,20 +202,30 @@ function drawEdges(
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+
+    // Stop clear of both account discs, so the arrowhead is not painted over by the node it points
+    // at. Shortening only the target end would misplace the edge's own start on a dense ring.
+    const ax = a.x + ux * NODE_GAP;
+    const ay = a.y + uy * NODE_GAP;
+    const bx = b.x - ux * NODE_GAP;
+    const by = b.y - uy * NODE_GAP;
+
     // Perpendicular, so the bow is always across the edge regardless of its direction.
-    const px = (-dy / len) * offset;
-    const py = (dx / len) * offset;
-    const cx = (a.x + b.x) / 2 + px;
-    const cy = (a.y + b.y) / 2 + py;
+    const px = -uy * offset;
+    const py = ux * offset;
+    const cx = (ax + bx) / 2 + px;
+    const cy = (ay + by) / 2 + py;
 
     return {
       id: t.id,
       from: t.from_account_id,
       to: t.to_account_id,
-      d: offset === 0 ? `M ${a.x} ${a.y} L ${b.x} ${b.y}` : `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`,
+      d: offset === 0 ? `M ${ax} ${ay} L ${bx} ${by}` : `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`,
       // The quadratic's midpoint is halfway between the chord and the control point, not at it.
-      mx: offset === 0 ? cx : (a.x + b.x) / 2 + px / 2,
-      my: offset === 0 ? cy : (a.y + b.y) / 2 + py / 2,
+      mx: offset === 0 ? cx : (ax + bx) / 2 + px / 2,
+      my: offset === 0 ? cy : (ay + by) / 2 + py / 2,
       isSubject: t.id === subjectId,
       leg: legOf(w, t.id),
       step,
@@ -208,11 +235,33 @@ function drawEdges(
   });
 }
 
+/** Label placement. `radial` pushes each label away from a centre (the RING); otherwise it sits
+ *  above the node, which is collision-free in the layered shapes. */
+function labelAt(
+  p: { x: number; y: number },
+  radial: { cx: number; cy: number } | null,
+): Pick<GeoNode, "labelDx" | "labelDy" | "labelAnchor"> {
+  if (!radial) return { labelDx: 0, labelDy: -13, labelAnchor: "middle" };
+  const dx = p.x - radial.cx;
+  const dy = p.y - radial.cy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  return {
+    labelDx: ux * 17,
+    // +3.5 puts the mono cap-height on the radius rather than the baseline.
+    labelDy: uy * 17 + 3.5,
+    // Near the top or bottom of the circle a side-anchored label would hang off the node it names.
+    labelAnchor: Math.abs(ux) < 0.34 ? "middle" : ux > 0 ? "start" : "end",
+  };
+}
+
 function nodesFrom(
   ids: UUID[],
   pos: Map<UUID, { x: number; y: number }>,
   accounts: Record<UUID, AmlAccount>,
   subject: AmlTransaction,
+  radial: { cx: number; cy: number } | null = null,
 ): GeoNode[] {
   return ids.map((id) => {
     const a = accounts[id];
@@ -226,6 +275,7 @@ function nodesFrom(
       bank: a?.bank ?? "—",
       account: a?.account ?? id.slice(0, 6),
       onSubject: id === subject.from_account_id || id === subject.to_account_id,
+      ...labelAt(p, radial),
     };
   });
 }
@@ -270,7 +320,7 @@ function ringLayout(
 
   return {
     kind: "RING",
-    nodes: nodesFrom(walk, pos, accounts, subject),
+    nodes: nodesFrom(walk, pos, accounts, subject, { cx: c, cy: c }),
     edges: drawEdges(rows, w, subject.id, pos),
     width: size,
     height: size,
@@ -375,7 +425,7 @@ function layeredLayout(
     // the one on screen.
     description:
       `A partial citation: the ${n} transactions this witness cites, through ${ids.length} ` +
-      `accounts.${legs} It is NOT the full structure around the hub — the rest of those accounts' ` +
+      `accounts.${legs} It is NOT the whole structure it sits in — the rest of those accounts' ` +
       `transactions are not carried by this response, so they are not drawn. ` +
       (cites
         ? `The subject transaction is one of the ${n}.`

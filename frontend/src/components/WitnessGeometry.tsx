@@ -157,8 +157,15 @@ function Figure({ geo, typology }: { geo: Geo; typology: string }) {
             <circle className="geo__dot" r="5" />
             {/* The account NUMBER is the node's visible identity (648/648 unique in this extract);
                 the bank is in the title, because a two-line label at every node of a 10-hop ring is
-                unreadable and the compound identity is what the tooltip and the description carry. */}
-            <text className="geo__acct" y="-13" textAnchor="middle">
+                unreadable and the compound identity is what the tooltip and the description carry.
+                The offset is RADIAL on a ring — a label above every node overlaps the ring's own
+                stroke on the left and right, hiding the edges it exists to annotate. */}
+            <text
+              className="geo__acct"
+              x={n.labelDx}
+              y={n.labelDy}
+              textAnchor={n.labelAnchor}
+            >
               {n.account}
             </text>
             <title>{`${n.bank} · ${n.account}`}</title>
@@ -166,11 +173,36 @@ function Figure({ geo, typology }: { geo: Geo; typology: string }) {
         ))}
       </svg>
 
+      {/* TWO LABELLED LEGS, AND IT SAYS SO. The dash alone would be a key the reader does not have:
+          which edges are the scatter and which the gather is a FACT about the evidence, and a fact
+          carried only by a stroke pattern with no legend is a fact the reader cannot read. These
+          are two parallel routes — the API returns NO_LINEAR_ORDER for them — and the legend says
+          that too, so nobody reads the diamond as a path. */}
+      {geo.kind === "LEGS" && (
+        <ul className="geo__legend">
+          <li>
+            <svg className="geo__swatch" viewBox="0 0 26 6" aria-hidden="true">
+              <path className="geo__edge geo__edge--quiet" d="M 1 3 L 25 3" />
+            </svg>
+            <span>scatter — one source fans out</span>
+          </li>
+          <li>
+            <svg className="geo__swatch" viewBox="0 0 26 6" aria-hidden="true">
+              <path className="geo__edge geo__edge--quiet geo__edge--gather" d="M 1 3 L 25 3" />
+            </svg>
+            <span>gather — they carry it into one destination</span>
+          </li>
+          <li className="geo__legend-note">
+            Two parallel routes, not one path. The evidence has no order to walk.
+          </li>
+        </ul>
+      )}
+
       {!geo.complete && (
         <p className="geo__caveat">
-          This is what the witness <strong>cites</strong>, not the full structure around the hub.
-          Those accounts&rsquo; other transactions are not carried by this response, so they are not
-          drawn — and none are invented to finish the picture.
+          This is what the witness <strong>cites</strong>, not the whole structure it sits in. Those
+          accounts&rsquo; other transactions are not carried by this response, so they are not drawn
+          — and none are invented to finish the picture.
         </p>
       )}
       {!geo.citesSubject && (
