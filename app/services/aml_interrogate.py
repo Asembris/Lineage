@@ -149,7 +149,23 @@ def scatter_gather_legs(
 
     This is NOT a path and must never be presented as one: `scatter` are the edges leaving the
     one fan-out source, `gather` are the edges those intermediaries send onward into the common
-    destination. The subject is one of the scatter legs.
+    destination.
+
+    THE SUBJECT IS USUALLY — BUT NOT ALWAYS — ONE OF THE SCATTER LEGS. This docstring previously
+    claimed it always was. That is FALSE, measured over the live extract: it holds for 41 of the
+    42 SCATTER-GATHER matches and fails for one, and the cause is worth knowing because it is the
+    same cause that makes the geometry hard to draw honestly.
+
+    THE MONEY-FLOW GRAPH IS A MULTIGRAPH: two distinct transactions can run between the same pair
+    of accounts. `Graph.succ()` keys one edge per (src, dst) PAIR, so `scatter_gather_witness`
+    cites `g.succ(u)[v]` — which, when the subject has a parallel twin, is the TWIN and not the
+    subject. On `c98de429` the graph cites `586a923b` (the same two accounts, a different amount)
+    and the subject is absent from its own witness.
+
+    A caller must therefore never assume membership. `interrogate_transaction` resolves the
+    subject into the `transactions` map unconditionally, and a renderer must mark the subject only
+    when the witness actually cites it. (GATHER-SCATTER is far worse — it omits the subject in 75
+    of its 107 matches, because its witness is truncated to MIN_FANOUT. See aml_graph.)
     """
     edges = [g.by_id[i] for i in txn_ids if i in g.by_id]
     if len(edges) != len(txn_ids):
