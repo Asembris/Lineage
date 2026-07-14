@@ -7501,3 +7501,149 @@ the invariant standing over the only irreversible write in the product.
 ### `neighbourhood` endpoint (Rung 5, still gated on looking at a render). The AUDIT/ordered-reveal
 ### surface (Rung 4 — the only place `is_fraud` may appear for a subject). Any change to the brake, the
 ### eval inputs, any measured constant, or the invalidation flow. A second r3f use.
+
+## ====== A CHECK THAT READS LIVE STATE IS A CHECK WHOSE CORRECTNESS DEPENDS ON WHAT ELSE RAN ======
+### (2026-07-14) — the sixth proxy, at full weight; and the coverage pin that found unchecked code on
+### its first run against real files.
+
+### ========== THE SIXTH PROXY: GREEN ALONE, BROKEN IN SUITE ==========
+
+`tests/test_console_fixtures.py`'s first draft **replayed each captured request against the live
+cluster and compared the response shape.** Run on its own: **9 passed.** Run in the full suite:
+**FAILED.**
+
+**THE MECHANISM, precisely.** The suite calls `seed()`, which **DELETEs every row in `decisions` and
+`belief_performance`**. The pin read from exactly those tables. Whether it saw the 5,500-row feed it
+was written to check, or an empty list, depended entirely on **whether a reseeding test had already
+run in that session.** In isolation the cluster was full and the check looked correct. In the suite
+the cluster was empty and the check compared `[]` against `[]`.
+
+**AND THE OBVIOUS FIX WOULD HAVE BEEN THE PROXY.** Treating an empty list as a wildcard makes it
+green everywhere. But **backend CI ALWAYS runs the full suite**, so the tables would ALWAYS have been
+empty by the time the pin ran — and **the row shape, the only shape the console actually renders,
+would have been checked NEVER, on any push, for the life of the project.** Green forever. Checking
+nothing. That is precisely `tsc --noEmit`: a check whose passing was structurally guaranteed.
+
+| # | the check | why it could not fail |
+|---|-----------|------------------------|
+| 1 | the two dead **vector indexes** | never appeared in a plan; the opclass could not serve the query |
+| 2 | `verify_corpus.py`'s **EXPLAIN** | EXPLAINed a query the application never runs |
+| 3 | the restore guard's **14-line proximity window** | passed its own bug |
+| 4 | `test_citations.py`'s **docstring** | carried the disease it was written to cure |
+| 5 | **`tsc --noEmit`** | typechecks ZERO files; exits 0 unconditionally; cited by NINE gates |
+| 6 | the composition guard's **CHECK C** | blinded by the very property that makes the design safe |
+| **7** | **the console pin's first draft** | **read a table the suite empties — would have compared `[]` to `[]` in CI, forever** |
+| **8** | **the geometry guard's own REDUCED-MOTION dimension** | **`reducedMotion` at the top of `use` is an unknown key JS silently ignores — 2 projects run twice** |
+
+**THE FIX IS TO STOP READING LIVE STATE AT ALL.** The pin now **round-trips each captured body
+through the route's real Pydantic `response_model`** (resolved from the live app's route table). It
+is deterministic, cluster-independent, order-independent — and it catches strictly MORE than the
+version that read the cluster, including the case plain `model_validate` **misses** (Pydantic ignores
+extra keys): **a field REMOVED from the model.** A separate liveness test covers what the round-trip
+cannot — the route still exists and still serves 200 — and is deliberately written to be true of an
+EMPTY cluster, so it cannot acquire the same dependence.
+
+### ===== THE PATTERN, NAMED. THIS IS THE SECOND TIME, NOT THE FIRST. =====
+
+Rung 2's **gloss guard** was green on targeted runs and RED on the full suite (`DecisionFeed.tsx`'s
+new comments, written after the last guard run). The lesson recorded then was *"run the guard after
+the last edit, not after the last edit you remember making."* **That was the right lesson and too
+narrow a one.** The general form is:
+
+> **A CHECK THAT READS LIVE STATE IS A CHECK WHOSE CORRECTNESS DEPENDS ON WHAT ELSE RAN.** Its
+> verdict is a function of the suite's ORDER, not only of the code. **Never trust a cluster-touching
+> check until it has run inside the FULL suite** — and prefer a check that does not depend on
+> cluster contents at all, because the strongest version of this fix was not "make it tolerant" but
+> "make it not need the data."
+
+Both instances were caught the same way, and only that way: **by running the whole suite instead of
+the file I had just written.**
+
+### ========== CHECK 1: THE COVERAGE PIN — AND IT FOUND UNCHECKED CODE IMMEDIATELY ==========
+
+Fixing `tsconfig.e2e.json` fixed the SYMPTOM (the geometry guard's own source being typechecked by
+nothing, which is how the fake reduced-motion dimension shipped green). **The CAUSE was that nothing
+asserted the frontend's TypeScript is COVERED by the projects `tsc -b` builds.** Add a directory
+tomorrow and it is silently unchecked again, in exactly the way that let a fake test dimension ship.
+
+`test_every_typescript_file_in_the_frontend_is_actually_TYPECHECKED` now derives the covered roots
+**from `tsconfig.json`'s references themselves** (never a hardcoded list — a hardcoded list is a
+second source of truth that can disagree with the first while everything stays green) and asserts
+every `.ts`/`.tsx` under `frontend/` falls inside one.
+
+**IT FAILED ON ITS FIRST RUN, AGAINST REAL CODE THAT PREDATES THIS SESSION.** The composition
+guard's five fixtures — `scripts/fixtures/*.tsx`, the demonstration that keeps the ORACLE BOUNDARY
+honest — were in **no typecheck project at all**. That matters beyond tidiness: the guard resolves
+symbols **by declaration site** through the TS compiler API, so a fixture whose imports silently
+stopped resolving would stop exhibiting its violation, and the failure would read as *"the guard is
+fine"* rather than *"the fixture rotted"*. They are now covered by `tsconfig.guard.json` (with
+`noUnusedLocals` off, and only there: a violation fixture exists to DECLARE a shape, not to use it).
+
+**MADE TO FAIL, with the exact command CI runs, and with the counterfactual that proves it could not
+have failed before:**
+
+```
+# a real type error planted in tests-e2e/geometry.spec.ts (string assigned to number)
+
+npx tsc -b                                  ->  EXIT 2
+    tests-e2e/geometry.spec.ts(67,9): error TS2322: Type 'string' is not assignable to type 'number'.
+    tests-e2e/geometry.spec.ts(67,9): error TS6133: 'oops' is declared but its value is never read.
+
+# now remove the ./tsconfig.e2e.json reference — i.e. the world as it was before this session —
+# and leave the SAME type error in place:
+
+npx tsc -b                                  ->  EXIT 0     *** GREEN. THE BUG IS RIGHT THERE. ***
+```
+
+That second line is the whole finding. It is the `tsc --noEmit` experiment run again, on the guard
+that exists to prevent `tsc --noEmit`.
+
+### ========== CHECK 3: THE CACHE — WHAT IS CACHED, AND WHAT HONESTLY IS NOT ==========
+
+**The key tracks the RESOLVED version, not a floating tag — checked, not assumed.** `package.json`
+declares `^1.61.1`, but **`npm ci` installs from the LOCKFILE**, which pins `1.61.1` exactly
+(`resolved` present for `@playwright/test`, `playwright`, `playwright-core`). The cache key hashes
+`frontend/package-lock.json`, so it changes whenever the Playwright version does and **a stale
+browser can never be restored for a new version.** It over-invalidates (any unrelated dependency bump
+re-downloads) — **that direction is safe; the other is not.**
+
+**The warm path's mechanism is verified locally:** with the browser already present,
+`npx playwright install chromium` is a **2.1s no-op**.
+
+**AND WHAT IS NOT CACHED, STATED RATHER THAN GLOSSED:** `--with-deps` installs system libraries via
+**apt**, which live OUTSIDE `~/.cache/ms-playwright`. The runner image is fresh every push, so **that
+step runs on every push regardless of a cache hit.** My earlier "+30-50s warm" was therefore
+optimistic and is withdrawn. Dropping `--with-deps` would buy it back and risk a cryptic
+browser-launch failure — **a guard that cannot RUN is a guard that cannot FAIL**, and that trade is
+not available. **The real cold and warm numbers are to be READ OFF THE ACTIONS TAB, not predicted**
+(warm needs a second frontend push; it is not yet measured, and is not claimed).
+
+### HARNESS GOTCHA (banked, and this is the THIRD time it has bitten)
+**`git checkout -- <file>` destroyed uncommitted work AGAIN.** Reverting `frontend/tsconfig.json`
+after the deliberate trip took it back to HEAD — **erasing the `tsconfig.guard.json` reference I had
+just written and not yet committed.** The banked rule is *"COMMIT the fix, THEN break it."* I
+committed the geometry guard and then broke it, correctly — and then made a NEW uncommitted edit to
+the same file mid-demonstration and reverted over it. **The rule needs its missing clause: commit the
+fix, break it, and make NO new edits to the file you are about to revert.**
+
+### ===== AND THE GUARD WAS FLAKY — CAUGHT BY RUNNING IT SIX TIMES, NOT ONCE =====
+The geometry guard passed, so I nearly stopped. Then a chained run reported **9 passed** where there
+are **12 tests** — three tests had not run, **and nothing said so**. Re-running it in a loop exposed
+the real fault: under the default **6 parallel workers**, `vite preview` (a single static server)
+intermittently stopped answering and **4 of 12 tests died on `page.goto: Test timeout of 30000ms
+exceeded`** — roughly **one run in three**.
+
+**A FLAKY GUARD OVER AN IRREVERSIBLE WRITE IS WORSE THAN NO GUARD.** It teaches the next person to
+re-run until green, which is exactly how a REAL failure gets waved through. And `retries: 0` — chosen
+so a retry could never hide a real flake — is only an honest setting if the run is actually
+deterministic.
+
+**Fixed by `workers: 1`, and it is FREE — measured, not assumed:** 6/6 clean at ~20s, against 21-46s
+for the parallel runs. **The bottleneck was the server, never the tests**, so parallelism bought
+nothing and cost determinism. `reuseExistingServer` is also now **false everywhere, not just in CI**:
+attaching to a leftover preview server that some other command is concurrently rewriting `dist/`
+under is another way to silently under-run.
+
+> **A GUARD THAT CAN SILENTLY UNDER-RUN IS A GUARD THAT CAN SILENTLY STOP COVERING A STATE.** Green
+> is not the same as complete: **read the test COUNT, not just the exit code.** Nothing in this
+> project would have caught "9 passed" — I only saw it because the number looked wrong.

@@ -1,0 +1,42 @@
+/* The COMPOSITION GUARD'S FIXTURES — typechecked, because they are a guard's demonstration and a
+   guard's demonstration is load-bearing code.
+ *
+ * These five .tsx files are the composition guard's proof that it still works: it re-analyzes them
+ * on every run and asserts it still finds the known violations at the known lines, so a gutted
+ * analyzer fails its own self-test. They were in NO typecheck project — `tsconfig.app.json`
+ * includes only `src`.
+ *
+ * That matters more than it looks. The guard resolves symbols BY DECLARATION SITE through the
+ * TypeScript compiler API; a fixture whose imports silently stopped resolving would stop exhibiting
+ * its violation, and the failure would read as "the guard is fine" rather than "the fixture rotted".
+ * Typechecking them means a broken fixture fails LOUDLY, in CI, as a type error — instead of quietly
+ * weakening the demonstration that the oracle boundary still has a working guard.
+ *
+ * Found by tests/test_frontend_typecheck.py's coverage pin, on its first run, against real code.
+ *
+ * `noUnusedLocals` is OFF here and nowhere else: a violation fixture exists to DECLARE a shape (a
+ * component that takes both layers), not to use it. Being unused is the point. */
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.guard.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["scripts/fixtures"]
+}

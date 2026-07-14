@@ -26,9 +26,19 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: "./tests-e2e",
-  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0, // A geometry assertion is deterministic. A retry would only hide a real flake.
+
+  // ONE WORKER, AND IT COSTS NOTHING. Under the default 6 parallel workers, `vite preview` — a
+  // single static server — intermittently stopped answering and 4 of 12 tests died on
+  // `page.goto: Test timeout of 30000ms exceeded`. Roughly one run in three. A FLAKY GUARD OVER AN
+  // IRREVERSIBLE WRITE IS WORSE THAN NO GUARD: it trains people to re-run it until it is green,
+  // which is how a real failure gets waved through.
+  //
+  // Serializing is FREE here — measured, not assumed: 5/5 clean at ~21s, against 21-46s for the
+  // parallel runs. The bottleneck was the server, never the tests, so parallelism bought nothing and
+  // cost determinism. `retries: 0` is only honest if the run is actually deterministic.
+  workers: 1,
   reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],
 
   use: {
@@ -72,7 +82,14 @@ export default defineConfig({
   webServer: {
     command: `npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // NEVER reuse a server, not even locally. With `reuseExistingServer: true` a run can attach to a
+    // preview server left over from a previous invocation — one that is serving a `dist/` some other
+    // command is concurrently rewriting. Chaining `vite build` into `playwright test` did exactly
+    // that here and produced a run reporting **9 passed** where there are 12 tests: three tests did
+    // not run, and NOTHING said so. A guard that can silently under-run is a guard that can silently
+    // stop covering a state — the same family as a check that cannot fail. One second of server boot
+    // is not worth that.
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });

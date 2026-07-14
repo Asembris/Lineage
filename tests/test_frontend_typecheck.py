@@ -82,6 +82,85 @@ def test_the_solution_tsconfig_is_why_noemit_is_vacuous():
     assert cfg.get("references"), "a solution file with no references checks nothing at all"
 
 
+def _load_jsonc(path: Path) -> dict:
+    """tsconfigs are JSONC — Vite's templates ship comments in them, and so do ours."""
+    src = path.read_text(encoding="utf-8")
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"^\s*//.*$", "", src, flags=re.M)
+    return json.loads(src)
+
+
+def _covered_roots() -> list[str]:
+    """Every path `tsc -b` actually descends into, derived from the solution file's references.
+
+    Read from the configs themselves rather than hardcoded: a hardcoded list would be a second
+    source of truth, and a second source of truth is a thing that can disagree with the first while
+    everything stays green.
+    """
+    solution = _load_jsonc(_FE / "tsconfig.json")
+    roots: list[str] = []
+    for ref in solution.get("references", []):
+        project = _load_jsonc(_FE / ref["path"].lstrip("./"))
+        roots.extend(project.get("include", []))
+        roots.extend(project.get("files", []))
+    return roots
+
+
+def test_every_typescript_file_in_the_frontend_is_actually_TYPECHECKED():
+    """THE COVERAGE PIN — because a file outside every project reference is checked by NOTHING.
+
+    ===================== THE BUG THIS EXISTS TO STOP RECURRING =====================
+
+    `playwright.config.ts` and `tests-e2e/` — the browser geometry guard, the check standing over
+    the only irreversible write in the product — were in NO typecheck project. `tsconfig.app.json`
+    includes `src`; `tsconfig.node.json` includes `vite.config.ts`; the guard was in neither. And
+    Playwright's transpiler STRIPS types without checking them, so nothing complained.
+
+    It was not hypothetical. `reducedMotion` was set at the top level of `use`, where it is an
+    unknown key that JavaScript SILENTLY IGNORES — it belongs under `contextOptions`. The two
+    "reduced-motion" projects were therefore byte-identical duplicates of the normal-motion ones,
+    and the guard's first green run ("12 passed") was really 2 projects run twice. **A whole
+    dimension of the guard was fake and green**, and the typecheck is what found it.
+
+    Fixing that file was the symptom. THIS is the cause: nothing asserted that the frontend's
+    TypeScript is covered by the projects `tsc -b` builds. Add a directory tomorrow — `e2e-v2/`, a
+    `bench/`, anything outside `src` — and it is silently unchecked again, in exactly the way that
+    let a fake test dimension ship. So the coverage is enumerated, not assumed.
+    """
+    roots = _covered_roots()
+    assert "tests-e2e" in roots and "playwright.config.ts" in roots, (
+        "the browser geometry guard's own source is no longer in a typecheck project.\n"
+        f"covered roots: {roots}\n"
+        "It was unchecked once already, and a fake reduced-motion dimension shipped green because "
+        "of it. tsconfig.json must reference a project that includes `tests-e2e`."
+    )
+
+    covered_dirs = [r for r in roots if not r.endswith((".ts", ".tsx"))]
+    covered_files = [r for r in roots if r.endswith((".ts", ".tsx"))]
+
+    unchecked: list[str] = []
+    for f in _FE.rglob("*.ts*"):
+        if f.suffix not in (".ts", ".tsx"):
+            continue
+        rel = f.relative_to(_FE).as_posix()
+        if rel.startswith(("node_modules/", "dist/")) or ".d.ts" in rel:
+            continue
+        if rel in covered_files:
+            continue
+        if any(rel.startswith(f"{d}/") for d in covered_dirs):
+            continue
+        unchecked.append(rel)
+
+    assert not unchecked, (
+        "THESE TYPESCRIPT FILES ARE TYPECHECKED BY NOTHING — `tsc -b` never descends into them:\n  "
+        + "\n  ".join(unchecked)
+        + f"\n\ncovered roots (from tsconfig.json's references): {roots}\n"
+        "This is how the geometry guard's fake reduced-motion dimension stayed green: its own source "
+        "was outside every project, and Playwright's transpiler strips types without checking them. "
+        "Add the directory to a referenced tsconfig, or reference a new project from tsconfig.json."
+    )
+
+
 def test_ci_typechecks_with_the_command_that_can_actually_fail():
     """frontend-ci must run `tsc -b`. It is the only thing that caught the missing import."""
     ci = (_ROOT / ".github" / "workflows" / "frontend-ci.yml").read_text(encoding="utf-8")
