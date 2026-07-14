@@ -66,3 +66,38 @@ jobs:
 
       - name: Build (vite build)
         run: npx vite build
+
+      # THE GEOMETRY GUARD — the invariant that is only provable by RENDERING.
+      #
+      # `.kill__actions` stacks (flex-direction: column) so that CANCEL takes the arm button's
+      # footprint and CONFIRM sits clear of it. That is a SAFETY MECHANISM, not a style choice: with
+      # the governed write pinned in a footer, the arm and confirm buttons share one bottom-anchored
+      # region, and two clicks of muscle memory in one screen position would be an irreversible
+      # fleet-wide write. A confirm gate protects against not KNOWING; it cannot protect against not
+      # MOVING YOUR HAND. Until this step existed, a flip back to `row` was caught by NOTHING.
+      #
+      # It cannot be a pytest grep for `flex-direction: column`: that asserts the CSS TEXT, not the
+      # geometry, and would pass a `.kill__cancel { position: absolute }` without blinking. It runs
+      # against a real browser over the REAL BUILD, with the console's data replayed from responses
+      # captured off the live cluster (frontend/tests-e2e/mock.ts).
+      #
+      # STILL FULLY OFFLINE. No DATABASE_URL, no cluster — frontend pushes remain the only pushes
+      # that do not reseed it. tests/test_console_fixtures.py (backend suite, which DOES see every
+      # backend change) pins those fixtures to the live API so the mock cannot drift, and
+      # tests/test_console_fixtures.py::test_frontend_ci_actually_invokes_the_geometry_guard asserts
+      # THIS STEP EXISTS — workflow files are not in ci.yml's paths-ignore, so deleting it fails the
+      # backend suite.
+      # The browser is ~130MB and is the whole cost of this guard. Cached on the lockfile hash (which
+      # is what pins the Playwright version), so a cold run pays the download once and every run
+      # after it restores instead.
+      - name: Cache the Chromium download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Chromium for the geometry guard
+        run: npx playwright install --with-deps chromium
+
+      - name: Geometry guard (Confirm must not land on the arm button's footprint)
+        run: npm run guard:geometry
