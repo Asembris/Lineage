@@ -89,11 +89,21 @@ const EVIDENCE_ROOTS = new Set([
 
 /** Every module of the evidence surface. Check B applies to each: not one imported symbol in any of
  *  them may reach the audit layer, through props or any other channel. Pinned, and completeness is
- *  separately asserted below, so a new evidence component cannot quietly escape the check. */
+ *  separately asserted below, so a new evidence component cannot quietly escape the check.
+ *
+ *  ONE ENTRY HERE IS A DELIBERATE DECLARATION, NOT A FORMALITY — `src/lib/witnessGeometry.ts`.
+ *  Check B' below asserts this list is complete with respect to COMPONENTS: anything rendering the
+ *  evidence layer from an unlisted module fails the build. But `witnessGeometry.ts` contains NO
+ *  JSX, so it is not a component, and B' cannot force it. A pure layout module is exactly the shape
+ *  of the hole check B exists to close (a zero-prop module that simply CALLS `listDecisions()`
+ *  itself), so it is listed by hand and MEANT: the geometry must be derivable from /interrogate
+ *  alone, and if it ever imports the audit layer through any channel, the build fails. */
 const EVIDENCE_MODULES = [
   "src/components/AmlConsole.tsx",
+  "src/components/WitnessGeometry.tsx",
   "src/hooks/useInterrogation.ts",
   "src/lib/basis.ts",
+  "src/lib/witnessGeometry.ts",
 ];
 
 /* ---------------------------------------------------------------------------------------- */
