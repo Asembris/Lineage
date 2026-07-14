@@ -180,15 +180,20 @@ function Figure({ geo, typology }: { geo: Geo; typology: string }) {
           that too, so nobody reads the diamond as a path. */}
       {geo.kind === "LEGS" && (
         <ul className="geo__legend">
+          {/* `geo__edge` MEANS "A TRANSACTION", AND A LEGEND KEY IS NOT ONE. These swatches first
+              carried that class for its stroke styling, and the geometry guard immediately failed:
+              it counted 6 edges where the witness cites 4, because the two legend keys were being
+              counted as money. The guard was right and the markup was wrong — a class that names a
+              thing must not be worn by something that is not that thing. */}
           <li>
             <svg className="geo__swatch" viewBox="0 0 26 6" aria-hidden="true">
-              <path className="geo__edge geo__edge--quiet" d="M 1 3 L 25 3" />
+              <path className="geo__swatch-line" d="M 1 3 L 25 3" />
             </svg>
             <span>scatter — one source fans out</span>
           </li>
           <li>
             <svg className="geo__swatch" viewBox="0 0 26 6" aria-hidden="true">
-              <path className="geo__edge geo__edge--quiet geo__edge--gather" d="M 1 3 L 25 3" />
+              <path className="geo__swatch-line geo__swatch-line--gather" d="M 1 3 L 25 3" />
             </svg>
             <span>gather — they carry it into one destination</span>
           </li>

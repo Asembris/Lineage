@@ -37,7 +37,7 @@
  */
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { installMock, SUBJECT_TXN_REF, SUBJECTS } from "./mock.js";
+import { expectedGeometry, installMock, SUBJECT_TXN_REF, SUBJECTS } from "./mock.js";
 
 interface Rect {
   x: number;
@@ -186,8 +186,117 @@ test.describe("the governed write", () => {
   });
 });
 
+/** Enter through the MOAT — the decision feed, where `is_fraud` legitimately lives — and click
+ *  through to the evidence layer. The seam hands over a bare UUID and nothing else. Every geometry
+ *  subject is captured from the feed's FIRST PAGE, so this never needs to page. */
+async function interrogate(page: Page, txnId: string): Promise<void> {
+  await page.goto("/");
+  const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+  await filter.getByRole("button", { name: /^aml/ }).click();
+  await page.locator(".feed__row", { hasText: txnId.slice(0, 6) }).first().click();
+  await page.getByRole("button", { name: /Interrogate the transaction/ }).click();
+  await page.waitForSelector(".aml__witnesses", { state: "visible" });
+}
+
+/**
+ * THE PICTURE MUST NOT UNDERSTATE THE EVIDENCE, AND IT MUST NOT INVENT A SUBJECT.
+ *
+ * ================== WHY THESE TWO, AND NOT "DOES THE RING CLOSE" ==================
+ * Ring closure is the money shot, and it is deliberately NOT guarded: each edge is drawn between the
+ * real account ids on its own row, so the ring closes BY CONSTRUCTION, and the data property behind
+ * it is already pinned in the backend suite (57/57 contiguous and closed). The one bug that could
+ * break it in pixels — collapsing two accounts into one node — cannot manifest: nodes are keyed by
+ * account UUID, and account numbers are 648/648 unique in this extract anyway. A per-push cost for a
+ * property that is designed out rather than observed is what this project cut the sticky-focus guard
+ * for. These two CAN regress, silently, and would be invisible:
+ *
+ *  1. EDGE COUNT. The money-flow graph is a MULTIGRAPH: 41 witnesses carry TWO distinct transactions
+ *     between the SAME pair of accounts. A layout keying edges by (from,to) — the natural thing to
+ *     write, and the thing a future refactor will reach for — draws THREE lines where the evidence
+ *     has FOUR. The picture then silently understates the evidence, which is this project's signature
+ *     defect ("CONCLUSIVE_NO: 463 searched") committed in the one surface that has no test.
+ *
+ *  2. THE SUBJECT MARKER. The subject is ABSENT from its own witness in 75 of 107 GATHER-SCATTER
+ *     matches. Marking `edges[0]`, or marking anything at all on those, points the reader at a
+ *     transaction they did not click — a fabrication, and a confident-looking one.
+ *
+ * Both are asserted against the WIRE, never against a number written here: `expectedGeometry()` reads
+ * the witness's own `transaction_ids` out of the captured interrogation. A hardcoded "10" would be a
+ * second copy of the same belief, free to drift with the fixture and stay green.
+ */
+test.describe("the witness geometry", () => {
+  for (const [label, txnId] of [
+    ["a RING — every hop drawn, and the subject marked", SUBJECTS.aml_ring_txn_id],
+    ["PARALLEL transactions — two on one account pair, drawn as two", SUBJECTS.aml_parallel_txn_id],
+    ["a witness that does NOT cite the subject — nothing marked", SUBJECTS.aml_omits_subject_txn_id],
+  ] as const) {
+    test(`the drawing matches the wire: ${label}`, async ({ page }) => {
+      const misses = installMock(page);
+      const expected = expectedGeometry(txnId);
+
+      // LIVENESS. A fixture whose subject witnesses nothing renders no geometry, and every
+      // assertion below would then pass over an empty page — which is exactly how the old capture
+      // (`ORDER BY decided_at DESC, id DESC`, over 1,500 rows sharing one `decided_at`) would have
+      // made this guard vacuous. It must have something to measure before it measures.
+      expect(
+        expected.length,
+        `${txnId} witnesses NO structure, so this guard would measure nothing. Re-capture with ` +
+          "`python -m scripts.capture_console_fixtures`, which picks geometry subjects on purpose.",
+      ).toBeGreaterThan(0);
+
+      await interrogate(page, txnId);
+      await expect(page.locator(".geo__section")).toBeVisible();
+
+      const figures = page.locator(".geo");
+      await expect(figures).toHaveCount(expected.length);
+
+      for (const w of expected) {
+        const fig = page.locator(".geo", { has: page.getByText(w.typology, { exact: true }) });
+
+        // 1. EVERY CITED TRANSACTION IS A LINE. Not "every account pair".
+        // Scoped to the DRAWING (`.geo__svg`), never the whole figure: the LEGS legend draws two
+        // key swatches, and counting those as money is exactly the mistake this assertion exists to
+        // catch. It caught it — in this guard's own first run, against the real markup.
+        await expect(
+          fig.locator(".geo__svg .geo__edge"),
+          `${w.typology}: the witness cites ${w.edges} transactions and the drawing does not have ` +
+            `${w.edges} edges.\n\nThe money-flow graph is a MULTIGRAPH — two distinct transactions ` +
+            `can run between the same two accounts. If the layout keys edges by (from,to) it will ` +
+            `merge them, and the picture will show FEWER transactions than the evidence contains. ` +
+            `The edge is the TRANSACTION; its identity is the transaction id.`,
+        ).toHaveCount(w.edges);
+
+        // 2. THE SUBJECT IS MARKED IF AND ONLY IF THE WITNESS CITES IT.
+        await expect(
+          fig.locator(".geo__svg .geo__edge--subject"),
+          `${w.typology}: the witness ${w.citesSubject ? "CITES" : "DOES NOT CITE"} the subject, so ` +
+            `exactly ${w.citesSubject ? 1 : 0} edge(s) must be marked as the subject.\n\n` +
+            `The subject is absent from its own witness in 75 of 107 GATHER-SCATTER matches (the ` +
+            `witness is truncated to MIN_FANOUT) and 1 of 42 SCATTER-GATHER ones (the graph cites a ` +
+            `parallel twin). Marking an edge anyway points the reader at a transaction they did not ` +
+            `click.`,
+        ).toHaveCount(w.citesSubject ? 1 : 0);
+      }
+
+      expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+    });
+  }
+});
+
 test.describe("the oracle boundary", () => {
-  test("the evidence surface never renders the label", async ({ page }) => {
+  // SWEPT ACROSS A SUBJECT THAT DRAWS AND ONE THAT DOES NOT.
+  //
+  // Until Rung 3 this ran on one subject — and that subject witnesses NOTHING, so it rendered no
+  // geometry. The drawing is a NEW TEXT SURFACE: every figure carries an `aria-label` describing the
+  // evidence and a `<title>` on every edge and node. A leak there would be announced to a screen
+  // reader and invisible on screen — the exact blind spot the `aria-label` sweep below was written
+  // for, in a surface that did not exist when it was written. So the subject that draws the most is
+  // swept too.
+  for (const [what, txnId] of [
+    ["a subject with NO geometry", SUBJECTS.aml_transaction_id],
+    ["a subject whose RING is drawn", SUBJECTS.aml_ring_txn_id],
+  ] as const) {
+    test(`the evidence surface never renders the label — ${what}`, async ({ page }) => {
     const misses = installMock(page);
     await page.goto("/");
 
@@ -197,7 +306,7 @@ test.describe("the oracle boundary", () => {
     // Enter through the moat — the decision feed, where `is_fraud` legitimately lives — and click
     // through to the evidence layer. The seam hands over a bare UUID and nothing else.
     await page
-      .locator(".feed__row", { hasText: SUBJECTS.aml_transaction_id.slice(0, 6) })
+      .locator(".feed__row", { hasText: txnId.slice(0, 6) })
       .first()
       .click();
     await page.getByRole("button", { name: /Interrogate the transaction/ }).click();
@@ -240,5 +349,6 @@ test.describe("the oracle boundary", () => {
     await expect(page.locator(".feed__row")).toHaveCount(0);
 
     expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
-  });
+    });
+  }
 });
