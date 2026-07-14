@@ -162,23 +162,31 @@ function WitnessRow({ w, r }: { w: AmlWitness; r: AmlInterrogationResponse }) {
   const size = w.transaction_ids.length;
   return (
     <li className={`aml__witness aml__witness--${w.outcome.toLowerCase()}`}>
+      {/* TYPOLOGY LEFT, OUTCOME RIGHT, CAPABILITY BELOW — a fixed two-row head.
+          Driving it caught the reason: with all three on one wrapping flex row, the outcome chip
+          landed on line 1 for STACK and wrapped to line 2 for GATHER-SCATTER, so the same fact sat
+          in a different place on each of the four cards and the row could not be read across. The
+          four witnesses are meant to be COMPARED; a layout that moves the comparison key per card
+          defeats that. */}
       <div className="aml__witness-head">
         <span className="aml__typology">{w.typology}</span>
-        {/* FLAG-CAPABLE is a measured property of this extract (the witness never fires on an edge
-            belonging to a different typology), not a design choice. A witness that is not
-            flag-capable is still real evidence — it simply may not authorize a flag on its own. */}
-        <span
-          className={`aml__capable${w.flag_capable ? " aml__capable--yes" : ""}`}
-          title={
-            w.flag_capable
-              ? "flag-capable: this witness never fires on an edge belonging to a different typology"
-              : "not flag-capable here: it may not authorize a flag on its own"
-          }
-        >
-          {w.flag_capable ? "flag-capable" : "not flag-capable"}
-        </span>
         <span className="aml__outcome">{w.outcome.toLowerCase().replace("_", " ")}</span>
       </div>
+      {/* FLAG-CAPABLE is a measured property of this extract (the witness never fires on an edge
+          belonging to a different typology), not a design choice. A witness that is not
+          flag-capable is still real evidence — it simply may not authorize a flag on its own. Both
+          states are legible: an asymmetry where only one of a binary fact passes contrast would
+          make the negative case quietly harder to read than the positive one. */}
+      <span
+        className={`aml__capable${w.flag_capable ? " aml__capable--yes" : ""}`}
+        title={
+          w.flag_capable
+            ? "flag-capable: this witness never fires on an edge belonging to a different typology"
+            : "not flag-capable here: it may not authorize a flag on its own"
+        }
+      >
+        {w.flag_capable ? "flag-capable" : "not flag-capable"}
+      </span>
       <p className="aml__witness-detail">{w.detail}</p>
       <div className="aml__witness-foot">
         {size > 0 && (

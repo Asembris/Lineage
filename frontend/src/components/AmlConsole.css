@@ -2,17 +2,31 @@
  * The evidence surface. Cold, dense, clinical — the world stays dead by default.
  *
  * TOKEN DISCIPLINE, and it is load-bearing rather than aesthetic:
- *   --bone   the ONE emphasis: "the system is pointing at this". Measured 12.04:1 on --void,
- *            the strongest contrast in the palette — which is why it is the right token for it.
- *   --ash    quiet provenance text. Measured 3.32:1 on --void: below WCAG AA (4.5:1) by 1.18, and
- *            that is a DELIBERATE FRONTEND.md choice, not an oversight — this text is meant to
- *            recede. It is never the only carrier of a fact; every reading is also stated in
- *            --bone or --ghost body copy.
- *   --ghost  the honest "we could not determine" — DASHED, never a clean filled pass.
+ *   --bone   the ONE emphasis: "the system is pointing at this". MEASURED 12.04:1 on --void — the
+ *            strongest contrast in the palette, which is why it is the right token for it.
+ *   --ghost  legible secondary. MEASURED 5.83:1 on --surface / 6.32:1 on --void — passes WCAG AA.
+ *   --ash    DELIBERATELY QUIET CHROME, and nothing else. MEASURED 3.06:1 on --surface / 3.32:1 on
+ *            --void: BELOW WCAG AA (4.5:1). That is a FRONTEND.md choice ("warmth is earned; the
+ *            world is quiet by default") and FRONTEND.md wins — but it is only defensible for text
+ *            that carries NO FACT: the section eyebrows, the key labels of a key/value pair whose
+ *            VALUE is legible, and the decorative arrow. See the rule below.
  *   NO --alert ANYWHERE. Painting a witness red would fuse "the graph found a structure" with
  *            "this is fraud". Those are different claims, and fusing them in colour is the
  *            oracle-boundary collapse. A MATCH is emphasis, not alarm.
  *   NO --trace / --origin. Warmth is earned on the trace path and nowhere else.
+ *
+ * ===== THE RULE, AND MEASURING IS WHAT PRODUCED IT =====
+ * IF THE READER MUST READ IT TO UNDERSTAND THE EVIDENCE, IT IS LEGIBLE (>= AA). Quiet is for
+ * chrome, never for a fact.
+ *
+ * The first draft broke this and I would have defended it as "deliberate restraint" — Raven
+ * measured `h2.aml__basis-label` at 3.06:1. That is the HEADLINE of the whole surface (the word
+ * "CONCLUSIVE_NO · self-loop"), rendered below AA because I had reached for --ash to say "this one
+ * is unremarkable". Dimming a headline to signal that it is unremarkable does not make it quiet;
+ * it makes it HARD TO READ. The four bases must be DISTINGUISHABLE, not ILLEGIBLE — and they are
+ * distinguished by border style, by label text, by headline, by detail and by count, none of which
+ * needed the contrast. Same for the witness size/shape, the census count, the flag-capable state
+ * and the provenance line: all facts, all now >= AA.
  */
 
 .aml {
@@ -221,7 +235,7 @@
   border-left-style: dotted;
 }
 .aml__basis--self_loop .aml__basis-label {
-  color: var(--ash);
+  color: var(--ghost);
 }
 .aml__basis--closed_search {
   border-left-color: var(--ash);
@@ -240,7 +254,7 @@
 .aml__basis-count {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ash);
+  color: var(--ghost); /* a census number is a fact, not chrome — 5.83:1 */
 }
 
 .aml__basis-label {
@@ -329,8 +343,8 @@
 
 .aml__witness-head {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -341,25 +355,30 @@
   letter-spacing: 0.04em;
 }
 
+/* Both states are >= AA. An asymmetry where "flag-capable" passed contrast and "not flag-capable"
+   did not (the first draft: 5.83 vs 3.06) makes the negative case quietly harder to read than the
+   positive one — a legibility gradient on a binary fact. The states differ by BORDER. */
 .aml__capable {
+  display: inline-block;
+  margin-top: 8px;
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ash);
-  border: 1px solid var(--line);
+  color: var(--ghost);
+  border: 1px dashed var(--line);
   padding: 3px 6px;
   border-radius: 2px;
 }
 .aml__capable--yes {
-  color: var(--ghost);
-  border-color: var(--ash);
+  border: 1px solid var(--ash);
 }
 
 .aml__outcome {
-  margin-left: auto;
+  flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ghost);
+  white-space: nowrap;
 }
 .aml__witness--match .aml__outcome {
   color: var(--bone);
@@ -379,10 +398,10 @@
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ash);
+  color: var(--ghost); /* "10 transactions · a closed ring" is the witness's SIZE and SHAPE */
 }
 .aml__witness-kind {
-  color: var(--ash);
+  color: var(--ghost);
 }
 .aml__witness-boundary {
   display: flex;
@@ -391,10 +410,12 @@
   flex-wrap: wrap;
 }
 
+/* "No model was called. No ground truth was read." — the surface's integrity claim, and one of the
+   most consequential sentences on it. It was 3.32:1. A claim nobody can read is not a claim. */
 .aml__provenance {
   margin: 4px 0 0;
   font-size: 11.5px;
   line-height: 1.6;
-  color: var(--ash);
+  color: var(--ghost);
   max-width: 84ch;
 }
