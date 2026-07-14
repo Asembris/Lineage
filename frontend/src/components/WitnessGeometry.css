@@ -163,6 +163,41 @@
   fill: var(--bone);
 }
 
+/* --- the leg legend (SCATTER-GATHER only) ------------------------------------------------- */
+/* The scatter/gather split is carried by a DASH, and a dash with no key is not readable. This is
+   the key. It is --ghost (AA), because it is a fact, not chrome. */
+
+.geo__legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--ghost);
+}
+
+.geo__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.geo__swatch {
+  flex: none;
+  width: 26px;
+  height: 6px;
+  overflow: visible;
+}
+
+.geo__legend-note {
+  margin-top: 2px;
+  color: var(--ghost);
+  font-style: italic;
+  max-width: 40ch;
+}
+
 /* --- the caveats, and the dominant view -------------------------------------------------- */
 
 .geo__caveat {
