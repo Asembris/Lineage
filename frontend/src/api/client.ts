@@ -8,6 +8,7 @@
 import type {
   AgentBeliefsResponse,
   AgentListResponse,
+  AmlInterrogationResponse,
   BeliefListResponse,
   BeliefPerformanceResponse,
   DecisionListResponse,
@@ -158,6 +159,23 @@ export function getProvenanceAudit(
   beliefId: UUID,
 ): Promise<ProvenanceAuditResponse> {
   return request<ProvenanceAuditResponse>(`/beliefs/${beliefId}/provenance-audit`);
+}
+
+/* --- The evidence layer --------------------------------------------------- */
+
+/** GET /aml/transactions/{id}/interrogate — what structure the graph witnesses around one
+ *  real money-flow edge, and in what order. Deterministic, free, and label-free: no model call,
+ *  and the response carries no ground truth (see AmlInterrogationResponse).
+ *
+ *  `asOf` pins the graph AND the row resolution to ONE MVCC snapshot (real AS OF SYSTEM TIME).
+ *  Out-of-window / malformed → 400; unknown transaction → 404. Not wired to the UI in Rung 2. */
+export function interrogateTransaction(
+  txnId: UUID,
+  asOf?: string,
+): Promise<AmlInterrogationResponse> {
+  return request<AmlInterrogationResponse>(
+    `/aml/transactions/${txnId}/interrogate${buildQuery({ as_of: asOf })}`,
+  );
 }
 
 /* --- The governed write --------------------------------------------------- */
