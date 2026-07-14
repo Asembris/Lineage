@@ -87,9 +87,19 @@ jobs:
       # tests/test_console_fixtures.py::test_frontend_ci_actually_invokes_the_geometry_guard asserts
       # THIS STEP EXISTS — workflow files are not in ci.yml's paths-ignore, so deleting it fails the
       # backend suite.
-      # The browser is ~130MB and is the whole cost of this guard. Cached on the lockfile hash (which
-      # is what pins the Playwright version), so a cold run pays the download once and every run
-      # after it restores instead.
+      # The browser is ~130MB and is the bulk of this guard's cost.
+      #
+      # THE KEY TRACKS THE RESOLVED VERSION, NOT A FLOATING TAG — checked, not assumed. package.json
+      # declares `^1.61.1`, but `npm ci` installs from the LOCKFILE, which pins 1.61.1 exactly. So
+      # hashing package-lock.json means the cache key changes whenever the Playwright version does,
+      # and a stale browser can never be restored for a new version. It over-invalidates (any
+      # unrelated dependency bump re-downloads) — that direction is safe; the other is not.
+      #
+      # WHAT IS *NOT* CACHED, STATED PLAINLY: `--with-deps` installs system libraries via apt, and
+      # those live outside ~/.cache/ms-playwright. The runner image is fresh every push, so that part
+      # runs EVERY time regardless of a cache hit. Dropping `--with-deps` would buy that back and
+      # risk a cryptic browser-launch failure instead — a guard that cannot RUN is a guard that
+      # cannot FAIL, and this project does not trade correctness for seconds.
       - name: Cache the Chromium download
         uses: actions/cache@v4
         with:
