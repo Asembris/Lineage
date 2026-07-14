@@ -5,14 +5,15 @@
  * that is what the agent RECORDED. But `CONCLUSIVE_NO` is not one thing, and rendering it as one
  * thing is a lie the console must not tell:
  *
- *   SELF_LOOP      447 of the 463 — an account paying itself. That is not a transfer between two
- *                  accounts, so `aml_graph.Graph` excludes it from adjacency BY CONSTRUCTION and
- *                  no search was ever possible. Nothing was explored.
+ *   SELF_LOOP      447 of the 463 are SELF-LOOPS — an account paying itself. That is not a transfer
+ *                  between two accounts, so `aml_graph.Graph` excludes it from adjacency BY
+ *                  CONSTRUCTION and no search was ever possible. Nothing was explored.
  *   CLOSED_SEARCH   16 of the 463 — the only ones where a search actually ran, traversed the
  *                  region, and closed inside the extract without finding a return path.
  *
  * Those two are the SAME persisted tag and they must NEVER render identically. The long-standing
- * gloss ("searched; there is no cycle") described all 463 as searches; it was true of sixteen.
+ * gloss ("searched; there is no cycle") described all 463 as searches when 447 of them are
+ * self-loops that were never searched at all; it was true of sixteen.
  *
  * HOW THE FOURTH STATE IS READ, AND WHY IT IS NOT THE `detail` STRING.
  * The wire also carries the distinction as PROSE, on the witness's `detail`. Matching that prose
