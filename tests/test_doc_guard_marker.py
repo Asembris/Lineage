@@ -116,3 +116,70 @@ def test_no_doc_guard_test_touches_the_cluster():
         + "\n"
         + result.stderr[-1500:]
     )
+
+
+# ---- the WORKFLOW meta-guards: read the REAL yaml, like test_composition_guard.py does ----------
+
+_DOCS_CI = _ROOT / ".github" / "workflows" / "docs-ci.yml"
+_BACKEND_CI = _ROOT / ".github" / "workflows" / "ci.yml"
+
+
+def test_docs_ci_runs_only_the_marked_guards_never_the_whole_suite():
+    """The split's whole safety rests on docs-ci running `pytest -m doc_guard`, not a bare `pytest`.
+
+    A future edit that drops the `-m doc_guard` filter would silently run all 211 tests in docs-ci —
+    and with docs-ci's dead-host DATABASE_URL the 185 cluster tests would fail the job (loud, not a
+    wipe), but the DOC guards would stop being the point and the offline contract would be broken. So
+    this reads the real yaml and pins the filter. (Reads the file, like the composition/geometry
+    meta-guards — a docstring promise is not a guard.)
+    """
+    assert _DOCS_CI.exists(), "docs-ci.yml is gone — the offline doc-guard job no longer exists."
+    ci = _DOCS_CI.read_text(encoding="utf-8")
+
+    assert "pytest -m doc_guard" in ci, (
+        "docs-ci.yml no longer runs `pytest -m doc_guard`. A bare `pytest` there runs the whole "
+        "211-test suite; the split's offline guarantee is gone."
+    )
+    # The DATABASE_URL the job actually SETS must be the dead host, not a real secret — an offline
+    # job that reaches the real cluster could reseed it on a docs push. Inspected per-line and
+    # comment-blind ON PURPOSE: a substring scan of the whole file would trip on a comment that
+    # merely NAMES `secrets.DATABASE_URL` to explain why it is absent (it did, on the first draft —
+    # the same mention-vs-use bug the gloss guard exists for).
+    env_lines = [
+        ln for ln in ci.splitlines()
+        if "DATABASE_URL:" in ln and not ln.lstrip().startswith("#")
+    ]
+    assert env_lines, "docs-ci.yml sets no DATABASE_URL — app.config would fail to import."
+    for ln in env_lines:
+        assert "secrets" not in ln, (
+            f"docs-ci.yml wires a real DATABASE_URL secret:\n    {ln.strip()}\n"
+            "This job MUST stay offline — a real connection here reseeds the cluster on a docs push."
+        )
+        assert "127.0.0.1:1" in ln, (
+            f"docs-ci.yml's DATABASE_URL is not the dead host:\n    {ln.strip()}\n"
+            "The dead host is the backstop that turns a stray cluster touch into a loud failure "
+            "instead of a silent wipe."
+        )
+    # It fires on root docs.
+    assert "'*.md'" in ci, "docs-ci.yml no longer triggers on root *.md pushes."
+
+
+def test_ci_yml_skips_the_cluster_suite_on_root_doc_pushes():
+    """The other half of the split: the cluster suite must be OFF for root-doc-only pushes, or the
+    docs commit still wipes the cluster (the problem this split exists to fix)."""
+    assert _BACKEND_CI.exists()
+    ci = _BACKEND_CI.read_text(encoding="utf-8")
+    # A cheap structural check: '*.md' must be in the paths-ignore list. (The full semantics —
+    # 'skips only when EVERY changed file matches' — are GitHub's; what we pin is that root docs are
+    # listed, and that the glob is the ROOT one, not '**/*.md' which would wrongly skip
+    # data/corpus/*.md.)
+    assert "paths-ignore:" in ci, "ci.yml no longer uses paths-ignore."
+    assert "'*.md'" in ci, (
+        "ci.yml's paths-ignore no longer lists '*.md', so a root-doc-only push still fires the "
+        "211-test cluster suite and WIPES the cluster — the exact regression this split removes."
+    )
+    assert "'**/*.md'" not in ci, (
+        "ci.yml ignores '**/*.md' (recursive), which would wrongly skip the suite on a "
+        "data/corpus/*.md change — ingested content that test_regulatory_corpus pins. Use the ROOT "
+        "glob '*.md'."
+    )

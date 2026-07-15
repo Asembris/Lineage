@@ -1,0 +1,61 @@
+name: docs-ci
+
+# Root-doc pushes (*.md) touch neither the backend nor the cluster, so they must NOT fire the
+# 211-test cluster suite in ci.yml — which calls seed.seed() and WIPES every decision (a docs-only
+# push was measured at 7-8 min against the real cluster; see NOTES "A FABRICATED DESCRIPTION OF A
+# PRIMARY SOURCE"). But a docs push must STILL be guarded: a fabricated citation, a broken restore
+# instruction, or a false "tsc --noEmit clean" claim added in a NOTES/README/DEMO commit is exactly
+# what the doc guards catch, and skipping them on the very push that can add one is the
+# ninth-vacuous-check shape (a guard skipped by the change it protects). So this job runs the
+# OFFLINE guard set — the doc guards and the composition/geometry META-guards — marked @doc_guard.
+#
+# `*.md` is the ROOT glob: GitHub's `*` does not cross `/`, so it matches the 5 root docs
+# (README, NOTES, ARCHITECTURE, DEMO, CLAUDE) and NOT data/corpus/*.md — that is ingested content,
+# pinned by tests/test_regulatory_corpus.py, and a change to it MUST still run the full suite in
+# ci.yml. ci.yml's `paths-ignore: ['*.md', 'frontend/**']` skips the cluster suite ONLY when every
+# changed file is a root doc or under frontend/; a mixed app.py + NOTES.md push still runs it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.md'
+
+concurrency:
+  group: docs-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # NO real database secret is wired into this job — that is deliberate. It is OFFLINE, and the
+      # dead host below is a belt-and-braces backstop: the @doc_guard set is pinned cluster-free by
+      # tests/test_doc_guard_marker.py (it runs the set against this same dead host and fails if
+      # anything connects), so nothing here should ever dial — and if a future test wrongly tries,
+      # it fails LOUDLY here instead of reseeding the cluster on a docs commit. OPENAI is a dummy so
+      # app.config imports; with no real secret present, this job CANNOT reach the real cluster.
+      DATABASE_URL: postgresql+psycopg://nobody:nobody@127.0.0.1:1/nothing
+      OPENAI_API_KEY: sk-dummy-docs-ci-not-used
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # The guards import app modules at collection time (the gloss guard and the geometry
+      # meta-guards live in files that import app.main), so the full deps are needed to COLLECT them
+      # — but nothing here opens a connection. This is the pip cost without the cluster cost.
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # `-m doc_guard` is load-bearing: a bare `pytest` here would run all 211 tests, and with the
+      # dead-host DATABASE_URL the 185 cluster tests would ERROR (not wipe — the host is dead) and
+      # fail the job. tests/test_doc_guard_marker.py::test_docs_ci_runs_only_the_marked_guards reads
+      # THIS file and fails the backend suite if the `-m doc_guard` filter is ever dropped.
+      - name: Run the offline doc + meta guards
+        run: pytest -m doc_guard
