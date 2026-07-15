@@ -366,6 +366,10 @@ def test_the_geometry_fixtures_still_exhibit_the_invariants_they_were_chosen_for
     )
 
 
+# The geometry META-guards below are OFFLINE (pure file reads) and marked so `docs-ci.yml` runs them
+# on a docs-only push. The rest of this module (the response_model pin, the live-200 pin, the
+# fixture-substrate pin) touches the app/cluster and is deliberately NOT marked.
+@pytest.mark.doc_guard
 def test_frontend_ci_actually_invokes_the_geometry_guard():
     """THE META-GUARD. A guard nobody runs is a file.
 
@@ -399,6 +403,7 @@ def test_frontend_ci_actually_invokes_the_geometry_guard():
     )
 
 
+@pytest.mark.doc_guard
 def test_the_geometry_guard_asserts_the_property_not_the_pixels():
     """A guard that breaks on innocent change teaches people to weaken it.
 
@@ -430,6 +435,7 @@ def test_the_geometry_guard_asserts_the_property_not_the_pixels():
     )
 
 
+@pytest.mark.doc_guard
 @pytest.mark.parametrize("path", [_FIXTURES, _SPEC, _MOCK, _ROOT / "frontend" / "playwright.config.ts"])
 def test_the_guard_exists(path: Path):
     assert path.exists(), f"the geometry guard lost a load-bearing file: {path}"
