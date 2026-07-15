@@ -79,8 +79,12 @@
   min-width: 0;
 }
 
+/* The feed's fact-carrying text is --ghost, not --ash. MEASURED: --ash is 3.06:1 on --surface —
+   below WCAG AA — and a date/txn-id/basis is a FACT, not chrome (Rung 2's rule: quiet is for
+   borders, never for a word). This surface predates that pass, which only ran on .aml. --ghost is
+   5.83:1: still cold, still secondary, now legible. --ash survives here as BORDERS and hover only. */
 .feed__date {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .feed__clock {
@@ -110,7 +114,7 @@
 }
 
 .feed__txn {
-  color: var(--ash);
+  color: var(--ghost);
   font-size: 0.68rem;
   white-space: nowrap;
   overflow: hidden;
@@ -129,7 +133,7 @@
    belief detail itself are the Phase-3 investigate flow; this only flags that a
    real driving_belief_id is present.) */
 .feed__belief {
-  color: var(--ash);
+  color: var(--ghost);
   font-size: 0.64rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -239,7 +243,7 @@
   border: 1px solid var(--line);
   border-radius: 3px;
   background: transparent;
-  color: var(--ash);
+  color: var(--ghost);
   font: inherit;
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -304,7 +308,7 @@
   padding: 1px 5px;
   border-radius: 2px;
   border: 1px solid var(--line);
-  color: var(--ash);
+  color: var(--ghost);
   white-space: nowrap;
 }
 
@@ -315,9 +319,10 @@
   background: var(--surface-2);
 }
 
-/* Searched (16) or structurally inert (447 self-loops) — either way, no cycle. Quiet. */
+/* Searched (16) or structurally inert (447 self-loops) — either way, no cycle. Quiet, but a
+   BASIS is a fact (the seam's whole disclosure): --ghost (5.83:1), never --ash (3.06:1, sub-AA). */
 .feed__basis--conclusive_no {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 /* "We could not determine." Dashed, because the answer is genuinely open — the search ran off the

@@ -142,12 +142,14 @@
   flex: 0 0 auto;
 }
 
+/* A region name is a label the reader must read to know what they are looking at — a fact.
+   --ghost (5.83:1), not --ash (3.06:1, sub-AA). See DecisionFeed.css for the full rationale. */
 .panel__title {
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--ash);
+  color: var(--ghost);
   margin: 0;
 }
 
