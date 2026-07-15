@@ -7818,10 +7818,12 @@ entire life, measuring nothing.
 | 7 | the console pin's **first draft** | read a table the suite empties |
 | 8 | the geometry guard's **reduced-motion dimension** | an unknown key JS silently ignores |
 | **9** | **the geometry guard's FIXTURE** | **its subject witnesses nothing — the guard would draw an empty page and report success** |
+| **10** | **my own RAVEN script** (see the dedicated entry below) | **read a key the tool does not return, and printed "0 below AA" including from ten errored calls — the vacuous check, in the INSTRUMENT** |
 
-**THE NEW SHAPE, and it is worth naming:** 1–8 were checks whose *logic* could not fail. This is the
-first whose **INPUT** could not fail. *A guard is only as falsifiable as the data you point it at* —
-and the data was chosen by an ORDER BY that was answering a different question.
+**THE NEW SHAPE, and it is worth naming:** 1–8 were checks whose *logic* could not fail. #9's **INPUT**
+could not fail. #10's **INSTRUMENT** could not report a failure. *A guard is only as falsifiable as the
+data you point it at, AND as the reader that parses its result* — #9's data was chosen by an ORDER BY
+answering a different question, and #10's result was read through a key that never existed.
 
 **THE FIX IS STRUCTURAL, NOT A BETTER PICK.** Three subjects are now selected ON PURPOSE, by running
 the real witness against the real graph, **each chosen to make a SPECIFIC invariant observable**, and
@@ -7956,3 +7958,67 @@ igniting. The **dashed idiom means INCOMPLETE**, reused from INCONCLUSIVE onto t
 ### surface (Rung 4)** — the ONE place `is_fraud` may appear for a subject, arriving as the SCORE of
 ### what the reader just watched, never as an input to it. Any change to the brake, the eval inputs, any
 ### measured constant, or the invalidation flow. A second r3f use.
+
+## ========== THE TENTH VACUOUS CHECK — AND IT WAS THE INSTRUMENT ITSELF (2026-07-14) ==========
+### An instrument that cannot report a failure is not a measurement. This is the most important
+### finding of the Rung 3 session, and it does not belong buried in a gate.
+
+Every prior vacuous check in this project's ledger (1–9) was a GUARD — a thing whose job is to fail
+when something is wrong, that could not. The tenth was the **MEASUREMENT INSTRUMENT** — the thing a
+guard's author reaches for to *prove* the work is good. It happened to Raven, and it happened to me,
+in the session whose entire subject was checks that cannot fail.
+
+### THE MECHANISM, precisely
+Rung 3's contrast gate feeds the real rendered DOM to `raven-mcp`'s `audit_contrast` over stdio and
+counts the elements below WCAG AA. My driver script did this:
+
+```
+const fails = p.failures ?? p.violations ?? [];   // <-- WRONG. audit_contrast returns NEITHER key.
+...
+console.log(`${name}  BELOW AA=${fails.length}`);  // always 0: undefined ?? undefined ?? [] -> []
+```
+
+`audit_contrast` returns **`aa_failures`** (the list) and **`aa_fail_count`** (the number). My script
+read `failures` and `violations` — **two keys the tool has never returned** — so `fails` was always
+the empty array, and every render printed **`BELOW AA=0`**. Worse: the FIRST TEN calls had **errored
+outright** (I passed raw HTML where the tool wanted a structured `dom_snapshot`), the error text does
+not parse as the expected JSON, and my script **still printed 0 for each**. Ten failed calls and ten
+clean "0 below AA" lines. A green result that was structurally guaranteed — `tsc --noEmit`, arriving
+inside the very tool I was using to prove legibility.
+
+### WHAT CAUGHT IT, AND IT IS THE DURABLE PART
+Not a re-read of the script. **Probing the instrument with a KNOWN-BAD value before trusting a clean
+result.** I fed Raven three swatches with answers this project already knew from Rung 2:
+
+```
+--ash  #5A6678 on --surface #121821  = 3.06:1  -> MUST FAIL AA
+--ghost #8A94A6 on --surface         = 5.83:1  -> MUST PASS
+--bone #C4CDD8 on --void #0A0E14     = 12.04:1 -> MUST PASS
+```
+
+Raven returned `aa_fail_count: 1`, with `--ash` flagged at **exactly 3.06:1** — matching Rung 2's
+measurement to the digit. That is what surfaced BOTH facts at once: the instrument genuinely works,
+AND the failure it reports lives under a key my script was not reading. The gate was then rewritten
+to read `aa_failures` / `aa_fail_count` and to **THROW if `aa_fail_count` is absent** — so a future
+key-rename fails loudly instead of silently reporting zero. The real result, once the script could
+report a failure: **0 of 772 text elements below AA** across 10 renders, including all 78 SVG account
+labels (scored on `fill`).
+
+> **THE RULE, FINAL FORM: AN INSTRUMENT YOU HAVE NOT SEEN FAIL IS NOT A MEASUREMENT.** Before trusting
+> a clean reading, feed the instrument a value you KNOW is bad and watch it go red — the same
+> discipline as breaking a guard against real code before believing it green. A "0 failures" from a
+> tool is worth exactly as much as a "0 failures" from a test: nothing, until you have watched it
+> report a non-zero.
+
+### WHY THIS RANKS ABOVE THE FEATURE
+The project's whole method is *guards that are proven able to fail*. This session added two such
+guards and proved them by breaking them on real code. But the CONTRAST evidence in the same gate was
+produced by an instrument I had **not** proven able to fail — and it was, in fact, incapable of it as
+I was calling it. Had `--ash` not existed as a known-bad probe, I would have shipped "0 below AA" as
+a measured result when it was a parsing artifact. **The discipline of break-it-first applies to the
+tools that measure the work, not only to the checks that guard it.** That is the generalisation, and
+it is why this sits in its own entry rather than a gate bullet.
+
+**Raven remains a MEASUREMENT, never a guard** — it runs in a session, on my invocation, and cannot
+trip on someone else's push. Nothing here changes that. What changed is that its *reading* is now
+parsed through a key that exists and verified against a probe that fails.
