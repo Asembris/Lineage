@@ -49,6 +49,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db import engine
 from app.main import app
 from app.models import Decision
+from app.schemas import AmlWitnessOut, DecisionOut
 from app.services.aml_graph import Outcome, check, load_graph
 from app.services.aml_seam import TXN_REF_TAGS, census, decide_all, txn_ref_for, witness_outcome_of
 from seed.seed import aid, bid
@@ -504,6 +505,38 @@ def test_witness_outcome_is_null_for_a_card_decision_never_invented():
             assert d["merchant"] is not None and d["confidence"] is not None
 
     asyncio.run(_run())
+
+
+def test_the_reverse_lookup_surface_carries_a_basis_scalar_never_a_witness_edge_list():
+    """FENCE (Rung 4, ruling 3): the recorded basis and the witness edges cannot be confused on the
+    wire, because they live on DIFFERENT objects reached by DIFFERENT endpoints.
+
+    The justification seam navigates from a decision (the reverse lookup) to the witness that
+    defends its verdict (/interrogate). The audit side of that seam — `DecisionOut`, what
+    `GET /decisions?aml_transaction_id=` serves — carries `witness_outcome`, the recorded BASIS as a
+    SCALAR, and NO witness-edge list under any name. The witness EDGES are a real field, but on the
+    EVIDENCE object (`AmlWitnessOut.transaction_ids`, served by /interrogate and re-derived fresh).
+
+    `witness_txn_ids` already means two different things elsewhere (the graph's `Check` edge list vs.
+    `verdict_guard.VerdictOutcome`'s MODEL claim). This pins that the seam adds no third confusion:
+    record and re-derivation stay structurally apart — the same discipline `lib/basis.ts` uses when
+    it re-derives the self-loop from account identity instead of reconciling a prose string.
+    """
+    audit = set(DecisionOut.model_fields)
+    # The audit surface serves the recorded basis, as a scalar projection of `txn_ref`.
+    assert "witness_outcome" in audit
+    # ...and NEVER a witness-edge list, under any name a reader could take for "the witness".
+    for forbidden in ("witness_txn_ids", "transaction_ids", "witness_transaction_ids"):
+        assert forbidden not in audit, (
+            f"DecisionOut carries `{forbidden}`. The reverse-lookup surface would then carry witness "
+            "edges, confusable with the recorded basis — and the seam could draw a persisted list as "
+            "if it were the graph's fresh witness. Witness edges belong to /interrogate."
+        )
+    # The witness EDGES are real — on the EVIDENCE object, a DIFFERENT class on a DIFFERENT endpoint.
+    # Distinct object + distinct route = the confusion is structurally impossible, not just avoided.
+    evidence = set(AmlWitnessOut.model_fields)
+    assert "transaction_ids" in evidence
+    assert "witness_outcome" not in evidence  # the evidence object names its verdict `outcome`
 
 
 def test_the_two_kinds_partition_the_feed_exactly():

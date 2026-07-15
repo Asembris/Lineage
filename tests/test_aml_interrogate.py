@@ -178,6 +178,49 @@ def test_interrogation_resolves_a_real_cycle_traversal_to_real_rows():
     asyncio.run(_run())
 
 
+def test_a_non_match_witness_carries_no_transaction_ids_so_the_field_is_never_a_non_witness():
+    """FENCE (Rung 4, ruling 3): `transaction_ids` is the WITNESS, or it is empty — never a
+    non-witness meaning, across the whole extract.
+
+    The field is named for the witness, and the justification seam (feed verdict -> the witness that
+    defends it) draws it. `witness_txn_ids` has already carried two different meanings elsewhere: on
+    the graph's `Check` it is the re-derived edge list, on `verdict_guard.VerdictOutcome` it is the
+    MODEL's claim. If a non-MATCH outcome ever populated the interrogation's `transaction_ids` with,
+    say, the region the search walked before giving up, a renderer would draw a structure the graph
+    did NOT witness — the exact silently-wrong-picture shape as "463 CONCLUSIVE_NO searches" (447 of
+    which were self-loops, never searched). Measured over all 1,500 edges: it does not happen. The
+    seam re-derives the witness fresh here and can only ever draw a real one.
+    """
+
+    async def _run():
+        g = await load_graph()
+        n_match = n_non_match = 0
+        for subject in g.by_id.values():
+            witnesses, _ = interrogate(g, subject)
+            for w in witnesses:
+                if w.outcome is Outcome.MATCH:
+                    n_match += 1
+                    # A MATCH names its edges — otherwise "the witness" would be empty and the
+                    # emptiness assertion below would be vacuously true for everything.
+                    assert w.transaction_ids, (
+                        f"{w.typology} MATCHED on {subject.id} but cited no transactions — a witness "
+                        "with no edges is not a witness."
+                    )
+                else:
+                    n_non_match += 1
+                    assert w.transaction_ids == [], (
+                        f"{w.typology} returned {w.outcome.value} on {subject.id} yet carries "
+                        f"{len(w.transaction_ids)} transaction_id(s). A field named for the witness "
+                        "must be EMPTY when the graph witnessed nothing — otherwise the seam draws a "
+                        "structure that was never found."
+                    )
+        # Liveness: the extract really exercises BOTH branches, so neither assertion is vacuous.
+        assert n_match > 0, "no MATCH witness in the extract — the non-empty check ran on nothing"
+        assert n_non_match > 0, "no non-MATCH witness — the emptiness check ran on nothing"
+
+    asyncio.run(_run())
+
+
 def test_scatter_gather_witness_has_no_linear_order_and_reports_it_by_status():
     """SG's witness is two scatter legs from one source + two gather legs into one destination.
 
