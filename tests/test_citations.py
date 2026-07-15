@@ -64,6 +64,13 @@ import ast
 import re
 from pathlib import Path
 
+import pytest
+
+# OFFLINE. Every test here is a pure file scan (no cluster, no network), so the whole module runs in
+# `docs-ci.yml` on a docs-only push. `tests/test_doc_guard_marker.py` empirically enforces that this
+# stays true — it runs the marked set against a dead-host DB and fails if any test connects.
+pytestmark = pytest.mark.doc_guard
+
 ROOT = Path(__file__).resolve().parents[1]
 
 CODE_DIRS = ["app", "scripts", "seed", "migrations", "tests", "eval"]

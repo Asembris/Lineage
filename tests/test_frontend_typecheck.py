@@ -35,6 +35,12 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
+# OFFLINE (pure file reads — the module docstring says so, and it is enforced): runs in `docs-ci.yml`
+# on a docs-only push. See tests/test_doc_guard_marker.py for how that offline-ness is guarded.
+pytestmark = pytest.mark.doc_guard
+
 _ROOT = Path(__file__).resolve().parents[1]
 _FE = _ROOT / "frontend"
 

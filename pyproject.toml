@@ -3,3 +3,12 @@ testpaths = ["tests"]
 addopts = "-v"
 # We drive our own loops via asyncio.run(); this just silences a cosmetic plugin warning.
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    # The offline guard set that `docs-ci.yml` runs on a docs-only (root *.md) push: the doc guards
+    # (citation, gloss, restore-instruction, typecheck) and the composition/geometry META-guards
+    # (which assert frontend-ci.yml still invokes the real guards). These NEVER touch the cluster —
+    # a marked test that does would REseed on every docs commit, and that is exactly what
+    # `tests/test_doc_guard_marker.py` empirically forbids (it runs the marked set against a
+    # dead-host DATABASE_URL, so a cluster touch — direct OR transitive — fails there, not in CI).
+    "doc_guard: an OFFLINE guard, safe to run on a docs-only push. MUST NOT touch the cluster.",
+]

@@ -44,6 +44,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+# OFFLINE (pure file reads — this whole module verifies the composition guard's integrity and that
+# frontend-ci.yml still invokes it; no cluster). The geometry/composition META-guards MUST keep
+# running under the CI split, so they run in `docs-ci.yml` too. Offline-ness enforced by
+# tests/test_doc_guard_marker.py.
+pytestmark = pytest.mark.doc_guard
+
 _ROOT = Path(__file__).resolve().parents[1]
 _FE = _ROOT / "frontend"
 _GUARD = _FE / "scripts" / "composition-guard.mjs"

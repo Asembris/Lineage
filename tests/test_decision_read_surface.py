@@ -420,6 +420,10 @@ def _paragraphs(path: Path):
         yield start, first, " ".join(buf)
 
 
+# OFFLINE gloss guard (pure file scan), marked so `docs-ci.yml` runs it on a docs-only push — a bad
+# gloss added to README/DEMO/ARCHITECTURE is caught there. The REST of this module touches the
+# cluster and is deliberately NOT marked; tests/test_doc_guard_marker.py would fail if it were.
+@pytest.mark.doc_guard
 def test_no_surface_describes_conclusive_no_as_463_searches():
     """THE SAME-BREATH RULE, applied to the gloss. A paragraph that calls CONCLUSIVE_NO a search
     must name the self-loops IN THAT PARAGRAPH — because 447 of the 463 never were one.

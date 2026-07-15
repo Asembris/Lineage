@@ -31,6 +31,11 @@ from pathlib import Path
 
 import pytest
 
+# OFFLINE (pure file reads): runs in `docs-ci.yml` on a docs-only push, so a broken restore
+# instruction added in a docs commit is caught there. Offline-ness guarded by
+# tests/test_doc_guard_marker.py.
+pytestmark = pytest.mark.doc_guard
+
 _ROOT = Path(__file__).resolve().parent.parent
 
 # Files that INSTRUCT: a reader follows them, or a user reads them on screen.
