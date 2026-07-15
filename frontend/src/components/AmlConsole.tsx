@@ -43,6 +43,7 @@
  * colour form. Warmth stays Trace's. The world here is cold, and it stays cold.
  */
 
+import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { DUR, EASE } from "../lib/motion";
 import { useInterrogation } from "../hooks/useInterrogation";
@@ -280,12 +281,25 @@ export function EvidencePane({ interrogation }: { interrogation: AmlInterrogatio
  */
 export function AmlConsole({ txnId, onClose }: { txnId: UUID; onClose: () => void }) {
   const state = useInterrogation(txnId);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // THE SEAM'S FOCUS HANDOFF (forward leg). This view is reached by a VIEW TRANSITION: the feed —
+  // and the "see why" button that triggered it — unmounts, so focus would otherwise fall to <body>
+  // and strand a keyboard user (verified by a tab-walk: it did, on both legs). Move focus to this
+  // view's heading, the evidence surface's logical entry, so the change is announced and the
+  // surface is navigable. The heading takes tabIndex={-1} (programmatic focus only; not in the tab
+  // order). The return leg — restoring focus to the "see why" row — is App's job (returnFocusTxn).
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
 
   return (
     <div className="aml">
       <header className="aml__head">
         <div>
-          <h1 className="aml__title">INTERROGATION</h1>
+          <h1 className="aml__title" tabIndex={-1} ref={headingRef}>
+            INTERROGATION
+          </h1>
           <p className="aml__sub">
             what the graph witnesses around one real transaction — and nothing about what it is
           </p>
