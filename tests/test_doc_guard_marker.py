@@ -6,6 +6,8 @@ no longer re-fires the 211-test cluster suite (measured: a docs-only push wiped 
 `@doc_guard` test touches the cluster. If one did, it would call `seed.seed()` — which DELETEs every
 decision — on every docs commit. This module forbids that.
 
+The subprocess pin runs green on the Linux runner too, not just locally (CI af3cd46, 215 passed).
+
 ============================ WHY THIS IS NOT A grep, AND WHY THAT MATTERS ============================
 
 The tempting pin is "no @doc_guard test's body mentions `engine` or `seed`". That is a PROXY, and it
