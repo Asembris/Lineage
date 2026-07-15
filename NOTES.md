@@ -8288,3 +8288,101 @@ reveal framing that motivated it.
   backend picks up an `app/main.py` edit for free; NEVER kill it to apply one.** No code or data was
   affected — cluster intact, code committed, `main.py` reverted byte-identical — only the live HTTP
   process needs a manual restart after 8000 is freed (`python -m scripts.serve`, per its docstring).
+
+## AML CONSOLE — RUNG 5: CUT. THE NUMBER THAT JUSTIFIED IT WAS REAL; THE FRAMING WAS NOT (2026-07-15)
+
+Rung 5 — the `neighbourhood` endpoint that would "serve the full structure so the drawing matches
+the prose" — is **CUT**. No endpoint, no migration, no new state, no geometry guard, no copy change.
+NOTES-only; the CI split keeps a root-`.md` push off the cluster, and the cluster was never touched
+this session (a read-only `load_graph` probe + an offline mock render — no `seed()`, no writes).
+
+### ================ THE HEADLINE IS THE META-FINDING, NOT THE CUT ================
+### A real, measured number was re-bucketed through the wrong category, and the interpretation —
+### not the number — hardened into a premise across three rungs. Caught by reading aml_graph.py
+### before building on it, which is the whole reason the gate reads a SOURCE, not a prior session.
+
+**The gate did its job at the LOOK step, before a line was written.** The rung existed to fix a
+"truncated citation": a GATHER-SCATTER whose prose says "gathers from 12 sources" ships 4
+transactions, so the drawing (4 edges) understates the sentence beside it. Rung 3 measured that gap
+honestly (107/107 GS understate, 39/42 SG) and it is REAL. But its *framing* — **"truncated
+citation, full structure withheld from the wire"** — was wrong, and reading the witness constructor
+is what showed it:
+
+- `witness_txn_ids = in_ids[:MIN_FANOUT] + out_ids[:MIN_FANOUT]` (aml_graph.py). `MIN_FANOUT = 2` is
+  **not a truncation of a larger intended citation** — it is the MINIMUM LEG COUNT THAT ESTABLISHES
+  THE TYPOLOGY. Two-in-two-out IS the witness: the qualifying proof that the pattern holds. The
+  witness never set out to cite all 12 and then got cut to 4; it deliberately cites the minimum
+  pair. So there is no "withheld citation" to restore — the premise of the endpoint was a category
+  error, not a wire limitation.
+
+### THE SUB-CLAIM THAT DID NOT SURVIVE THE SOURCE (and why recording it uncorrected would have been the very sin)
+A kickoff/plan framing asserted the "12 sources" figure "was never in the payload; the prose says
+2+ sources." **The primary source contradicts this, and it must not be canonized:**
+
+- `detail = f"hub gathers from {len(gathered)} sources then scatters to {len(scattered)} destinations"`
+  (aml_graph.py:~300). `len(gathered)` is a genuine count of the hub's timing-filtered in-neighbours.
+  A read-only probe over all 1,500 edges printed it VERBATIM for subject `0aad49a1`:
+  `hub gathers from 12 sources then scatters to 12 destinations`. It is served on `AmlWitness.detail`
+  and RENDERED to the reader at AmlConsole.tsx:194 (`<p className="aml__witness-detail">{w.detail}</p>`).
+- The `>= MIN_FANOUT` phrasing lives ONLY in the CONCLUSIVE_NO (non-match) detail, which never
+  reaches a drawing. The MATCH prose states the measured count, not "2+".
+
+So "12" is a real `len(gathered)`, on the wire, on screen. What propagated wrongly was the
+INTERPRETATION that `transaction_ids` "should" have carried it.
+
+### THE FAILURE CLASS — NAMED, AND DISTINCT FROM THE CI-LOG FABRICATION
+| | the CI-log fabrication | THIS (Rung 5's premise) |
+|---|---|---|
+| the datum | a file description with nothing real behind it | a REAL, measured number (`len(gathered)=12`) |
+| the error | a source invented and asserted | a real datum re-bucketed (descriptive count → truncated citation) |
+| how it spread | "a summary reads like the source" | "an illustration reads like a premise" |
+| what caught it | read the primary source (`ci.yml`, the log) | read the primary source (`aml_graph.py` witness constructor) |
+
+The through-line with the base-rate mirage and the CI-log entry: **a claim enters the record as an
+illustration and hardens into a premise unless it is re-derived from source.** This is the
+interpretation-hardening variant — NOT "a number cited as if read," because here the number WAS read
+and IS real. Recording it as identical to the CI-log case would itself be an illustration hardening
+into a premise, committed in the entry that names the sin.
+
+### THE LOOK-FIRST VERIFICATION — a pure cut is honest only if the thing declined is verified already-correct BY LOOKING
+Drove the real render (the mock-faithful build — the project's certified to-the-pixel replay —
+1280×800), and read the ON-SCREEN text and the ACCESSIBLE description, not the JSX. For a
+GATHER-SCATTER (`b1983536`) and a SCATTER-GATHER (`37ebc195`) subject:
+
+- **Face:** a dashed chip `partial · the 4 transactions this witness cites`, sitting beside the
+  typology name — *partial* is co-equal with "GATHER-SCATTER", not an afterthought.
+- **Caveat:** `This is what the witness cites, not the whole structure it sits in.`
+- **Full count present:** the witness row directly below renders `hub gathers from 12 sources then
+  scatters to 12 destinations` / `7 intermediaries scatter from one source and gather into one
+  destination`.
+- **Accessible description matches the face** (Rung 3's screen-reader discipline holds):
+  `A partial citation: the 4 transactions this witness cites … It is NOT the whole structure it sits in`.
+
+The label neither says "(2 legs shown)" / "(2 sources shown)" (a plan-era guess) nor over-claims
+"this is the pattern" — the word *partial* is on its face and the real magnitude is one row below. So
+**even the one-line relabel is unnecessary.** The one arguably-imperfect phrase ("…not carried by
+this response", which faintly implies withholding) is literally true as rendered and, with "12
+sources" stated beside it, misleads no one — changing it was considered and DECLINED. Rung 3's
+labelling was already correct; Rung 5 is a pure cut.
+
+### THE NUMBERS, RE-CONFIRMED LIVE (read-only, the exact witness code /interrogate runs)
+- **GATHER-SCATTER:** 107 matches, all ship 4 (2 in + 2 out); the full hub fan is 6–28 edges /
+  5–25 nodes (worst `0aad49a1`: prose 12/12, full 28 edges / 25 nodes). NOT flag-capable.
+- **SCATTER-GATHER:** 42 matches, 39 understate (the 3 faithful ones are the `mids=2` cases where
+  full == 4 == shipped); ship 4; full 4–30 edges / 4–17 nodes (worst `08a8a98e`: prose 15, full 30
+  edges / 17 nodes). FLAG-CAPABLE.
+- **`aml_evidence.neighbourhood()` is the WRONG data for the drawing** and this is the second reason
+  to cut: it is the 6-hop SEARCH region (median 120, max 120 — the `NEIGHBOURHOOD_LIMIT`), full of
+  distractors. Drawing it is the dishonest hairball. The un-truncated WITNESS structure (≤30 edges)
+  is a different, smaller thing — and even that is a clean-but-tall bipartite fan (a 12- or 15-node
+  column ≈ 900–1130px, taller than the viewport), so "serve the searched region so the drawing can be
+  complete" was doubly mis-specified. If a future session ever revisits this, the honest artifact is
+  a structured full-COUNT beside a bounded sample — never `neighbourhood()` drawn edge-for-edge.
+
+### RUNG 5 GATE — a docs-only landing
+- **Pure cut, verified by looking** (rendered pixels + accessible description read, both drawings).
+- **NOTES-only**; no endpoint, migration, state, guard, or copy change. Docs push via the CI split
+  (`docs-ci.yml`), cluster untouched — no restore needed.
+- Meta-finding recorded with the CORRECTED framing (the "12 was never in the payload" sub-claim is
+  contradicted by aml_graph.py and refused), so a future session can re-derive it from source: the
+  witness constructor, the `detail` f-string, AmlConsole.tsx:194, and the read-only probe counts.
