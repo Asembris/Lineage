@@ -165,6 +165,58 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * THE JUSTIFICATION SEAM — "see why". The path from a verdict to the witness that defends it,
+ * shown only on AML rows (a card decision has no money-flow graph to witness). It is a sibling of
+ * the row button, right-aligned beneath it, and deliberately subordinate: the row's primary action
+ * is still Investigate. Cold — --ghost, no signal colour — because a navigation affordance is not a
+ * state of alarm and must not compete with the one always-on signal on this surface (--alert fraud).
+ * It does NOT touch how `is_fraud` renders; it sits outside the row button entirely.
+ * --------------------------------------------------------------------------------------------- */
+/* The row and its "see why" are ONE banded record: the row gives up its own bottom rule so the
+   two share a single border, and the seam reads as part of the row above it, never as a stray
+   control belonging to the row below. */
+.feed__item:has(.feed__seewhy-wrap) .feed__row {
+  border-bottom: none;
+}
+
+.feed__seewhy-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0.85rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.feed__seewhy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+  padding: 1px 4px;
+  border: none;
+  background: transparent;
+  color: var(--ghost);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  appearance: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .feed__seewhy {
+    transition: color 120ms ease;
+  }
+}
+
+.feed__seewhy:hover {
+  color: var(--bone);
+}
+
+.feed__seewhy:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
 /* --- The kind filter ------------------------------------------------------------------------
    Cold vocabulary only (--ash / --bone / --line). A filter is a lens, not a state of alarm, so it
    spends NO signal colour: --alert stays fraud's, and the trace warmth stays Trace's. The selected

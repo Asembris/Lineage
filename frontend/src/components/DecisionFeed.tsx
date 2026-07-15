@@ -70,10 +70,12 @@ function DecisionRow({
   d,
   selected,
   onSelect,
+  onInterrogate,
 }: {
   d: Decision;
   selected: boolean;
   onSelect: (id: UUID) => void;
+  onInterrogate: (txnId: UUID) => void;
 }) {
   const { date, time } = splitInstant(d.decided_at);
   const beliefDriven = d.driving_belief_id !== null;
@@ -139,6 +141,28 @@ function DecisionRow({
           <span className="feed__conf">{formatConfidence(d.confidence)}</span>
         </span>
       </button>
+
+      {/* THE JUSTIFICATION SEAM. The verdict above is the CONCLUSION; this is the path to the
+          witness that DEFENDS it. It was three clicks deep (select → Investigation → interrogate);
+          the seam puts it at the verdict's own depth. It is a SIBLING button, never nested inside
+          the row button, and it NAVIGATES (onInterrogate → the `aml` view arm), so the feed — and
+          every `is_fraud` on it — unmounts: the witness and the label are joined by an ordered
+          transition, never co-mounted. Present on EVERY AML row: a MATCH lands on the drawn ring, a
+          self-loop/closed-search on an honest "no witness to draw", an INCONCLUSIVE on its named
+          boundary account. It never silently no-ops. Card rows have no money-flow graph to witness,
+          so they carry no seam — the same reason they carry no basis chip. */}
+      {d.aml_transaction_id && (
+        <div className="feed__seewhy-wrap">
+          <button
+            type="button"
+            className="feed__seewhy"
+            aria-label="See the witness the graph derived for this transaction"
+            onClick={() => onInterrogate(d.aml_transaction_id as UUID)}
+          >
+            see why <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      )}
     </li>
   );
 }
@@ -239,6 +263,7 @@ export function DecisionFeed({
   data,
   selectedId,
   onSelect,
+  onInterrogate,
   kind,
   onKind,
   counts,
@@ -251,6 +276,10 @@ export function DecisionFeed({
   data: DecisionsData;
   selectedId: UUID | null;
   onSelect: (id: UUID) => void;
+  /* The justification seam: open the evidence surface for an AML row's transaction. It hands over
+     a bare UUID and switches the view — the feed unmounts, so no witness is ever on screen beside
+     an `is_fraud`. See DecisionRow's "see why" and NOTES "AML CONSOLE — RUNG 4". */
+  onInterrogate: (txnId: UUID) => void;
   kind: DecisionKind | null;
   onKind: (k: DecisionKind | null) => void;
   counts: Loadable<KindCounts>;
@@ -291,6 +320,7 @@ export function DecisionFeed({
                 d={d}
                 selected={d.id === selectedId}
                 onSelect={onSelect}
+                onInterrogate={onInterrogate}
               />
             ))}
           </ol>

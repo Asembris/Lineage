@@ -152,6 +152,15 @@ function App() {
   };
   const investigation = resolveInvestigation(selectedId, decisions, agents, beliefs);
 
+  // THE JUSTIFICATION SEAM. A verdict is a conclusion; the witness that defends it is the
+  // justification, and it lived three clicks deep (select → Investigation → interrogate). This
+  // opens the evidence surface for a transaction directly — from a feed row's "see why", or from
+  // the Investigation's interrogate button. It is a VIEW TRANSITION, not a co-mount: `view` flips
+  // to the `aml` arm and the console body (feed, Inspector, and every `is_fraud`) UNMOUNTS. The
+  // join it hands down is a bare UUID; the witness is re-derived FRESH by /interrogate, never
+  // carried from the decision. See the composition guard and NOTES "AML CONSOLE — RUNG 4".
+  const openInterrogation = (txnId: UUID) => setView({ kind: "aml", txnId });
+
   // Trace state. Changing the investigated decision resets any active trace so a
   // stale warm path never lingers over a new investigation.
   const [trace, setTrace] = useState<TraceState>({ status: "idle" });
@@ -329,6 +338,7 @@ function App() {
                     data={data}
                     selectedId={selectedId}
                     onSelect={onSelect}
+                    onInterrogate={openInterrogation}
                     kind={kind}
                     onKind={onKind}
                     counts={counts}
@@ -367,7 +377,7 @@ function App() {
                   onReplay: replayTrace,
                 }}
                 invalidateHandlers={invalidateHandlers}
-                onInterrogate={(txnId) => setView({ kind: "aml", txnId })}
+                onInterrogate={openInterrogation}
               />
             </Panel>
           </div>
