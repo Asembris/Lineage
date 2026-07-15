@@ -8386,3 +8386,142 @@ labelling was already correct; Rung 5 is a pure cut.
 - Meta-finding recorded with the CORRECTED framing (the "12 was never in the payload" sub-claim is
   contradicted by aml_graph.py and refused), so a future session can re-derive it from source: the
   witness constructor, the `detail` f-string, AmlConsole.tsx:194, and the read-only probe counts.
+
+## AML CONSOLE — RUNG 6: POLISH AND THE HONESTY PASS. THE LADDER CLOSES. (2026-07-16)
+
+The last rung. It adds NO capability — it makes the console COHERENT and every claim it renders
+HONEST, to the standard the rest of the project holds. The whole risk was that "polish" becomes
+invented work or a restyle that breaks an invariant, so the investigation WAS the rung: measure
+what is actually incoherent/dishonest, fix only that, and evidence every SKIP as rigorously as
+every fix. Four fixes shipped; four non-fixes defended with numbers. Frontend + docs, no cluster
+wipe, no backend change, no guard RULE relaxed.
+
+### THE INSTRUMENT — RAVEN WAS NOT INSTALLED THIS SESSION, AND I DID NOT FABRICATE IT
+Raven (`raven-mcp`) was NOT on PATH, NOT via npx, and NOT in `.mcp.json` (only `cockroachdb-cloud`,
+which needs auth unavailable here). Rungs 2-3 spoke to it over stdio; this session it was simply
+absent. Per the tenth-vacuous-check lesson, a contrast number from an instrument I cannot invoke is
+a fabrication. So contrast was measured the reproducible way: **drive the mock-faithful build,
+read each element's real `getComputedStyle` color + effective background + size, compute WCAG in
+Node.** The formula was **probed known-bad-FIRST** and reproduces the project's own independently-
+measured values EXACTLY — `--ash/--surface 3.06`, `--ghost/--surface 5.83`, `--bone/--void 12.04`,
+`--ash/--void 3.32` — and, as the control that proves it discriminates rather than cries wolf, it
+reports the `.aml` evidence surface at **0 below AA** (corroborating Rungs 2-3) while flagging the
+feed. An instrument that passes the clean surface and fails the dirty one, and whose formula matches
+four known values, is a measurement. A CI contrast guard was NOT added — Rung 3 cut that on purpose
+("a contrast audit measures the pixels you rendered, not the states you have"); the drive is a
+session reading, like Raven, and its spec was deleted after.
+
+### THE BIGGEST FINDING WAS NOT ON THE AML SURFACE — IT WAS THE FEED, NEVER AUDITED
+Rung 2 established "--ash carries no text; a fact reads >= AA" and applied it ONLY to `.aml` — Raven
+arrived in Rung 2 and only ever ran there. The FEED, the INSPECTOR default, and the PANEL titles
+predate that pass and were never measured. Driven at 1280x800 AND 1280x900: the console body had
+**679 sub-AA text instances, 9 distinct facts**, all `--ash` at **3.06:1** (2.74:1 for the belief
+"formed" date on `--surface-2`). Every one a FACT — the txn id (Rung 1's own row-disambiguator),
+the date, the belief tag, the "no cycle" BASIS chip (the seam's central disclosure — the brief
+named "basis chips"), the kind chips, the Fleet stat labels, the region titles. "Chrome contained
+facts" (Rung 2) at the feed level, in a surface that escaped the audit. Fixed `--ash -> --ghost`
+(5.83:1 / 5.22:1 on `--surface-2`); `--ash` stays borders + hover only. After: **console body 0
+below AA at both heights; `.aml` unchanged.**
+
+### THE INVERSE TRAP — A BLIND GLOBAL SWEEP WOULD HAVE REGRESSED DISABLED STATES
+The stylesheet sweep (Rung 2's "sweep the token, not just the pixels") found ~50 more
+`color: var(--ash)` across TimeTravel / Investigation / Invalidate / Consistency / the ledger legend
+and the header nav. Same defect class — but several are **deliberate disabled states**
+(`.feed__more-btn:disabled`, `.inv__trace-btn:disabled`, `.tt__open-btn:disabled`) where `--ash` is
+the CORRECT dimmed-inactive signal, and hover states. A blind `--ash -> --ghost` would have made
+disabled controls read as enabled — the "chrome contained facts" trap run in reverse. So the fix was
+bounded to the MEASURED facts in the approved scope (feed + inspector + panel), none of which is a
+disabled state. **The broader `--ash`-text surface is deferred as its own MEASURED pass** (render
+each state, then decide) — not skipped, and not blind-swept. This bound is itself the rung's ethos:
+measure before you touch, and a same-class defect you have not rendered is not a fact you may assume.
+
+### THE APP'S ONLY SPRING — lib/motion.ts SAID "NO SPRINGS", AND IT WAS FALSE
+`lib/motion.ts` states the invariant "the app uses NO springs; everything is a TWEEN on the shared
+DUR/EASE". The AML evidence pane (`AmlConsole.tsx`, built Rung 2 — a week AFTER Phase 6's motion
+harmonization) revealed with `type: "spring"` (stiffness 260, damping 30): the ONLY spring in
+`components/` or `lib/`, and the only framer-motion component not importing `lib/motion.ts`. The
+witness geometry drawn INSIDE that same surface already used `DUR.reveal`/`EASE.out`; the pane
+wrapping it did not. A surface appearing IS the DUR.reveal gesture. Converted to
+`{ duration: DUR.reveal, ease: EASE.out }`, restoring the doc's truth. Reduced-motion path unchanged
+(collapses to the identical final frame). No guard covers motion feel; geometry guard 40/40.
+
+### THE REAL RUNG: THE LEDGER SAID "NO UI YET" FOR AN ENDPOINT THAT HAS A CONSOLE
+The honesty ledger's "Interrogate / provenance-audit / counterfactual endpoints" row read "built,
+no UI yet" — FALSE for `/interrogate` since Rungs 1-5 built exactly that UI (the evidence pane, the
+witness geometry, the "see why" seam all render it). A false claim inside the credibility surface is
+the STATIC-prose rot the ledger exists to catch ("LIVE rows survive schema change; STATIC rows
+rot"). Split honestly: interrogate -> the AML console; provenance-audit -> the ledger's own top-line
+verdict only; counterfactual -> still no UI. STATIC (a fact about which endpoints have a surface,
+not a cluster quantity). **README + HonestyLedger.tsx moved in LOCKSTEP.** The same drift was
+corrected in the adjacent README sites so the doc is internally consistent: the API table
+(interrogate -> "aml console"), the "two no UI yet routes" prose (now one), the "Next:" line (THREE
+of its four items had shipped — the regulatory corpus, the AML console, and the Time-travel
+sparkline), and a new AML-console row in the "Shipped" table.
+
+**THE LIVE 65.3% ROW IS ARITHMETIC, AND IT WAS DRIVEN AGAINST THE REAL CLUSTER — not just
+compiled.** The seam row is NOT the row I changed; I confirmed it stays computed. `seamValue()`
+derives `share = inc.n/total*100` and `laundering = sum(byOutcome[o].laundering)` over seven live
+`countDecisions` reads — no hardcoded "65.3%". Driven live (the real backend, real cluster) the
+ledger rendered: genealogy `24 agents · 3 alive · 2 beliefs`; seam `1,500 decisions · 57 MATCH ·
+463 CONCLUSIVE_NO · 980 INCONCLUSIVE -> 65.3% could not determine, silently approving 252 of 300
+laundering rows`; decisions `5,500 · 8 perf windows`; provenance `CLEAN · 8 edges · 0 anomalies`;
+and the corrected static row's new text. **page errors: none.**
+
+### HOW THE LIVE DRIVE WAS DONE — THE 5173/CORS TRAP, AND AN HONEST WAY AROUND IT
+`:5173` was held by an unrelated app ("Attest — Groundedness Auditor"), the exact trap Rung 4
+banked, and backend CORS allows 5173 ONLY. Editing CORS is a backend change (out of scope) and the
+kill-the-`--reload`-backend / WSAEACCES trap. So the built console (on 4173) was driven against the
+**real** `:8000` through a Playwright route that `route.fetch()`es the real response and adds only
+the CORS header — real cluster data, one harness-level header, no fabricated body. Confirm the
+CONTENT, never the port (the recurring `:8000`/splunkd/`:5173` lesson).
+
+### F3 — THE SEAM DROPPED FOCUS ON BOTH LEGS (tab-walk, before AND after)
+The seam is a view transition: "see why" unmounts the feed and the button that triggered it, so a
+tab-walk showed focus falling to `<body>` on the forward leg AND staying there on back — a keyboard
+user stranded on the newest interaction. Fixed: forward, `AmlConsole` focuses its heading on mount
+(tabIndex=-1, programmatic-only, no ring); back, App remembers the txn (`returnFocusTxn`) and
+`DecisionFeed` refocuses that row's "see why" on remount. Re-tab-walked: forward -> `h1.aml__title`,
+back -> `button.feed__seewhy`. The fix was CONDITIONAL on the tab-walk showing a real drop; it did.
+
+### THE FOUR DEFENDED NON-FIXES, EVIDENCED AS RIGOROUSLY AS THE FIXES
+- **Height / the "partial caveat below the fold" worry — BENIGN, do NOT fix a scrollable body.**
+  Measured, both heights: **page overflow 0px on every surface.** `.aml` scrolls its OWN body
+  (`overflow:auto`). On the partial subject the SVG is `735->897` and its caveat `907->997` — **10px
+  apart, in the one scroll container**: they move together, you cannot see the full drawing without
+  the caveat entering view. RINGs are `complete` and render **no caveat at all**. Nothing
+  load-bearing is orphaned; this is not the Inspector-fold shape (a non-scrolling region), it is a
+  scrollable body the user's own rule says must not be "fixed".
+- **The `is_fraud` dot — NOT a finding, untouched.** It is a non-text `role="img"` indicator; my
+  instrument (text only) never flagged it. `--alert` measures **4.55:1** on `--surface` / 4.94:1 on
+  `--void`, clearing WCAG 1.4.11's 3:1 non-text floor with room. The contrast fix touches only feed
+  TEXT and cannot ripple to it or to the guarded absence-from-`.aml`.
+- **The 140ms hover (`AmlConsole.css:98`, `Investigation.css:411`) vs the console's 120ms — LEFT.**
+  Hover feedback, OUTSIDE `lib/motion.ts`'s scope (reveal/bloom/pulse/sweep), carries no fact, 20ms
+  imperceptible. Touching it is the invented polish the rung exists to avoid.
+- **The broader `--ash`-text surface — DEFERRED (see the inverse-trap section), not skipped.**
+
+### WHAT DID NOT NEED TOUCHING (named, so it is not churned)
+The composition guard, the geometry guard, the oracle boundary, `is_fraud`'s presentation, the
+witness geometry's partial-labelling, the LIVE 65.3% seam census, `--ash`-as-borders/hover, and the
+`.aml` evidence surface (measured 0 below AA). None was restyled to make the session feel productive.
+
+### RUNG 6 GATE — all green
+- Four commits, each its own piece: `--ash->--ghost` contrast; the spring->tween; the ledger "no UI
+  yet" correction (README + HonestyLedger lockstep + adjacent sites); the seam focus handoff.
+- `tsc -b` 0 · `oxlint` 0 · `vite build` 0 · `guard:composition` 0 · `guard:geometry` **40/40 (4
+  projects)** — all green after every change.
+- Contrast **re-measured after the fix: console body 0 below AA at 1280x800 AND 1280x900; `.aml`
+  still 0**; the WCAG formula validated known-bad-first and against the clean-surface control.
+- F3 tab-walked before (body/body) and after (h1.aml__title / feed__seewhy).
+- The ledger's LIVE rows DRIVEN against the real cluster (57/463/980, 252/300, 65.3%), page errors
+  none — confirmed reading the cluster, not merely compiling.
+- **Cluster untouched** — every drive was read-only (no `seed()`, no writes); the eventual push is
+  frontend + docs, which skips `ci.yml` (both `frontend/**` and `*.md` in `paths-ignore`) and runs
+  `docs-ci` offline. No backend change, no endpoint, no measured constant, no guard RULE relaxed.
+
+### RUNG 6 explicitly NOT done (deferred, with reasons): the broader `--ash`-text surface
+(TimeTravel / Investigation / Invalidate / Consistency / header nav) — a MEASURED pass, because it
+mixes facts with deliberate disabled/hover states that a blind sweep would regress; a CI contrast
+guard (Rung 3 cut it on purpose); the recorded demo video (human task, placeholder deliberately
+kept); any backend change, endpoint, or `belief_performance` for the azure belief (step 4 stays CUT).
+The AML console ladder is closed. Do NOT push without explicit approval — held for review.
