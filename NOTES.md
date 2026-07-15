@@ -8182,7 +8182,7 @@ justifies it was three clicks deep** (select → Investigation → interrogate).
 control (`DecisionFeed.tsx`) navigates straight to the evidence surface for that transaction. It is a
 sibling of the row button, never nested; it re-derives the witness FRESH via `/interrogate` and
 carries a bare `UUID`, never the decision. **217 backend tests** (215 + 2 fence); geometry guard
-**36 tests / 4 projects** (was 28; +2 tests × 4). No new endpoint, no schema change, no backend field.
+**40 tests / 4 projects** (was 28; +3 tests × 4). No new endpoint, no schema change, no backend field.
 
 ### RULING 1 — THE COMPOSITION GUARD DOES NOT RELAX, AND IT DID NOT HAVE TO
 The seam is a VIEW TRANSITION: `see why` → `onInterrogate` → `setView({kind:"aml"})`, and the console
@@ -8230,10 +8230,16 @@ this regresses that the STATIC guard misses — the check-C shape: an inline wit
 feed, fetched raw and drawn as SVG without a typed `AmlWitness` prop. Check C sees no
 evidence-coloured component; `DecisionFeed` is no EVIDENCE_MODULE for check B. So the guard is blind
 to that channel, and the only thing that catches it is asserting the RENDERED feed has no witness
-geometry. `geometry.spec.ts::"the justification seam"`: the feed shows `is_fraud` (`.feed__fraud-dot`
-> 0, liveness) and **no `.geo`**; and `see why` navigates to the witness with the feed GONE.
-**MADE TO TRIP on real code:** an inline `.geo` preview in `DecisionRow` failed it with `200
-elements` where 0 are allowed; reverted byte-identical (`git diff --stat` empty), re-run green.
+geometry. `geometry.spec.ts::"the justification seam"` (3 tests): the feed shows `is_fraud`
+(`.feed__fraud-dot` > 0, liveness) and **no `.geo`**; `see why` navigates to the witness with the
+feed GONE; **and — post-back coverage — after `see why` → back, the RETURNED-TO feed is restored
+(`is_fraud` present) and STILL draws no witness.** The cold check alone would miss a preview that
+only manifests after a round trip (keyed on retained state — `selectedId` is retained, so it is a
+real channel). **MADE TO TRIP on real code, at BOTH the cold and the post-back assertion:** an
+inline `.geo` preview in `DecisionRow` failed with `200 elements` where 0 are allowed — the post-back
+run failing specifically at the returned-to `.geo` assertion (line 469), *after* the back navigation,
+proving that assertion executes and can fail. Reverted byte-identical (`git diff --stat` empty),
+re-run green (40/4 projects).
 
 ### RULING 5 — is_fraud IS BYTE-IDENTICAL. The seam adds a PATH to the witness; it does not touch how
 the label is shown. The earlier plan's `--alert`-on-`is_fraud` recommendation was withdrawn with the
@@ -8241,13 +8247,20 @@ reveal framing that motivated it.
 
 ### GATE — all green
 - **217 backend tests pass** (215 + the 2 fence). `tsc -b`, `oxlint`, `vite build`,
-  `guard:composition`, `guard:geometry` (36/4 projects) all green — the geometry guard re-run proved
+  `guard:composition`, `guard:geometry` (40/4 projects) all green — the geometry guard re-run proved
   the feed restructure did not regress the `.feed__row`/interrogate selectors or the `.feed__row
   count 0` oracle assertion.
-- **DRIVEN + SCREENSHOTTED** (mock-faithful build, 1280×800 + reduced-motion): the `see why` seam
-  renders cold and subordinate on every AML row, the miss rows (`37ebc1`, `2f9f1d` — is_fraud +
-  INCONCLUSIVE) keep their fraud dot untouched, and `see why` on the hero `045adfd2` lands on the
-  CYCLE ring with the feed unmounted.
+- **DRIVEN LIVE, FORWARD AND BACK, against the REAL backend** (not the mock — the mock proves
+  RENDERING, not navigation-against-real-responses). On a `uuid`-CORS-allowed dev origin:
+  - MATCH `045adfd2`: feed (57 rows / 43 fraud dots / 0 `.geo`) → `see why` → witness (ring drawn,
+    **10 edges**, feed unmounted) → **back** → feed restored (57 / 43 / **0 `.geo`**).
+  - CONCLUSIVE_NO `3195dd5c`: feed → `see why` → the honest landing — *"CONCLUSIVE_NO · self-loop /
+    The account paid itself. No search was possible. / same account"*, **0 geometry drawn**, feed
+    unmounted → **back** → feed restored (**0 `.geo`**). Ruling 2's "present for all, lands
+    truthfully" verified through the actual browser navigation, live, not just at the API.
+- **SCREENSHOTTED for VISUAL critique** (mock-faithful build, 1280×800 + reduced-motion — CORS made
+  the *visual* pass mock-only, see harness): `see why` renders cold and subordinate on every AML row;
+  the miss rows (`37ebc1`, `2f9f1d` — is_fraud + INCONCLUSIVE) keep their fraud dot untouched.
 - **CONTRAST, probed instrument first.** The one new text element (`see why`, `--ghost` on the feed
   `--surface`) measures **5.83:1** on the real rendered pixels — the exact value Rung 2 independently
   measured for `--ghost`/`--surface`, which validates the ratio function; clears AA (4.5). No other
@@ -8262,3 +8275,16 @@ reveal framing that motivated it.
   never the port (the recurring `:8000`/`splunkd` lesson, in a new disguise on `:5173`).
 - `vite preview` on 4173 left running from a manual launch blocked the guard's own `webServer`
   (`reuseExistingServer:false`); freed it by PID before re-running.
+- **THE LIVE FORWARD+BACK DRIVE was achieved by TEMPORARILY adding the dev origin to CORS
+  (`app/main.py`) and reverting byte-identical** — the origin was chosen to match the `--strictPort`
+  dev server. The pre-existing backend was `uvicorn --reload`, so it HOT-RELOADED the CORS edit on
+  its own; **I did not need to restart it, and killing it was a mistake.**
+- **THE COSTLY MISTAKE — I KILLED THE PRE-EXISTING `--reload` BACKEND AND COULD NOT REBIND 8000.**
+  `splunkd` holds `0.0.0.0:8000`. The original Lineage backend had bound `127.0.0.1:8000` FIRST, so
+  it coexisted; once killed, a new specific bind is DENIED with **WSAEACCES (Errno 13, not 10048)** —
+  splunkd's wildcard now wins because the bind ORDER cannot be reproduced without restarting splunkd
+  (out of scope). 8000 is NOT in a Windows excluded range (checked) — this is purely the bind-order
+  trap, a sharper form of the `:8000`/`splunkd` lesson already banked. **The lesson: a `--reload`
+  backend picks up an `app/main.py` edit for free; NEVER kill it to apply one.** No code or data was
+  affected — cluster intact, code committed, `main.py` reverted byte-identical — only the live HTTP
+  process needs a manual restart after 8000 is freed (`python -m scripts.serve`, per its docstring).
