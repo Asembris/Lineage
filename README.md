@@ -186,12 +186,13 @@ configured in `.mcp.json`; see the Technical Implementation note above for its h
 | `POST /beliefs/{id}/invalidate` | ⚠️ **the one governed write** — atomic fleet-wide kill in a single serializable txn + S3 certificate | invalidate |
 | `GET /decisions` | fleet-wide decision feed, one agent's history — **and the reverse lookup**. Six filters; see below | feed · ledger |
 | `GET /aml/transactions/{id}` | one money-flow edge | — |
-| `GET /aml/transactions/{id}/interrogate` | **click-to-interrogate** — re-derives the structural witness across all four typologies, surfaces competing structures | no UI yet |
+| `GET /aml/transactions/{id}/interrogate` | **click-to-interrogate** — re-derives the structural witness across all four typologies, surfaces competing structures | aml console |
 | `GET /demo/consistency/stream` | SSE — real observer samples of the atomic-vs-eventual proof (isolated `demo` db) | consistency |
 
-The two "no UI yet" routes are real, tested, and verified against live cluster data — they simply
-have no console surface, and the [honesty ledger](#honesty-ledger) says so rather than leaving them
-undiscoverable.
+`/interrogate` now has a console surface — the **AML console** (evidence pane · witness geometry ·
+the "see why" seam). The remaining "no UI yet" route (`counterfactual-invalidation`) is real,
+tested, and verified against live cluster data — it simply has no console surface, and the
+[honesty ledger](#honesty-ledger) says so rather than leaving it undiscoverable.
 
 ### `GET /decisions` — the seam's read surface
 
@@ -342,7 +343,7 @@ cluster, so the document and the running system cannot quietly disagree.
 | Provenance-integrity audit | **verification, not a patch** | The two legitimate `belief_inheritance` writers preserve the A1–A4 invariants by construction, so **no live vulnerability exists**; `GET /beliefs/{id}/provenance-audit` is verification + out-of-band tamper detection. OWASP `ASI06` primary-verified; MITRE ATLAS `AML.T0080` **secondary-sourced**, not confirmed on the authoritative page |
 | Counterfactual invalidation query | **measured, exact — verdict-aware** | `GET /beliefs/{id}/counterfactual-invalidation?at=T` returns **exact** counts, not estimates. The counts are split by the verdict that actually happened: **N** = belief-driven **approvals** withdrawn, **M** = their real `is_fraud` subset (the harm), `withdrawn_blocks`, and `frauds_caught_by_block` (what invalidating would **forfeit**). No fabricated "fraud we'd have caught" — no faithful per-row fallback verdict exists, so none is invented. **Correction:** this row previously asserted *"the belief only ever approves"*. That was true of the crimson card belief and is **false of the fleet** — the azure laundering belief **blocks** (57 of its 1,500 decisions). Under the old un-split aggregate the endpoint counted the 43 laundering rows it correctly **blocked** as *auto-approved frauds*, crediting its catches as its harms. Fixed, with a regression test that fails against the old aggregate. A belief with no measured windows returns `windows: null`, never a grid of zeros. |
 | Explanation-faithfulness guard | **probabilistic guard** | Scores the agent's `rationale` against the exact evidence it saw; `SUPPORTED` means "passed the check", **not "proven faithful"** (documented false-negatives — the faithfulness eval's fabricated-hop 0.50, faithful SG anchor 0.40). Cites OWASP `LLM09:2025 Misinformation`; **explicitly not** a retrieval/memory-poisoning defense (`LLM08`/`ASI06`) — it checks prose against retrieved rows, not whether those rows are poisoned |
-| Interrogate / provenance-audit / counterfactual endpoints | **built, no UI yet** | `GET /aml/transactions/{id}/interrogate`, `/beliefs/{id}/provenance-audit`, `/beliefs/{id}/counterfactual-invalidation` are built, tested, and verified against real cluster data but have no console surface yet — each is a separate plan-gated frontend session; listed here rather than left undiscoverable |
+| Interrogate / provenance-audit / counterfactual endpoints | **one now has a console; two do not** | `GET /aml/transactions/{id}/interrogate` **now has a console surface** — the AML console renders it (the evidence pane, the witness geometry drawn from the cited rows, and the "see why" seam on every AML feed row). This row read *"no UI yet"* for the entire life of that console — the STATIC-prose rot this ledger exists to catch. `/beliefs/{id}/provenance-audit` is surfaced only as this ledger's own top-line verdict (a data-point, not a per-edge UI). `/beliefs/{id}/counterfactual-invalidation` still has **no** console surface — listed here rather than left undiscoverable |
 
 ---
 
@@ -500,8 +501,11 @@ internal engineering-log labels; they index into [NOTES.md](NOTES.md) and mean n
 | **Measured uncertainty on the staleness curve** | The numbers justifying the one irreversible write now carry their sample size and 95% Wilson interval — certificate schema 1.2, computed by the endpoint and the certifier Lambda through one shared function |
 | **The grounding seam** *(G)* | **The first time any decision in this system cites real external evidence.** azure-0 forms a laundering belief → inherited down 7 real edges → the *living* azure-7 applies it to **1,500 real IBM money-flow edges** → each decision cites the real row it ruled on through a **database-enforced FK** → `is_fraud` comes from the real `is_laundering`, a label the deciding rule never saw. Every link is a real row, and the chain resolves in **both** directions. Migrations 0006–0008; the label-free decider (`aml_seam.py`); the AST tripwire that pins the oracle boundary in Python *and* in raw SQL. **It earns the *provenance* half of a single causal chain and refuses the *justification* half** — see the limitation below |
 
+| **The AML console** | The seam's decisions, made navigable and honest: a reachable feed (offset paging over all 1,500), the four-way basis, the **evidence surface** (witness geometry re-derived from `/interrogate` alone), and the **justification seam** (feed verdict → "see why" → witness → back). Guarded by the **composition guard** (the answer key can never render beside the exam) and a **Playwright geometry guard**. Frontend Rungs 1–6 |
+
 Also complete: Phases 1–3 (the belief-inheritance spine, agents, and the money-shots), Phase 4
-hardening, and the full React console (Frontend Phases 1–6).
+hardening, the full React console (Frontend Phases 1–6), and the AML console ladder (Rungs 1–6)
+rendering the grounding seam.
 
 > **The seam's honest limit, stated where the capability is claimed.** A rot story on this belief
 > would need a measured staleness curve on AML outcomes. **We built the seam, measured for that
@@ -525,9 +529,11 @@ not a gap.
 | **Temporal drift / belief-decay detection** *(C)* | **CUT — the data does not support it.** The item was conditional (*"build only if the data supports a real signal — verify first, never decorative"*). It was verified first. **As detection it is a duplicate:** the decay is already computed from real outcomes, rendered as the full 8-window curve, embedded in the certificate, and made actionable by the counterfactual — and an automated "this belief is rotting" verdict over a population of **one** belief would return a constant, with two of its three states structurally unreachable. **As drift *characterization* it is refuted:** the curve's one non-monotonic feature, the gen-6 dip, is **not distinguishable from noise** (p = 0.12 at n=250/window), and the modeled campaign's true effect (+0.0227) is **smaller than the per-window noise SD (0.03)** — so it does not shrink with more data. A detector that named it correctly could only do so by reading the generator's own constants. Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item C*. |
 | **Confidence propagation through the inheritance chain** *(D)* | **CUT — nothing propagates.** Same conditional gate as C, and it fails for a **different reason, which is the finding.** The belief is **one immutable row**: `belief_inheritance` has no confidence or weight column and `belief_performance` has no `agent_id`, so the only quantity that varies per hop is a **timestamp**. Looking up its window is a *join*, not a propagation — no hop transforms anything, so uncertainty lives on the windows (shared by every holder), never on the edges. **D passes C's generator-lookup test and is still meaningless:** *computable, generator-free, and meaningless.* Proven, not argued — in a world with **zero decay** (every window pinned at 0.924) the compounded number still reports the 7-hop holder as **15% more degraded** than the 5-hop one: it measures **path length, not health**. And the two agents who share window 5 have **identical true reliability by construction**, yet differ by 0.137 at **p = 0.046** — the shipped data realizes the one-in-twenty false positive that any per-holder confidence metric would inherit. The two living holders are **statistically indistinguishable** (0.528 vs 0.459, p = 0.30). Full numbers: [NOTES.md](NOTES.md) → *Roadmap Item D*. |
 
-**Next:** the regulatory corpus (FATF/FFIEC/FinCEN, gated on a `data/raw/` drop with structure-aware
-chunking), an AML console surface rendering the seam's decisions, the recorded demo video, and the
-Time-travel sparkline rendering the confidence band the API now serves.
+**Next:** the recorded demo video — the README's `<!-- TODO: demo video link -->` placeholder is
+deliberately still there, with no fabricated URL. *(The three other items this line used to name —
+the regulatory corpus, an AML console rendering the seam's decisions, and the Time-travel sparkline
+— have all since shipped; leaving them here would be the same doc-drift the honesty ledger's
+"no UI yet" row was just corrected for.)*
 
 ---
 

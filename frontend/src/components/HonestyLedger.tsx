@@ -414,15 +414,19 @@ const ROWS: RowSpec[] = [
   },
   {
     item: "Interrogate / provenance-audit / counterfactual endpoints",
-    label: "built, no UI yet",
+    label: "one now has a console; two do not",
     mode: "static",
     note: (
       <>
-        <code>GET /aml/transactions/{"{id}"}/interrogate</code>,{" "}
-        <code>/beliefs/{"{id}"}/provenance-audit</code>, and{" "}
-        <code>/beliefs/{"{id}"}/counterfactual-invalidation</code> are built, tested, and
-        verified against real cluster data but have no console surface yet — each is a
-        separate plan-gated frontend session; listed here rather than left undiscoverable.
+        <code>GET /aml/transactions/{"{id}"}/interrogate</code> <b>now has a console surface</b> —
+        the AML console renders it (the evidence pane, the witness geometry drawn from the cited
+        rows, and the &ldquo;see why&rdquo; seam on every AML feed row). This row read{" "}
+        <em>&ldquo;no UI yet&rdquo;</em> for the entire life of that console — the STATIC-prose rot
+        this ledger exists to catch.{" "}
+        <code>/beliefs/{"{id}"}/provenance-audit</code> is surfaced only as this ledger&rsquo;s own
+        top-line verdict (a data-point, not a per-edge UI).{" "}
+        <code>/beliefs/{"{id}"}/counterfactual-invalidation</code> still has <b>no</b> console
+        surface — listed here rather than left undiscoverable.
       </>
     ),
   },
