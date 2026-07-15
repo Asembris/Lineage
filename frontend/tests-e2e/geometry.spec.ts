@@ -429,4 +429,46 @@ test.describe("the justification seam", () => {
 
     expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
   });
+
+  test("returning from the witness restores a feed that STILL carries no witness", async ({ page }) => {
+    // POST-BACK COVERAGE. The cold-render assertion above proves the feed carries no witness on first
+    // paint. But the regression it guards — a witness inlined in the feed — could be introduced on a
+    // path that only manifests AFTER a return: a "recently viewed witness" preview keyed on retained
+    // state. `selectedId` IS retained across the seam (see why calls onInterrogate, never onSelect);
+    // `useInterrogation` is cleared (it lives inside AmlConsole, which unmounts on back). A preview
+    // keyed on either would render on the RETURNED-TO feed and be invisible to the cold check. So the
+    // returned-to state is asserted, not assumed.
+    const misses = installMock(page);
+    await page.goto("/");
+    const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+    await filter.getByRole("button", { name: /^aml/ }).click();
+
+    const ring = SUBJECTS.aml_ring_txn_id;
+    const item = page.locator(".feed__item", {
+      has: page.locator(".feed__row", { hasText: ring.slice(0, 6) }),
+    });
+    await item.getByRole("button", { name: /See the witness/ }).click();
+    await expect(page.locator(".aml__witnesses")).toBeVisible();
+
+    // BACK to the console — the seam's return leg.
+    await page.getByRole("button", { name: /back to the console/ }).click();
+    await page.waitForSelector(".feed__row");
+
+    // The feed is restored (is_fraud is back on the audit surface, where it belongs) and STILL draws
+    // no witness. A witness that only appeared after a round trip would trip HERE and pass the cold
+    // check — which is the whole reason this second assertion exists.
+    expect(
+      await page.locator(".feed__fraud-dot").count(),
+      "the returned-to feed shows no is_fraud — the back navigation did not restore the audit surface",
+    ).toBeGreaterThan(0);
+    await expect(
+      page.locator(".geo"),
+      "A WITNESS IS DRAWN ON THE RETURNED-TO FEED. Something inlined the witness into the feed on the\n" +
+        "post-back path — invisible to the cold-render check, visible here. The witness belongs to the\n" +
+        "evidence surface, reached by 'see why', never on the feed.\n",
+    ).toHaveCount(0);
+    await expect(page.locator(".geo__edge")).toHaveCount(0);
+
+    expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+  });
 });
