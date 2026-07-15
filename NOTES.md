@@ -8022,3 +8022,86 @@ it is why this sits in its own entry rather than a gate bullet.
 **Raven remains a MEASUREMENT, never a guard** — it runs in a session, on my invocation, and cannot
 trip on someone else's push. Nothing here changes that. What changed is that its *reading* is now
 parsed through a key that exists and verified against a probe that fails.
+
+## ====== A FABRICATED DESCRIPTION OF A PRIMARY SOURCE — A NEW FAILURE CLASS (2026-07-15) ======
+### CI wipes the cluster on EVERY non-frontend push, docs-only included. It always has. And a
+### later session nearly overturned that TRUE fact by reasoning confidently from a `ci.yml` that
+### never existed.
+
+### THE FACT, FROM PRIMARY SOURCES ONLY
+A docs-only push wipes the shared cluster, and it is CI that does it — not (only) the local verify
+run. Proven, not inferred:
+
+- **The run.** Commit `c329af1` changed **`NOTES.md` and nothing else** (1 file, +69/−3). It fired
+  `CI` run **`29399536126`** (`head_sha=c329af1`), whose `Run tests` step log reads, verbatim:
+  ```
+  collecting ... collected 211 items
+  ================= 211 passed, 3 warnings in 432.74s (0:07:12) ==================
+  ```
+  **211 collected, 211 passed, ZERO skipped, zero deselected** — no such line exists in the log —
+  7m12s against the real Frankfurt cluster. The full suite calls `seed.seed()` (ordered DELETEs of
+  every decision), so the cluster came out empty. Corroborated locally: since the prior verified
+  5,500 restore this session ran **no** local `seed()` — only doc guards against a dead-host dummy
+  URL (`…@127.0.0.1:1/…`) that cannot reach Frankfurt — yet `decisions` was **0** afterward. The
+  only thing that touched the real cluster was CI.
+- **The config, across its whole history.** `ci.yml` has carried `DATABASE_URL: ${{ secrets.DATABASE_URL }}`
+  and a bare `run: pytest` since its **first** commit (`2ece896`). `git log -p -- .github/workflows/ci.yml`
+  shows **four commits ever** (`2ece896` create → `b5e82b0` add `paths-ignore: ['frontend/**']` →
+  `3ee9141`/`fb532d9` timeout tweaks) and **no `-DATABASE_URL` line anywhere** — the secret was
+  never gated, never removed. `paths-ignore` lists only `frontend/**`, so a docs-only push is not
+  skipped. There is no `conftest`/`pyproject` skip mechanism; bare collection is 211 tests with no
+  offline/cluster split.
+
+**THE ORIGINAL ENTRIES WERE RIGHT AND ARE NOT CORRECTED.** Every prior note that said a `NOTES.md`
+or docs-only commit "re-fires the full backend suite" and "wipes the cluster" (the Rung-1 entry
+*"`NOTES.md` IS NOT A FRONTEND FILE, AND A DOCS-ONLY COMMIT WIPES THE CLUSTER"*, and the banked
+push→CI→poll→restore→verify sequence) stated the true mechanism. They stand.
+
+### THE FAILURE, NAMED — AND IT IS NOT ONE OF THE TEN VACUOUS CHECKS
+A **later session of this project** produced a **fabricated description of a primary source**: it
+reported `ci.yml` as *"no `DATABASE_URL`, skips 185 cluster-touching tests, runs ~12 offline
+tests,"* and concluded the cluster wipe *"was always local — the verify run's `seed()` — and CI
+never touched it."* **That configuration has never existed in this repository's history.** The
+"~12 offline tests" is the shape of the *proposed, never-built* `docs-ci.yml` from the workflow
+investigation — a design, described as if it were the live file. The claim was asserted about
+`ci.yml` without reading `ci.yml`, its history, or the log's skip count.
+
+It was **persuasive**. A whole review turn was built on it, and it came within one instruction of
+being **canonized as a correction to the entries that were actually right** — i.e. of replacing a
+true causal story in the log with a false one, which is the precise defect this project treats as a
+project-losing gimmick. It was caught for one reason only: **two sessions gave opposite claims, both
+citing "evidence," and the tie was broken by reading the actual `211 passed, 0 skipped` line from
+the real Actions log.** Absent the contradiction, the fabrication would have shipped.
+
+| | the ten vacuous checks | THIS |
+|---|---|---|
+| what failed | a check that *could not fail* | **reasoning from a source that was never read** |
+| the artifact | a green result guaranteed by construction | a confident *description* of a file/log/state |
+| why it survived | "green feels like corroboration" | "a summary reads like the source" |
+| what catches it | break the check against real code | **read the primary source — never a summary of it** |
+
+### THE DURABLE RULE
+> **READ THE PRIMARY SOURCE BEFORE ACCEPTING ANY CAUSAL CLAIM ABOUT IT — file contents, log lines,
+> git history — NEVER a session's summary of them, including THIS PROJECT'S OWN PRIOR SESSIONS.**
+
+*"Verify by running the command"* — the defense that beats a fabricated citation — **does not reach
+this**, because the fabrication IS a claim about what the command would show. You cannot re-run your
+way out of a false description of the source; you can only open the source. `ci.yml` is 61 lines and
+git-tracked; the skip count is one line in a log that already ran. The decisive evidence cost one
+`cat`, one `git log -p`, and one grep of a log. Nobody spent it until the contradiction forced it.
+
+**And a session's own prior write-up is a summary, not a source** — that is the sharp edge here.
+NOTES exists precisely so a later session can trust the record, which makes a fabricated NOTES
+entry uniquely dangerous: it is the one summary the next session is *designed* to believe without
+re-checking. So a causal claim in NOTES that a later session cannot re-derive from a primary source
+is a liability, not a record. This entry is re-derivable: the run id, the head sha, the skip-count
+line, and the four-commit history are all here, and all still readable at their sources.
+
+### THE STANDING OPTION (proven, not assumed): the two-workflow split
+Because docs pushes genuinely DO cost a wipe — now measured, `c329af1` → 211/211/7m12s — the
+`ci.yml`(cluster) / `docs-ci.yml`(offline guards) split from the workflow investigation is a real
+win, not a hypothetical: it would stop every future `NOTES.md` commit from reseeding the cluster,
+while keeping the doc guards (citation, gloss, restore, typecheck) running on the exact pushes that
+can violate them. The investigation proved the doc guards run offline (38 pure guards, 2 s, dummy
+dead-host URL) and that `*.md` (root-glob) excludes the ingested `data/corpus/*.md`. Gated on
+explicit approval and its own plan; noted here so the option is not re-discovered from scratch.
