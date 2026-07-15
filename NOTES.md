@@ -8105,3 +8105,65 @@ while keeping the doc guards (citation, gloss, restore, typecheck) running on th
 can violate them. The investigation proved the doc guards run offline (38 pure guards, 2 s, dummy
 dead-host URL) and that `*.md` (root-glob) excludes the ingested `data/corpus/*.md`. Gated on
 explicit approval and its own plan; noted here so the option is not re-discovered from scratch.
+
+## ====== THE CI SPLIT: DOCS-ONLY PUSHES NO LONGER WIPE THE CLUSTER (2026-07-15) ======
+### A root-*.md push now runs the OFFLINE guards (docs-ci.yml), not the 211-test cluster suite —
+### and the safety-pin that keeps that split honest is proven to trip THROUGH A FIXTURE, not just
+### on a direct reference.
+
+The proven problem (measured three times: `c329af1`, `3b7c285`, and the landing `af3cd46` below):
+a push touching only root docs fired `ci.yml`'s full 211-test suite against the real cluster,
+7-8 min, and `seed.seed()` WIPED every decision. CI has always had `DATABASE_URL` — see "A
+FABRICATED DESCRIPTION OF A PRIMARY SOURCE" for why an earlier session wrongly believed otherwise.
+The fix is the same two-workflow asymmetry the composition/geometry guards already use.
+
+### THE SHAPE
+- **`ci.yml`** `paths-ignore` gains `'*.md'` — the ROOT glob. GitHub's `*` does not cross `/`, so it
+  matches the five root docs (README/NOTES/ARCHITECTURE/DEMO/CLAUDE) and NOT `data/corpus/*.md`
+  (ingested content pinned by `test_regulatory_corpus`, which must still run the suite). `**/*.md`
+  would wrongly match the corpus; `test_ci_yml_skips_the_cluster_suite_on_root_doc_pushes` forbids
+  it. `paths-ignore` skips only when EVERY changed file matches, so a mixed `app.py + NOTES.md` push
+  still runs the full suite.
+- **`docs-ci.yml`** (new) fires on `paths: ['*.md']`, OFFLINE (a dead-host `DATABASE_URL`, no
+  secret), and runs `pytest -m doc_guard`: the doc guards (citation, gloss, restore-instruction,
+  typecheck) and the composition/geometry META-guards. A fabricated citation or a broken restore
+  instruction in a docs commit is still caught — skipping the guards on the push that can add one is
+  the ninth-vacuous-check shape, and the whole reason a naive `paths-ignore: ['**/*.md']` was
+  refused.
+
+### THE SAFETY-PIN IS THE LOAD-BEARING PART, AND IT IS NOT A grep
+`docs-ci` fires on every docs push, so a `@doc_guard` test that touched the cluster would reseed and
+WIPE on a NOTES commit — worse than today. The pin (`tests/test_doc_guard_marker.py`) does not read
+the marked tests' source. It RUNS them in a child process against a dead host
+(`127.0.0.1:1`) and asserts they all pass. A pure guard never connects; a test that reaches the
+cluster — directly, through a HELPER, or through a FIXTURE, at any depth — attempts a connection, is
+refused, and FAILS, naming itself. Transitivity is caught by CONSTRUCTION: the connection attempt is
+OBSERVED, not reasoned about. A body-grep would have missed exactly the fixture case.
+
+**MADE TO TRIP, twice, on real behaviour, each reverted:**
+- a directly-marked cluster test → the pin fails naming `test_the_witness_census...`.
+- **a marked test whose OWN BODY names no cluster symbol, reaching it only through a `db_session`
+  fixture** → the pin fails at the fixture's setup (`connection to server at 127.0.0.1, port 1
+  failed`). This is the case a grep cannot see, and it is the one that matters.
+
+The honest limit, documented on the marker in `pyproject.toml`: this is a TEST-TIME guarantee, not
+edit-time. A marked test that grows a cluster call later is caught the moment that path runs (here,
+and in docs-ci), not when it is written. The human rule — never mark a test that connects — is
+what the pin makes non-optional.
+
+### THE WORKFLOW META-GUARDS READ THE REAL YAML
+Like `test_composition_guard.py`, the two meta-tests open the actual workflow files:
+`docs-ci` must run `-m doc_guard` (never a bare `pytest` that would run all 211 under the dead host),
+must set the dead host, and must carry no `secrets.DATABASE_URL`; `ci.yml` must ignore `'*.md'` and
+never `'**/*.md'`. Both proven to trip. The DATABASE_URL check is per-line and comment-blind on
+purpose — its first draft matched a comment that merely NAMED the secret to explain its absence,
+the same mention-vs-use bug the gloss guard exists for, and it caught itself.
+
+### THE LANDING
+`af3cd46` (marker + safety-pin `710b405`, then the split) pushed: it changed tests + workflows, so
+`ci.yml` fired once more (the last docs-adjacent wipe) and `docs-ci` did NOT (no root `.md` in the
+push). **CI green, 215 passed** (211 + the 4 pin/meta tests) — and the subprocess safety-pin ran
+green on the Linux runner, not just locally. The two-case live proof (a docs-only push must skip
+`ci.yml` and leave the cluster intact; a backend push must fire it) is run against the LIVE split;
+GitHub evaluates triggers from the pushed workflow files, so it can only be observed after landing,
+and it is being read from the Actions tab rather than reasoned about.
