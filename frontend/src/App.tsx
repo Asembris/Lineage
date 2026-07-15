@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useConsoleData } from "./hooks/useConsoleData";
 import { Loaded, Panel } from "./components/Panel";
 import { DecisionFeed } from "./components/DecisionFeed";
@@ -129,6 +129,13 @@ function App() {
   const { agents, decisions, beliefs, counts, witnessCounts, loadMore, loadingMore } =
     useConsoleData(kind, witness);
   const [view, setView] = useState<View>({ kind: "console" });
+
+  // The seam's focus handoff (return leg). When the evidence view closes, focus should return to the
+  // "see why" row it came from, not vanish to <body> (verified by a tab-walk: it did). App remembers
+  // the transaction; DecisionFeed refocuses that row's control when it remounts. The forward leg —
+  // focusing the evidence surface's heading on open — lives in AmlConsole.
+  const [returnFocusTxn, setReturnFocusTxn] = useState<UUID | null>(null);
+  const clearReturnFocus = useCallback(() => setReturnFocusTxn(null), []);
 
   // Investigate: which decision is under investigation (null = none). Clicking a
   // selected row again clears it. State lives here because the feed (left) and the
@@ -323,7 +330,13 @@ function App() {
           preference; it is the oracle boundary in pixels, and `frontend/scripts/composition-guard.mjs`
           fails the build if an audit-coloured component ever appears inside this arm. */}
       {view.kind === "aml" ? (
-        <AmlConsole txnId={view.txnId} onClose={() => setView({ kind: "console" })} />
+        <AmlConsole
+          txnId={view.txnId}
+          onClose={() => {
+            setReturnFocusTxn(view.txnId);
+            setView({ kind: "console" });
+          }}
+        />
       ) : view.kind === "consistency" ? (
         <ConsistencyDemo />
       ) : view.kind === "ledger" ? (
@@ -347,6 +360,8 @@ function App() {
                     witnessCounts={witnessCounts}
                     loadMore={loadMore}
                     loadingMore={loadingMore}
+                    returnFocusTxn={returnFocusTxn}
+                    onFocusReturned={clearReturnFocus}
                   />
                 )}
               </Loaded>

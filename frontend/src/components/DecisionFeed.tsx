@@ -42,6 +42,7 @@
  * The chips are cold too (--bone/--ash): a filter is not a state of alarm.
  */
 
+import { useEffect, useRef } from "react";
 import {
   PAGE_SIZE,
   type DecisionsData,
@@ -71,14 +72,30 @@ function DecisionRow({
   selected,
   onSelect,
   onInterrogate,
+  returnFocusTxn,
+  onFocusReturned,
 }: {
   d: Decision;
   selected: boolean;
   onSelect: (id: UUID) => void;
   onInterrogate: (txnId: UUID) => void;
+  returnFocusTxn: UUID | null;
+  onFocusReturned: () => void;
 }) {
   const { date, time } = splitInstant(d.decided_at);
   const beliefDriven = d.driving_belief_id !== null;
+
+  // The seam's focus handoff (return leg). When the feed remounts after the evidence view closes,
+  // the row whose "see why" opened it takes focus back — so a keyboard user lands where they left,
+  // not on <body>. App holds the txn (returnFocusTxn); only the matching row fires, exactly once
+  // (it clears the pending txn, so the guard is false on the next render).
+  const seeWhyRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (returnFocusTxn && d.aml_transaction_id === returnFocusTxn) {
+      seeWhyRef.current?.focus();
+      onFocusReturned();
+    }
+  }, [returnFocusTxn, d.aml_transaction_id, onFocusReturned]);
   return (
     <li className="feed__item">
       <button
@@ -154,6 +171,7 @@ function DecisionRow({
       {d.aml_transaction_id && (
         <div className="feed__seewhy-wrap">
           <button
+            ref={seeWhyRef}
             type="button"
             className="feed__seewhy"
             aria-label="See the witness the graph derived for this transaction"
@@ -272,6 +290,8 @@ export function DecisionFeed({
   witnessCounts,
   loadMore,
   loadingMore,
+  returnFocusTxn,
+  onFocusReturned,
 }: {
   data: DecisionsData;
   selectedId: UUID | null;
@@ -288,6 +308,8 @@ export function DecisionFeed({
   witnessCounts: Loadable<WitnessCounts>;
   loadMore: () => void;
   loadingMore: boolean;
+  returnFocusTxn: UUID | null;
+  onFocusReturned: () => void;
 }) {
   // TWO DIFFERENT EMPTIES, AND CONFLATING THEM WOULD BE A LIE. An empty FILTER on a populated
   // cluster is not a broken world and must never print restore instructions; only a genuinely
@@ -321,6 +343,8 @@ export function DecisionFeed({
                 selected={d.id === selectedId}
                 onSelect={onSelect}
                 onInterrogate={onInterrogate}
+                returnFocusTxn={returnFocusTxn}
+                onFocusReturned={onFocusReturned}
               />
             ))}
           </ol>

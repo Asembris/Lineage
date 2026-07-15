@@ -75,6 +75,12 @@
   color: var(--bone);
   margin: 0;
 }
+/* Focused programmatically on mount for the seam's focus handoff (tabIndex=-1, not in the tab
+   order, not an interactive control) — so it shows no ring. Keyboard controls keep their
+   :focus-visible rings elsewhere on this surface (.aml__close). */
+.aml__title:focus {
+  outline: none;
+}
 
 .aml__sub {
   margin: 6px 0 0;
