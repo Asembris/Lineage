@@ -8167,3 +8167,98 @@ green on the Linux runner, not just locally. The two-case live proof (a docs-onl
 `ci.yml` and leave the cluster intact; a backend push must fire it) is run against the LIVE split;
 GitHub evaluates triggers from the pushed workflow files, so it can only be observed after landing,
 and it is being read from the Actions tab rather than reasoned about.
+
+## AML CONSOLE — RUNG 4: THE JUSTIFICATION SEAM, NOT A REVEAL (2026-07-15)
+
+The rung was briefed as "the audit reveal — the one surface where `is_fraud` may appear for a
+subject." **That framing was wrong, and catching it was the rung.** `is_fraud` has been on the feed
+and the Investigation since Phase 3, guarded and correct; building a dramatic reveal around it would
+have solved a non-problem and *manufactured* a new co-visibility risk to guard. The real gap is
+finding-3's cousin: in the feed the **verdict is a 0-click conclusion**, but the **witness that
+justifies it was three clicks deep** (select → Investigation → interrogate). That is the
+**Inspector-fold inversion again** — conclusion reachable, justification not — in a new surface.
+
+**THE SEAM: feed verdict → "see why" → the witness that defends it → back.** A per-AML-row `see why`
+control (`DecisionFeed.tsx`) navigates straight to the evidence surface for that transaction. It is a
+sibling of the row button, never nested; it re-derives the witness FRESH via `/interrogate` and
+carries a bare `UUID`, never the decision. **217 backend tests** (215 + 2 fence); geometry guard
+**36 tests / 4 projects** (was 28; +2 tests × 4). No new endpoint, no schema change, no backend field.
+
+### RULING 1 — THE COMPOSITION GUARD DOES NOT RELAX, AND IT DID NOT HAVE TO
+The seam is a VIEW TRANSITION: `see why` → `onInterrogate` → `setView({kind:"aml"})`, and the console
+body — feed, Inspector, every `is_fraud` — **unmounts**. It is the exact navigation the
+Investigation's "Interrogate the transaction →" already performed, given a second, shallower trigger.
+No component holds both layers; check A/B/C unchanged; the guard stayed green through the build.
+
+### RULING 2 — THE 463 DEAD-END IS HONEST: PRESENT FOR ALL, LANDS TRUTHFULLY (answer (a))
+`/interrogate` resolves ANY transaction. `see why` is on EVERY AML row and always lands somewhere
+true: a MATCH on the drawn ring, a self-loop/closed-search on the honest "no witness to draw", an
+INCONCLUSIVE on its named boundary account. **Verified live on `3195dd5c`** (self-loop): all four
+witnesses `CONCLUSIVE_NO`, `transaction_ids=[]`, no boundary, no label — the evidence surface renders
+"the account paid itself; no search was possible." Card rows carry no seam (no money-flow graph to
+witness) — the same structural reason they carry no basis chip; the affordance is **absent**, never a
+silent no-op. Not the 447-inside-CONCLUSIVE_NO shape.
+
+### RULING 3 — THE witness_txn_ids OVERLOAD IS FENCED (it cannot occur on the seam's path)
+The overload is real but lives on `verdict_guard.VerdictOutcome` (the MODEL's claim), off the seam.
+On the seam's two endpoints: `/decisions` (`DecisionOut`) carries `witness_outcome` — the recorded
+BASIS as a SCALAR — and **no witness-edge field**; `/interrogate` (`AmlWitnessOut.transaction_ids`) is
+the graph's freshly re-derived witness, `[]` for every non-MATCH outcome. Two meanings, two objects,
+two endpoints — structurally unconfusable, the way `basis.ts` re-derives the self-loop from account
+identity instead of reconciling prose. **FENCED, not refactored, with two tests MADE non-vacuous by
+liveness asserts:**
+- `test_the_reverse_lookup_surface_carries_a_basis_scalar_never_a_witness_edge_list` — `DecisionOut`
+  has `witness_outcome`, lacks `witness_txn_ids`/`transaction_ids`; the edges live on `AmlWitnessOut`.
+- `test_a_non_match_witness_carries_no_transaction_ids_so_the_field_is_never_a_non_witness` — over all
+  1,500 edges, every non-MATCH witness has `transaction_ids==[]` (and MATCH ones are non-empty, so the
+  emptiness check is not vacuous).
+
+### RULING 4 — NO NEW RUNTIME CO-VISIBILITY PATH, AND HOW IT WAS PROVEN FROM PRIMARY SOURCE
+Single-view-mount is ARCHITECTURAL, read from `App.tsx` not trusted from the route:
+1. The body is a plain ternary; App imports no `framer-motion`; there is **no `AnimatePresence` /
+   keep-mounted / `display:none`** wrapper on the arms. React commits the swap atomically — no frame
+   has both trees. (The seam adds NONE, stated as a non-goal: `AnimatePresence` keeps an exiting
+   subtree mounted during its exit animation — the one way a transition could co-mount both.)
+2. The interrogation is fetched by `useInterrogation` **inside `AmlConsole`** — never lifted to App.
+   On back it is destroyed; nothing in App holds it. `selectedId` is retained but addresses the
+   Investigation (audit), which never renders a witness.
+3. The feed reads no interrogation state (`witness` there is the filter ENUM); `.geo` is mounted only
+   inside `EvidencePane`.
+
+**So no guard was needed for the transition.** But a browser guard EARNS its place for the ONE way
+this regresses that the STATIC guard misses — the check-C shape: an inline witness PREVIEW in the
+feed, fetched raw and drawn as SVG without a typed `AmlWitness` prop. Check C sees no
+evidence-coloured component; `DecisionFeed` is no EVIDENCE_MODULE for check B. So the guard is blind
+to that channel, and the only thing that catches it is asserting the RENDERED feed has no witness
+geometry. `geometry.spec.ts::"the justification seam"`: the feed shows `is_fraud` (`.feed__fraud-dot`
+> 0, liveness) and **no `.geo`**; and `see why` navigates to the witness with the feed GONE.
+**MADE TO TRIP on real code:** an inline `.geo` preview in `DecisionRow` failed it with `200
+elements` where 0 are allowed; reverted byte-identical (`git diff --stat` empty), re-run green.
+
+### RULING 5 — is_fraud IS BYTE-IDENTICAL. The seam adds a PATH to the witness; it does not touch how
+the label is shown. The earlier plan's `--alert`-on-`is_fraud` recommendation was withdrawn with the
+reveal framing that motivated it.
+
+### GATE — all green
+- **217 backend tests pass** (215 + the 2 fence). `tsc -b`, `oxlint`, `vite build`,
+  `guard:composition`, `guard:geometry` (36/4 projects) all green — the geometry guard re-run proved
+  the feed restructure did not regress the `.feed__row`/interrogate selectors or the `.feed__row
+  count 0` oracle assertion.
+- **DRIVEN + SCREENSHOTTED** (mock-faithful build, 1280×800 + reduced-motion): the `see why` seam
+  renders cold and subordinate on every AML row, the miss rows (`37ebc1`, `2f9f1d` — is_fraud +
+  INCONCLUSIVE) keep their fraud dot untouched, and `see why` on the hero `045adfd2` lands on the
+  CYCLE ring with the feed unmounted.
+- **CONTRAST, probed instrument first.** The one new text element (`see why`, `--ghost` on the feed
+  `--surface`) measures **5.83:1** on the real rendered pixels — the exact value Rung 2 independently
+  measured for `--ghost`/`--surface`, which validates the ratio function; clears AA (4.5). No other
+  new pixel; `is_fraud` unchanged.
+
+### HARNESS (banked)
+- **PORT 5173 WAS HELD BY AN UNRELATED APP ("Attest"), so `vite dev` bound 5174 — and backend CORS
+  allows 5173 ONLY**, so a live-backend drive was CORS-blocked. Rather than kill an unknown user
+  process or edit CORS, screenshots were taken against the **mock-faithful build** (`mock.ts`, which
+  the project certifies reproduces the live console to the pixel). The tell that it was the wrong app:
+  the page read "Attest / Verify what your AI claims" — not the Lineage console. Confirm the CONTENT,
+  never the port (the recurring `:8000`/`splunkd` lesson, in a new disguise on `:5173`).
+- `vite preview` on 4173 left running from a manual launch blocked the guard's own `webServer`
+  (`reuseExistingServer:false`); freed it by PID before re-running.
