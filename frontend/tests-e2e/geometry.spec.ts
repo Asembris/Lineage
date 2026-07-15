@@ -352,3 +352,81 @@ test.describe("the oracle boundary", () => {
     });
   }
 });
+
+/*
+ * THE JUSTIFICATION SEAM (Rung 4) — the mirror of the oracle-boundary sweep above.
+ *
+ * That sweep proves the label is never on the EVIDENCE surface. This proves the witness is never on
+ * the AUDIT surface (the feed). The two-graph separation is guarded from BOTH sides, in pixels.
+ *
+ * ============== WHY THIS EARNS A PUSH-COST THE COMPOSITION GUARD DOES NOT COVER ==============
+ * The seam adds a "see why" control to the feed. Single-view-mount is architectural — App renders
+ * exactly one body arm, so the feed and the witness surface are never mounted together, and reading
+ * App.tsx proves it. But the ONE way that could regress is an inline witness PREVIEW rendered in the
+ * feed row itself ("so users don't have to click"). If that preview fetched /interrogate raw and
+ * drew SVG without a typed `AmlWitness` prop, the composition guard would MISS it: check C sees no
+ * evidence-coloured component to flag, and `DecisionFeed` is not an EVIDENCE_MODULE for check B. So
+ * the guard is blind to that channel — the check-C shape — and the only thing that catches it is
+ * asserting the rendered feed has no witness geometry in its DOM. It CAN regress; it costs one
+ * assertion on a feed this job already drives; so it is guarded.
+ */
+test.describe("the justification seam", () => {
+  test("the feed renders is_fraud but never a witness", async ({ page }) => {
+    const misses = installMock(page);
+    await page.goto("/");
+    const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+    await filter.getByRole("button", { name: /^aml/ }).click();
+    await page.waitForSelector(".feed__row");
+
+    // LIVENESS. The audit surface really does render the label here — otherwise "no witness" would
+    // be a vacuous pass over a feed showing nothing (a fixture whose first page had zero fraud rows
+    // would make this guard measure nothing, the ninth-vacuous-check shape). The feed marks fraud
+    // with a dot (role="img", NO text), so an innerText check would miss it — the count is on the
+    // element.
+    expect(
+      await page.locator(".feed__fraud-dot").count(),
+      "the aml feed's first page has no is_fraud row, so this guard measures nothing — re-capture " +
+        "with `python -m scripts.capture_console_fixtures`",
+    ).toBeGreaterThan(0);
+
+    // THE INVARIANT. No witness geometry is drawn on the audit surface. The witness (`.geo`, its
+    // edges and nodes) belongs to the EVIDENCE surface alone; inlining it beside `is_fraud` would
+    // put the graph's structure next to the answer key — the two-graph separation collapsed in
+    // pixels, and past the composition guard's blind spot (see the header).
+    await expect(
+      page.locator(".geo"),
+      "A WITNESS IS DRAWN ON THE FEED. The audit surface renders the graph's structure beside the\n" +
+        "ground-truth label. The witness belongs to the evidence surface, reached by 'see why' — it\n" +
+        "must never be inlined in the feed. The two layers are joined by a view transition, never by\n" +
+        "co-mounting.\n",
+    ).toHaveCount(0);
+    await expect(page.locator(".geo__edge")).toHaveCount(0);
+
+    expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+  });
+
+  test("see why on a feed row opens the evidence surface and unmounts the feed", async ({ page }) => {
+    const misses = installMock(page);
+    await page.goto("/");
+    const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+    await filter.getByRole("button", { name: /^aml/ }).click();
+
+    // The seam's new, shallow trigger — a per-row control, NOT the deep Investigation path. Locate
+    // the ring subject's row and click ITS "see why" (a sibling of the row button, so no invalid
+    // nested-button).
+    const ring = SUBJECTS.aml_ring_txn_id;
+    const item = page.locator(".feed__item", {
+      has: page.locator(".feed__row", { hasText: ring.slice(0, 6) }),
+    });
+    await item.getByRole("button", { name: /See the witness/ }).click();
+
+    // A VIEW TRANSITION, not a co-mount: the evidence surface is up, and the feed — with every
+    // is_fraud on it — is GONE. The same invariant the oracle-boundary sweep pins, reached through
+    // the new trigger, closing the loop that single-view-mount guarantees by construction.
+    await expect(page.locator(".aml__witnesses")).toBeVisible();
+    await expect(page.locator(".feed__row")).toHaveCount(0);
+    await expect(page.locator(".feed__fraud-dot")).toHaveCount(0);
+
+    expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+  });
+});
