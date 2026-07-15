@@ -44,6 +44,7 @@
  */
 
 import { motion, useReducedMotion } from "framer-motion";
+import { DUR, EASE } from "../lib/motion";
 import { useInterrogation } from "../hooks/useInterrogation";
 import type { AmlAccount, AmlInterrogationResponse, AmlWitness, UUID } from "../api/types";
 import {
@@ -221,7 +222,10 @@ export function EvidencePane({ interrogation }: { interrogation: AmlInterrogatio
     : {
         initial: { opacity: 0, y: 6 },
         animate: { opacity: 1, y: 0 },
-        transition: { type: "spring" as const, stiffness: 260, damping: 30 },
+        // A surface appearing is the DUR.reveal gesture — the same tween every other surface reveal
+        // uses. This was the app's ONLY spring, and lib/motion.ts states "the app uses NO springs";
+        // the AML pane (built after Phase 6's harmonization) had silently broken that invariant.
+        transition: { duration: DUR.reveal, ease: EASE.out },
       };
 
   return (
