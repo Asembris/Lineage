@@ -1,7 +1,7 @@
 name: docs-ci
 
 # Root-doc pushes (*.md) touch neither the backend nor the cluster, so they must NOT fire the
-# 211-test cluster suite in ci.yml — which calls seed.seed() and WIPES every decision (a docs-only
+# 217-test cluster suite in ci.yml — which calls seed.seed() and WIPES every decision (a docs-only
 # push was measured at 7-8 min against the real cluster; see NOTES "A FABRICATED DESCRIPTION OF A
 # PRIMARY SOURCE"). But a docs push must STILL be guarded: a fabricated citation, a broken restore
 # instruction, or a false "tsc --noEmit clean" claim added in a NOTES/README/DEMO commit is exactly
@@ -53,9 +53,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # `-m doc_guard` is load-bearing: a bare `pytest` here would run all 211 tests, and with the
-      # dead-host DATABASE_URL the 185 cluster tests would ERROR (not wipe — the host is dead) and
-      # fail the job. tests/test_doc_guard_marker.py::test_docs_ci_runs_only_the_marked_guards reads
-      # THIS file and fails the backend suite if the `-m doc_guard` filter is ever dropped.
+      # `-m doc_guard` is load-bearing: a bare `pytest` here would run all 217 tests, and with the
+      # dead-host DATABASE_URL the 176 cluster tests (217 total − 41 doc_guard) would ERROR (not
+      # wipe — the host is dead) and fail the job. The two counts are DIFFERENT quantities: 217 is
+      # the whole suite, 176 is what is left once the @doc_guard set is deselected. Do not collapse
+      # them into one number — the 41 are PROVEN cluster-free by tests/test_doc_guard_marker.py, and
+      # calling all 217 "cluster tests" would deny the safety-pin that proves it.
+      # tests/test_doc_guard_marker.py::test_docs_ci_runs_only_the_marked_guards reads THIS file and
+      # fails the backend suite if the `-m doc_guard` filter is ever dropped.
       - name: Run the offline doc + meta guards
         run: pytest -m doc_guard
