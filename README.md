@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=22&duration=3600&pause=900&color=E8A33D&center=true&vCenter=true&width=860&lines=Lineage%3A+agent-genealogy+belief-inheritance+forensics;A+living+agent+acts+on+beliefs+inherited+from+ancestors+it+never+met;No+flag+without+a+witness+the+graph+itself+can+re-derive" alt="Lineage" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&size=22&duration=3600&pause=900&color=E8A33D&center=true&vCenter=true&width=860&lines=Lineage%3A+agent-genealogy+belief-inheritance+forensics;A+living+agent+acts+on+beliefs+inherited+from+ancestors+it+never+met;No+flag+without+a+witness+the+graph+itself+can+re-derive;Two+graphs%2C+one+transactional+timeline%3A+genealogy+joined+to+real+money-flow+evidence" alt="Lineage" />
 
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
