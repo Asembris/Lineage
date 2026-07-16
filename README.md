@@ -5,7 +5,7 @@
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
 [![CI](https://github.com/Asembris/Lineage/actions/workflows/ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/ci.yml)
-&nbsp;![tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)
+&nbsp;![tests](https://img.shields.io/badge/tests-217%20passing-brightgreen)
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -407,7 +407,7 @@ run on 5173.
 ### Tests & evals
 
 ```bash
-pytest                                          # 167 tests against the real cluster (~3m16s)
+pytest                                          # 217 tests against the real cluster
 PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
 ```
 
@@ -426,7 +426,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # struct
 | AWS | S3 (certificates) + Lambda (certifier) |
 | Eval judge | NVIDIA NIM (nemotron) / Ollama (gemma) via DeepEval — never OpenAI |
 | Frontend | React 19 + Vite + TypeScript, framer-motion, react-three-fiber, oxlint |
-| Tests | pytest (167, live-cluster) |
+| Tests | pytest (217, live-cluster) |
 
 ---
 
@@ -467,7 +467,7 @@ CockroachDB/
 │                            probe_vector_opclass.py — the measurement behind migration 0010
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
-├── tests/                   31 files, 167 tests (all live-cluster) — incl. test_oracle_boundary
+├── tests/                   35 files, 217 tests (all live-cluster) — incl. test_oracle_boundary
 │                            (the AST tripwire) and test_citations (no fabricated provenance)
 ├── frontend/                React 19 + Vite console — three views:
 │                            console (tree · feed · inspector) · consistency demo (2D + 3D)
