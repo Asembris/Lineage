@@ -8525,3 +8525,151 @@ mixes facts with deliberate disabled/hover states that a blind sweep would regre
 guard (Rung 3 cut it on purpose); the recorded demo video (human task, placeholder deliberately
 kept); any backend change, endpoint, or `belief_performance` for the azure belief (step 4 stays CUT).
 The AML console ladder is closed. Do NOT push without explicit approval — held for review.
+
+## THE README VERIFICATION PASS — A NON-FINDING, THREE FALSE PREMISES FROM THE REVIEWER, AND THE ELEVENTH VACUOUS CHECK (2026-07-16)
+
+Docs-only. Seven commits, all root `*.md`. No seed change, no migration, no endpoint, no measured
+constant. The cluster was never written to: every probe was read-only, and the one OpenAI call was a
+single `text-embedding-3-small` embed, approved in advance and spent on verification rather than the
+thing it was approved for. **Cluster survives at 5,500.**
+
+### ============ CRIMSON'S PLACEHOLDER WAS A NON-FINDING. IT WAS FIXED IN 48c1a04. ============
+### Record it so a future session does not "rediscover" it as broken — the brief that opened this
+### session did exactly that, and its premise was three days stale.
+
+The session was convened to fix crimson's placeholder embedding: *"seed.seed() re-plants it on every
+reseed; azure was fixed by committing its real vector as a fixture; crimson was left."* **Measured
+first, and the premise died before a line was written:**
+
+    origin    (crimson)  cos dist from placeholder_embedding(1536) = 1.003275372   L2 1.0000
+    aml-cycle (azure)    cos dist from placeholder_embedding(1536) = 1.009940308   L2 0.9999
+
+Crimson was never left. `git log -S` on the fixture returns **one** commit — `48c1a04` — and it added
+**both** `origin` and `aml-cycle` in the same change. `seed/seed.py:208-209` plants both from
+`belief_embeddings.json`; `tests/test_belief_embeddings.py:93` **reseeds the live cluster** and
+asserts both are >0.5 from the placeholder. The pattern the brief asked to apply to crimson had
+already been applied to crimson, by the commit that invented the pattern.
+
+**THE APPROVED CALL WAS REDIRECTED FROM GENERATE TO VERIFY, AND THAT IS THE ONLY REASON IT WAS WORTH
+SPENDING.** Regenerating the fixture would have rewritten it with byte-identical content. Instead the
+one call re-embedded crimson's exact `rule_text` and compared:
+
+    FRESH re-embed vs committed FIXTURE : 0.000000000000   <- the fixture IS genuine model output
+    FRESH re-embed vs LIVE row          : 0.000000000000
+    FRESH re-embed vs placeholder       : 1.003275372
+
+That link — *"the committed vector is a real `text-embedding-3-small` output for the text it claims"* —
+was asserted in this file and had never been re-run by anyone who did not write the assertion. Now it
+is measured. **A cached embedding is a genuine model output; this is the check that says so without
+taking the cache's word for it.**
+
+### THE VERIFICATION THE BRIEF DEMANDED WAS ITSELF VACUOUS, IN THE PROJECT THAT KEEPS A REGISTRY OF THOSE
+The brief said: *"Confirm after planting: crimson's live cosine distance from placeholder_embedding is
+NO LONGER 0.000 — the falsifiable proof it took."* **That check passes before any change.** It could
+not have failed. It is the `tsc --noEmit` shape arriving in a work order rather than in a gate, and it
+would have certified a no-op commit as a repair. A commit titled `fix(seed): plant crimson's real
+vector` would have been **a false claim in the git log** — the one place this project has never put one.
+
+### ============ THE THREE FALSE PREMISES CAME FROM THE REVIEWER. THAT IS THE NEW SHAPE. ============
+### Every prior entry in this file is about a DOCUMENT that rotted. This one is about a READER'S
+### MODEL of a document that rotted — while the document itself was correct.
+
+A second brief ordered four README fixes. Three rested on premises that are false about the file as it
+stands, and each was disproved by one command:
+
+| the premise | the command | what the source said |
+|---|---|---|
+| *"README says **99** in ~4 places"* | `grep -n "\b99\b" README.md` | **no match. "99" is not in the file.** It said `167`; the real count is **217** |
+| *"the roadmap Shipped table **stops at Item 8**"* | read lines 485-504 | it runs 0-8 **and** 9, A, B, E, F, staleness CIs, G, the AML console |
+| *"the **Next:** line still lists the grounding seam and hero demo as upcoming"* | read lines 532-536 | it lists **only** the demo video, and explicitly says the other items *"have all since shipped"* |
+| *"header line 3 is just CYCLE recall"* | decode the `lines=` param | three lines, none carrying **any number**; line 3 is the brake claim |
+
+**HAD I COMPLIED, EVERY EDIT WOULD HAVE BEEN A REGRESSION JUSTIFIED BY A FALSE PREMISE:** editing a
+`99` that does not exist, restructuring a roadmap that was already complete, and "fixing" a `Next:`
+line that was already correct — each landing as a confident `docs(readme):` commit. The reviewer had
+authority to order the edit and was wrong about the file; **authority does not make a premise true, and
+"the reviewer said so" is not a primary source.** The instruction that saved it was the reviewer's own:
+*get the primary-source numbers BEFORE editing any of them.*
+
+> **THE RULE, and it is the citations rule arriving from a fourth direction: verify the PREMISE against
+> the artifact, not just the claim. A brief describing a file is a summary of a file. It rots exactly
+> like the file's own prose, it carries more authority than prose, and it is the one document nobody
+> thinks to check — because it arrived as an instruction.**
+
+The through-line with the CI-log fabrication and the scratchpad-gitignore entries is exact: a claim
+entered the record as an illustration and hardened into a premise. The only difference is the
+substrate — there it was a summary of a source, here it was a reader's memory of one.
+
+### ========== THE ELEVENTH VACUOUS CHECK: grep COUNTS PIPES. IT CANNOT SEE A TABLE. ==========
+### The registry stood at TEN (NOTES:7962). This is the eleventh, and it is the check-C shape on
+### markdown: an instrument structurally blind to the defect class it was aimed at.
+
+A blank line **terminates** a GFM table. One sat between the grounding-seam row and the AML console
+row, so the AML console row — and the regulatory-corpus row this session added beneath it — carried no
+header or delimiter of their own and **were not table rows at all.** They rendered as a paragraph of
+literal pipe text. The AML console had been orphaned that way since the day it was written; **the two
+most recent capabilities in the project were the two a reader could not find in the table that exists
+to list them.** Measured with `markdown-it`, before and after:
+
+    before : 1 table, 17 rows, tail = "| <strong>The regulatory corpus</strong> | 233 verbatim ..."
+    after  : 1 table, 19 rows, both rows render as real <td> cells
+
+**THEN I COMMITTED THE IDENTICAL DEFECT AND DID NOT SEE IT.** The Rung 5 cut row went in behind its own
+blank line. The cause is the finding: **I checked the shipped table with a RENDERER and the cut table
+with `grep -cE`.** To grep, a table row and a paragraph that happens to begin with a pipe are the same
+string. It returned `3` and I read it as three rows; three rows is also exactly what you get when one
+of them is not a row. Only rendering distinguishes them, and the moment the renderer was pointed at the
+cut table it printed **3 `<tr>` where 4 were expected**, with the whole-doc probe flagging
+`no stray pipe paragraphs: False`. That flag is the only reason this is a fixed bug and not a shipped one.
+
+**THE DAMNING DETAIL:** the sentence *"a blank line TERMINATES a table"* was written into commit
+`45fe722`'s message **one commit away from a live instance of it.** Knowing the rule, writing the rule,
+and citing the rule did not find the second instance. Running the renderer did.
+
+> **THE RULE: a verification tool must be able to SEE the defect class it is pointed at. `grep` sees
+> text; a table break is STRUCTURE. Check C was green because its fixtures could not reach the mount it
+> guarded; `tsc --noEmit` was green because it read zero files; this was green because it counts
+> characters at line-start and the defect is invisible at line-start. Three instruments, one disease:
+> the check and the defect lived in different layers, and green felt like corroboration.**
+
+### GATE — all green (2026-07-16)
+- **Seven commits, docs-only**, each its own piece: test count `167 -> 217`; the Rung 5 cut disclosed;
+  the regulatory-corpus roadmap row; the header's 4th line; two table-break fixes (AML console
+  pre-existing, Rung 5 self-inflicted); this entry.
+- **Every README number re-verified against a PRIMARY SOURCE, not this file.** Live cluster: 24 agents,
+  2 beliefs, 15 edges, 5,500 decisions (4,000 card / 1,500 AML), census **57/463/980** with fraud
+  **43/5/252**, 65.3% = 980/1500, curve `.924 .952 .876 .852 .724 .556 .624 .528` (8 crimson / 0 azure),
+  `count(DISTINCT decided_at)=1` for AML, 648/1500/20/300, typology 4, regulatory 233 = 129+59+33+5+7.
+- **The detection eval was RE-RUN**, not quoted: every figure reproduces — CYCLE 100%/75.4% dev,
+  100%/100% hold-out (Wilson floor **90.8%**), SG 40.6%/92.9% and 50.0%/89.6%, structural
+  82.8/59.0/68.9 and 94.2/65.3/77.1, LR 62.4/76.3/68.6 and 76.9/80.6/78.7, ACH 38.7/100/55.8 and
+  50.4/100/67.0.
+- **The 0.75% baseline figure — the last unverified number in the document — was ISOLATED and it
+  reproduces** from the raw CSV, which no script computes: 5,078,345 rows scanned, ACH **600,797**,
+  ACH-and-laundering **4,483**, ACH non-laundering **596,314** (matching NOTES:2346's `4,483 + 596,314`),
+  precision `4,483/600,797` = **0.7462% -> 0.75%**. Format split matches NOTES:1260 exactly.
+- **The vector-index claim was RUN, not read** — the reputationally load-bearing one, corrected once
+  already. `EXPLAIN` on the real unscoped shape (`regulation.py:368`) emits a real
+  **`vector search  table: regulatory_corpus@ix_regulatory_corpus_embedding`**; de-indexed `beliefs`
+  correctly shows **FULL SCAN**. The catalog lists exactly ONE embedding index. README's text is not
+  merely accurate, it is the strongest available version — it also carries the "opclass flip is inert"
+  correction, which the brief's own spec for it omitted.
+- **README ledger vs the live `HonestyLedger.tsx`: 20 rows, same items, same order, no drift.** The
+  embedding row says "both real" in both, and the cluster agrees.
+- **Markdown RENDERED, not grepped:** 13 tables, **0 stray pipe paragraphs**, all three cuts and all
+  18 shipped capabilities as real `<td>` cells.
+- **217 tests COLLECTED, not run** — deliberately. Several tests call `seed.seed()`, which DELETEs every
+  decision, so running the suite to re-time the `~3m16s` figure would have wiped the 5,500-row cluster
+  for a docs commit. **The runtime figure was DROPPED instead of updated:** a number you have not
+  measured does not get carried forward at a new-looking value. The count is checkable in one command;
+  the runtime is now not claimed at all.
+- `ci.yml` **skips** (root `*.md` in `paths-ignore`); `docs-ci` runs offline. No wipe, no restore.
+
+### Explicitly NOT done (still gated): re-timing the suite (needs a full run -> a wipe -> the two-command
+### restore; the figure was dropped rather than guessed); the `~25%` / `0.973` / `0.189` / Wilson-CI
+### `[0.466, 0.589]` figures (self-consistent across README + component, not independently re-derived
+### this session); softening README:315's "typecheck gate" (the `tsc --noEmit` vacuity is real, but it is
+### a frontend-ci fact, not a README number); squashing the two table-break commits (the AML-console
+### break PREDATES this session and its commit says so — squashing would bury a real "orphaned since it
+### was written" finding); the recorded demo video (human task, placeholder deliberately kept); ANY seed,
+### migration, endpoint, guard, or measured constant.
