@@ -72,7 +72,7 @@
 
 .ledger__legend-txt {
   font-size: 0.72rem;
-  color: var(--ash);
+  color: var(--ghost);
   margin-right: 0.75rem;
 }
 
@@ -125,7 +125,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 /* Item cell — name over the live reading (live rows only). */
@@ -222,6 +222,6 @@
 
 /* STATIC — permanent fact: dim cold, no outline. */
 .ledger__mode--static {
-  color: var(--ash);
+  color: var(--ghost);
   border: 1px solid transparent;
 }
