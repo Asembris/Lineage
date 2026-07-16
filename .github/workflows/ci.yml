@@ -34,8 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     # The full suite runs SEQUENTIALLY against the real Frankfurt cluster + S3. Each reseeding
     # test resets via ordered DELETEs (seed.seed(), ~1s), NOT TRUNCATE — that swap cut the suite
-    # from ~36 min to 2m39s locally (measured 2026-07-10, 89 passed). The slowest tests are now
-    # the inherently-timed ones (demo/SSE fan-out ~10s, real S3 round-trip ~9s, eventual
+    # from ~36 min to 2m39s locally (measured 2026-07-10, 89 passed — historical, deliberately NOT
+    # carried forward: the suite is 217 now, but 217 tests were never timed at 2m39s and a number
+    # you have not measured does not get restated at a new-looking value. Do NOT "fix" the 89; to
+    # update this pair, re-time the suite — which costs a full run and a cluster wipe). The slowest
+    # tests are now the inherently-timed ones (demo/SSE fan-out ~10s, real S3 round-trip ~9s, eventual
     # per-holder delay ~7s), not reseeds, so there is no bulk reseed cost left to cut. CI adds
     # runner->Frankfurt latency + the pip-install step on top of the pytest wall time; 15 min is
     # honest headroom (~2-3x the expected job time), not the old 40-min-over-runtime cushion.
@@ -47,7 +50,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
-      # Required only so app.config imports; NO test makes a real OpenAI call (all 89 are
+      # Required only so app.config imports; NO test makes a real OpenAI call (all 217 are
       # deterministic / OpenAI-free). A dummy value is deliberate — do NOT add the real key.
       OPENAI_API_KEY: sk-dummy-ci-openai-not-used
     steps:
