@@ -82,7 +82,7 @@
   margin: 0.4rem 0 0.9rem;
   font-size: 0.76rem;
   line-height: 1.5;
-  color: var(--ash);
+  color: var(--ghost);
   max-width: 40rem;
 }
 
@@ -94,7 +94,7 @@
 .cx__caution {
   margin: 0.7rem 0 0;
   font-size: 0.74rem;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 /* --- Buttons -------------------------------------------------------------- */
@@ -346,7 +346,7 @@
 }
 
 .cx-obs__state--ALL_ACTIVE {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-obs__state--SPLIT {
@@ -373,7 +373,7 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--ash);
+  color: var(--ghost);
   margin-bottom: 0.4rem;
 }
 
@@ -408,7 +408,7 @@
 }
 
 .cx-obs__seq {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-obs__st {
@@ -483,7 +483,7 @@
   display: block;
   font-size: 0.74rem;
   line-height: 1.5;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-sum__vs {
@@ -491,7 +491,7 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-sum__takeaway {
@@ -526,7 +526,7 @@
 
 .cx-sum__facts dt {
   font-size: 0.74rem;
-  color: var(--ash);
+  color: var(--ghost);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -588,7 +588,7 @@
   letter-spacing: 0.04em;
   padding: 0.3rem 0.7rem;
   background: transparent;
-  color: var(--ash);
+  color: var(--ghost);
   border: none;
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease;
@@ -620,7 +620,7 @@
 .cx__preview-cap {
   display: block;
   font-size: 0.72rem;
-  color: var(--ash);
+  color: var(--ghost);
   margin-top: 0.3rem;
 }
 
@@ -639,7 +639,7 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--ash);
+  color: var(--ghost);
   margin-bottom: 0.5rem;
 }
 
@@ -682,7 +682,7 @@
   grid-column: 2;
   font-size: 0.74rem;
   line-height: 1.45;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx__strat-desc code {
@@ -739,7 +739,7 @@
 .cx3d-hint {
   margin: 0 0 1rem;
   font-size: 0.72rem;
-  color: var(--ash);
+  color: var(--ghost);
   letter-spacing: 0.01em;
 }
 
@@ -779,7 +779,7 @@
   flex: 0 0 auto;
   background: transparent;
   border: none;
-  color: var(--ash);
+  color: var(--ghost);
   font-size: 0.9rem;
   cursor: pointer;
   padding: 0 0.2rem;
@@ -808,7 +808,7 @@
 
 .cx-detail__facts dt {
   font-size: 0.72rem;
-  color: var(--ash);
+  color: var(--ghost);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -824,14 +824,14 @@
 }
 
 .cx-detail__status--dead {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-detail__src {
   margin: 0.8rem 0 0;
   font-size: 0.7rem;
   line-height: 1.5;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .cx-detail__src code {

@@ -136,7 +136,7 @@
 }
 
 .inv__conf {
-  color: var(--ash);
+  color: var(--ghost);
   font-variant-numeric: tabular-nums;
 }
 
@@ -173,7 +173,7 @@
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ash);
+  color: var(--ghost);
   align-self: baseline;
 }
 
@@ -197,7 +197,7 @@
 }
 
 .inv__agent--unknown {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 /* --- The driving belief --------------------------------------------------- */
@@ -254,7 +254,7 @@
   margin-top: 0.5rem;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .inv__invalidated {
@@ -379,7 +379,7 @@
   margin: 0;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 /* The only warm accents in the Inspector — echoing the origin the trace just lit. */

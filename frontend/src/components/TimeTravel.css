@@ -62,7 +62,7 @@
   appearance: none;
   background: var(--surface);
   border: 0;
-  color: var(--ash);
+  color: var(--ghost);
   font-family: var(--font-mono);
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -138,7 +138,7 @@
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .tt__facts {
@@ -159,7 +159,7 @@
 .tt__frauds {
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .tt__frauds-n {
@@ -212,7 +212,7 @@
   font-family: var(--font-mono);
   font-size: 0.64rem;
   line-height: 1.4;
-  color: var(--ash);
+  color: var(--ghost);
   font-variant-numeric: tabular-nums;
 }
 
@@ -249,7 +249,7 @@
 }
 
 .tt__depo-arrow {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .tt__depo-status {
@@ -257,7 +257,7 @@
 }
 
 .tt__depo-status--absent {
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .tt__depo-badge {
@@ -275,7 +275,7 @@
   font-family: var(--font-mono);
   font-size: 0.62rem;
   line-height: 1.45;
-  color: var(--ash);
+  color: var(--ghost);
 }
 
 .tt__mono {
@@ -329,7 +329,7 @@
   font-family: var(--font-mono);
   font-size: 0.64rem;
   line-height: 1.45;
-  color: var(--ash);
+  color: var(--ghost);
   font-variant-numeric: tabular-nums;
 }
 
