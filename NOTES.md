@@ -8673,3 +8673,162 @@ and citing the rule did not find the second instance. Running the renderer did.
 ### break PREDATES this session and its commit says so — squashing would bury a real "orphaned since it
 ### was written" finding); the recorded demo video (human task, placeholder deliberately kept); ANY seed,
 ### migration, endpoint, guard, or measured constant.
+
+## THE DEFERRED 38-FACT CONTRAST PASS — AND THE INSTRUMENT CAUGHT ITS AUTHOR (2026-07-16)
+
+Rung 6 fixed the console body (679 -> 0 below AA) but bounded the fix to MEASURED facts and
+deferred "the broader `--ash`-text surface (TimeTravel / Investigation / Invalidate / Consistency /
+header nav) — a MEASURED pass, because it mixes facts with deliberate disabled/hover states that a
+blind sweep would regress". This is that pass. Frontend-only, no cluster wipe, no backend change,
+no guard RULE relaxed. **38 rules changed, 21 left, 3 deferred.**
+
+### THE INSTRUMENT — RAVEN AGAIN ABSENT, AND THE PROBE HARD-EXITED ON ITS AUTHOR
+Raven (`raven-mcp`) was NOT on PATH, NOT via npx, NOT in `.mcp.json` (only `cockroachdb-cloud`,
+which needs auth unavailable here), and `ToolSearch` found no Raven tools. Same as Rung 6; a
+contrast number from an instrument I cannot invoke is a fabrication, so it was not claimed. The
+pixel method instead: drive the mock-faithful build, read each element's real `getComputedStyle`
+color + effective background + size, compute WCAG in Node. **Probed known-bad FIRST** — it
+reproduces `--ash/--surface 3.06`, `--ghost/--surface 5.83`, `--bone/--void 12.04`,
+`--ash/--void 3.32`, `--alert/--alert-dim 4.13`, `--ghost/--surface-2 5.22`, and returns
+`aa_fail_count = 3`. Two controls prove it discriminates rather than passing everything: the `.aml`
+evidence surface and the feed body (Rungs 2/3/6) both read **0 below AA** while the unfixed header
+was flagged.
+
+**AND IT REFUSED TO RUN.** The first probe hard-exited: `*** INSTRUMENT FAILED ITS OWN PROBE ***`.
+I had asserted the kill-panel blast-radius numbers were `--alert` on `--surface-2` (4.08); the real
+background is **`--alert-dim`** (#3a1518, the deliberate alert wash) = 4.13. **A wrong causal claim
+about a primary source, caught by the instrument before it reached the fix** — and the ONLY reason
+it was caught is that the probe asserts an expected value instead of printing whatever it finds.
+The tenth-vacuous-check discipline paid off in the opposite direction from the one it was written
+for: not "the instrument reports zero while broken" but "the instrument contradicts the author".
+
+### `--ash` TEXT CANNOT PASS AA ANYWHERE IN THIS PALETTE — the fact that reshapes the problem
+`--ash` on `--void` = **3.32**, on `--surface` = 3.06, on `--surface-2` = 2.74. AA needs 4.5. Its
+BEST case, on the darkest background the design has, fails. So the ratio column is settled by the
+TOKEN — arithmetic, not rendering — and the only questions that need looking at are **fact-vs-chrome**
+and **resting-vs-quiet**. This is why the 8 unrenderable rules could be adjudicated honestly.
+
+### THE SCOPE CAME FROM THE STYLESHEET, NOT THE RENDER (Rung 2's rule, applied)
+**38 resting `color: var(--ash)` TEXT rules** across 6 files — counted from source, not inherited
+from the brief (which said "~38" and was right). The first count said 39: `.inv__tag--formed` is
+`border-left-color` and my `grep -v "border-color"` does not exclude `border-left-color`. Corrected,
+not carried. **30 of the 38 were driven and measured; 8 were verified by markup + palette
+arithmetic** — see below, and the honesty about WHICH is which travels with the fix.
+
+### EVERY ONE OF THE 38 IS A FACT. The sharpest:
+- **`.tt__depo-status--absent`** — *"not held at this time"*. The AOST deposition's ENTIRE PAYLOAD,
+  at 3.06 — while its positive twin `held · <badge>` renders readable. **Rung 2's "flag-capable was
+  ASYMMETRIC — the negative case was quietly harder to read than the positive one", verbatim, on
+  the time-travel money shot.**
+- **`.tt__depo-note`** — *"the row is immutable across MVCC"*: the two-clocks thesis.
+- **`.tt__derivation`** — *"confidence 0.92 -> 0.53 across 8 measured windows"*: the staleness derivation.
+- **`.ledger__mode--static`** — *"STATIC"*: the provenance chip the ledger exists to show.
+- **`.cx__caution`** — *"Resets fleet state"*: a destructive-action warning.
+- **`.kill-done__pre-src`** / **`.kill-done__pre-label`** — the pre-kill state's provenance and its
+  "sealed in certificate" claim.
+- **`.cx-detail__src`** — *"Real closure edge from GET /beliefs/{id}/lineage · edge N of M"*.
+
+**THE ARROW PRECEDENT WAS CHECKED, NOT ASSUMED.** Rung 2's `.aml__arrow` **IS** `aria-hidden="true"`
+and Rung 2 STILL ruled it a FACT, explicitly declining the WCAG 1.4.11 3:1 graphical-object defence
+("resting the legibility of the direction of the money on six hundredths of a ratio point.
+Declined."). So `aria-hidden` is NOT a chrome test here — the project already rejected that
+reasoning. Three members (`.tt__depo-arrow`, `.cx-sum__vs`, `.cx-detail__close`) are arguable
+connectors/glyphs; they were flagged as arguable to the approver rather than dressed as clear facts,
+and swept in under the uniform rule. **"--ash never colours text" is a rule a future session can
+check; "--ash colours text only where a past session judged it chrome" is unenforceable and rots.**
+
+### ============ THE INVERSE TRAP IS CLOSED BY CONSTRUCTION, NOT BY CARE ============
+Rung 6's warning: a blind `--ash -> --ghost` would make **disabled controls read as enabled** — the
+"chrome contained facts" trap run in reverse. The transform matched `color: var(--ash)` ONLY where
+the enclosing selector lacks `:disabled`. Untouched, still `--ash`:
+`.tt__open-btn:disabled`, `.inv__trace-btn:disabled`, `.feed__more-btn:disabled`.
+
+**AND "0 BELOW AA" COULD NOT HAVE PROVEN THIS.** None of the three appears anywhere in the 57-element
+before-list, because **a disabled state never rendered in any drive** — the measurement is
+structurally blind to the regression it would have caused. The proof is the DIFF, not the reading:
+`DecisionFeed.css` has **no diff at all** (its only `--ash` text rule is the disabled one). A
+measurement cannot prove a negative about a branch it never executed; the scoping rule can.
+
+### THE TWO SEMANTIC PAIRS THAT LOOK LIKE THE TRAP AND ARE NOT — INCLUDED, deliberately
+`.cx-detail__status--dead` (vs `--alive`: `--alive`) and `.cx-obs__state--ALL_ACTIVE` (vs `--SPLIT`:
+`--alert`, `--ALL_INVALIDATED`: `--alive`) are **colour CODES**, not disabled states. `--ghost`
+preserves the code: still cold, still blue-grey, still "dead by default" against green/red. Rung 2's
+own argument — *nothing became warm, things became readable*. A dead-holder status the reader cannot
+read is a fact lost, in service of a recession `--ghost` does not break. This was the closest call in
+the set and was flagged as such before the ruling.
+
+### THE 8 VERIFIED BY MARKUP + ARITHMETIC, NOT BY LIVE RENDER (stated, so it travels)
+`.inv__agent--unknown`, `.inv__conclusion-meta`, `.cx__hint`, `.cx-obs__state--ALL_ACTIVE`,
+`.cx-detail__close`, `.cx-detail__facts dt`, `.cx-detail__status--dead`, `.cx-detail__src`.
+**Reason: the holder-detail panel is behind an r3f canvas raycast that synthetic stream data cannot
+land on**, and `.cx__hint`'s reseed-wait branch needs a live stall. The ratio is deterministic
+(`--ash` text fails on every background); the FACT verdict was read from the real markup — a primary
+source. Rung 6's rule ("a same-class defect you have not rendered is not a fact you may assume")
+bites on the *fact* verdict, and that came from the source, not from assumption. Leaving 8 known
+failing facts because a raycast would not land would have been shipping a knowingly incomplete pass
+on its THIRD lap.
+
+The mock was extended past Rung 6's reach to render `kill-done`, the Consistency run + summary + 3D,
+and the **ABSENT deposition** (an `as_of` read returning an empty belief list — which is what the
+endpoint genuinely does at an earlier timestamp; that IS the AOST point). Those payloads are
+DERIVED-shaped-to-the-committed-types, not captured, and are flagged as such: contrast is a property
+of the CSS on rendered text and does not depend on the data being live. **30 of 38 rendered, up from
+20.**
+
+### LEFT: 21, each justified as non-text or deliberate-quiet
+- **3** `:disabled` rules (above).
+- **16** `border-color: var(--ash)` — `--ash`'s legitimate home, and Rung 2's landing ("it survives
+  as a BORDER and hover token").
+- **2** `--line` separator glyphs: `.tt__ci-sep` **1.19** and `.console__fleet-sep` **1.33** — the
+  app's two worst ratios, surfaced rather than buried. Both sit in **gapped flex rows**
+  (`gap: 0.4em` / `0.85rem`), so the separation is delivered by LAYOUT, not the glyph; both operands
+  are self-labelled ("3 alive", "24 agents", "n = 250"). Unlike the money arrow, reversing them means
+  nothing and deleting them costs the reader nothing. `--line` is the divider token used as a
+  divider. Pure decoration.
+
+### ========== DEFERRED, WITH ITS MEASURED TRUTH RECORDED: `--alert` AS TEXT ==========
+A THIRD class the 38 does not contain, found by this pass and **NOT fixed** — its own plan-gate.
+`--alert` (#e5484d) as TEXT passes on `--surface` (**4.55**) and `--void` (**4.94**) — which is
+exactly why Rung 6's non-fix defence of the `is_fraud` dot cleared it — and **FAILS** on the two
+surfaces it is actually used on:
+
+| rule | ratio | background | the fact |
+|---|---|---|---|
+| `.kill__warn b` | **4.13** | `--alert-dim` | *"2 living holders"* / *"8 inheritance edges"* — the BLAST RADIUS of the irreversible fleet-wide write |
+| `.inv__belief-status--invalidated` | **4.08** | `--surface-2` | *"invalidated"* |
+| `.inv__invalidated` | **4.08** | `--surface-2` | *"invalidated 2026-07-16"* |
+
+All three need 4.5 (text; the 3:1 non-text floor does not apply). `.kill__warn b` is 13.1px/600 —
+below WCAG's 18.66px bold large-text threshold. The asymmetric-gradient shape again: the surrounding
+`--bone` prose reads at 10.05 and the NUMBERS — the payload — are the least readable part of the
+sentence. **THE RIPPLE RISK IS WHY IT IS DEFERRED, and it is real: changing the `--alert` TOKEN
+would reach `is_fraud`'s presentation (`.feed__fraud-dot`), a guarded invariant.** A local fix is a
+colour-semantics call on the governed write — `--bone` would take the numbers to 10.05 and cost the
+danger colour; a text-safe alert token clears AA and keeps it but invents palette vocabulary
+FRONTEND.md resists. That decision earns its own session; it does not ride along in a contrast pass.
+**Do NOT "rediscover" this as broken — it is measured, recorded, and deliberately open.**
+
+### GATE — all green (2026-07-16)
+- **0 of the 38 below AA**, re-measured across 11 surfaces x {1280x800, 1280x900} x {motion,
+  reduced-motion}: 3.06 -> **5.83**, 2.74 -> **5.22**, 3.32 -> **6.32**. 0 horizontal overflow, 0
+  page errors at either height. The 6 survivors are exactly the 2 ruled-chrome `--line` separators
+  and the 4 instances of the 3 deferred `--alert` rules — nothing else.
+- `.aml` went **5 -> 1** sub-AA (the survivor is `.console__fleet-sep`), confirming the header fix
+  landed without touching the evidence surface; `.aml` itself was independently re-confirmed at 0.
+- `tsc -b` 0 · `oxlint` 0 · `vite build` 0 · `guard:composition` 0 (76 components inspected, 20
+  reaching a layer, its 4 known violations still trip) · `guard:geometry` **40/40**.
+- **COLOUR-ONLY, PROVEN BY THE DIFF: 38 insertions, 38 deletions, every `+`/`-` line exactly
+  `color: var(--ash)` -> `color: var(--ghost)`.** No element's presence, count or mount site moves;
+  `color` is paint-only and forces no reflow, which is why the geometry guard's bounding boxes are
+  unmoved. `is_fraud` byte-identical.
+- **Cluster untouched** — every drive was read-only against captured fixtures. The push is frontend
+  + docs, which skips `ci.yml` (both `frontend/**` and `*.md` in `paths-ignore`) and runs `docs-ci`
+  offline.
+
+### Explicitly NOT done (still gated): the `--alert`-as-text class (3 rules, above — its own
+### plan-gate, and the ripple into `is_fraud` is why); a CI contrast guard (Rung 3 cut it on purpose,
+### and Rung 6 restated why — "a contrast audit measures the pixels you rendered, not the states you
+### have"; this instrument is a session reading, like Raven, and its spec was deleted after); the two
+### `--line` separators (ruled chrome, justified above); the recorded demo video; any backend change,
+### endpoint, seed, migration, measured constant, or `belief_performance` for the azure belief (step 4
+### stays CUT). Do NOT push without explicit approval — held for review.
