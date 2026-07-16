@@ -8832,3 +8832,107 @@ FRONTEND.md resists. That decision earns its own session; it does not ride along
 ### `--line` separators (ruled chrome, justified above); the recorded demo video; any backend change,
 ### endpoint, seed, migration, measured constant, or `belief_performance` for the azure belief (step 4
 ### stays CUT). Do NOT push without explicit approval — held for review.
+
+## 185 WAS NEVER THE TOTAL — A RE-BUCKETED COUNT, CAUGHT IN THE INSTRUCTION THAT ORDERED IT (2026-07-16)
+
+Comment-only, both workflows. The brief said: *"docs-ci.yml's comments say '211-test cluster suite'
+(:4) and '185 cluster tests' (:57). Real is 217. Fix the comments to the real number."* **The 217 was
+right. Applying it to BOTH numbers would have shipped a false claim** — and the reason is the exact
+failure this file already has an entry for.
+
+### THE TWO NUMBERS ARE DIFFERENT QUANTITIES
+`docs-ci.yml:57` reads *"a bare `pytest` here would run all 211 tests, and with the dead-host
+DATABASE_URL the 185 cluster tests would ERROR."* **211 is the whole suite; 185 is what is LEFT once
+`@doc_guard` is deselected.** The arithmetic is exact and closes on itself both then and now:
+
+    211 total − 26 doc_guard = 185     (when the comment was written)
+    217 total − 41 doc_guard = 176     (measured this session)
+
+Verified two ways, not inherited from the brief (**Rung 5's lesson applies to a kickoff prompt as
+much as to a doc**):
+
+    $ pytest --collect-only -q | tail -1          -> 217 tests collected
+    $ pytest -m doc_guard --collect-only -q       ->  41/217 collected (176 deselected)
+    $ pytest -m "not doc_guard" --collect-only -q -> 176/217 collected (41 deselected)
+    $ DATABASE_URL=<dead host> pytest -m doc_guard -q  -> 41 passed, 176 deselected in 4.35s
+
+The last one is the corroboration that matters: the split is confirmed by an actual RUN against
+`127.0.0.1:1`, not only by collection.
+
+### WHY WRITING 217 THERE WOULD HAVE BEEN A LIE, NOT A ROUNDING ERROR
+It would assert that **all 217 tests touch the cluster**. They do not: **41 are PROVEN cluster-free**
+by `tests/test_doc_guard_marker.py`, which RUNS them in a child process against a dead host and
+fails if anything dials. So the sentence would have **denied the existence of the safety-pin that is
+the whole reason `docs-ci` is allowed to exist** — in the comment whose job is to explain why
+`-m doc_guard` is load-bearing. A comment that contradicts its own guard is worse than a stale one.
+
+### ============ THE SHAPE: A REAL NUMBER RE-BUCKETED THROUGH THE WRONG CATEGORY ============
+This is the Rung 5 finding (*"A real, measured number was re-bucketed through the wrong category,
+and the interpretation — not the number — hardened into a premise"*), and it is also the README
+pass's finding (*"THE THREE FALSE PREMISES CAME FROM THE REVIEWER"*), arriving together: **the
+re-bucketing was inside the instruction that ordered the fix.** 185 was never wrong; the
+*description* of what it counted was. Same as 447 self-loops inside "CONCLUSIVE_NO"; same as
+"chrome" containing the deciding typology. **A category is not a measurement**, and neither is an
+instruction.
+
+> **THE RULE, restated from a fifth direction: when a brief tells you to change a number, check what
+> the number COUNTS before you change what it SAYS. Two numbers in one sentence are two quantities
+> until proven otherwise, and "make them both the real number" is only meaningful if they measure
+> the same thing.**
+
+The fix is structural, not prose: `:57` now carries **"(217 total − 41 doc_guard)"** inline plus an
+explicit *"the two counts are DIFFERENT quantities … do not collapse them into one number"*. The
+split is re-derivable at the site, so the next reader cannot re-bucket it from the text alone.
+
+### THE SWEEP FOUND FOUR SITES, NOT THE TWO FLAGGED
+`grep` of BOTH workflows for every count token:
+
+| site | was | now | why |
+|---|---|---|---|
+| `docs-ci.yml:4` | 211-test cluster suite | **217** | `ci.yml` runs a bare `pytest` = 217 |
+| `docs-ci.yml:56` | all 211 tests | **217** | same quantity |
+| `docs-ci.yml:57` | the 185 cluster tests | **176** | total − doc_guard; a DIFFERENT quantity |
+| `ci.yml:50` | all 89 are deterministic | **217** | live claim, stale count |
+| `ci.yml:37` | measured 2026-07-10, 89 passed | **89, disarmed** | dated historical measurement |
+
+**The two `89`s in `ci.yml` were never flagged** and would have sat waiting to trigger a second
+workflow push — i.e. a second wipe — later.
+
+### `ci.yml:50` WAS VERIFIED BEFORE ITS COUNT WAS BUMPED
+Bumping a count makes you the author of the claim AT that count. *"NO test makes a real OpenAI call
+(all N are deterministic / OpenAI-free)"* had to be true at 217 before N could become 217:
+
+    $ grep -rnE "^\s*(from|import).*openai|embed_text\(|AsyncOpenAI" tests/
+    tests/test_corpus.py:11:  ... this hermetic test
+    tests/test_corpus.py:13:   for the real embed_text() re-embedding against the cluster.)
+
+Two docstring lines, both saying the test does NOT call it. `test_belief_embeddings.py` reads the
+committed JSON fixture; `test_aml_routes.py` actively asserts the paid path is unreachable. **True
+at 217.**
+
+### `ci.yml:37` IS LEFT AT 89 — AND DISARMED SO IT STAYS THAT WAY
+*"cut the suite from ~36 min to 2m39s locally (measured 2026-07-10, 89 passed)"* is a **dated
+historical measurement**, not a stale claim: 89 tests really did run in 2m39s that day. Writing
+"217 passed" would assert a measurement **that never happened** — the README pass's own rule (*a
+number you have not measured does not get carried forward at a new-looking value*), which is why
+that pass DROPPED its runtime figure rather than update it. Re-timing costs a full run and a wipe.
+
+**But leaving it bare was a trap, and this project's history says so:** the next session greps for
+stale counts, finds `89` beside four freshly-updated `217`s, "fixes" it, and **falsifies a real
+dated measurement in the name of consistency.** So the number is annotated in place — *"historical,
+deliberately NOT carried forward … Do NOT 'fix' the 89; to update this pair, re-time the suite"*.
+The number stays 89; what changed is that it is now un-"fixable" without reading why. **Prose
+corrections do not stick (nine restore lies proved it); an annotation AT THE SITE is the cheapest
+structural half available for a comment.**
+
+### GATE
+- Counts verified from primary source, twice (collect-only + a real offline run). **Nothing
+  inherited from the brief — including its "217", which happened to be right.**
+- **Comment-only, proven mechanically:** every `+`/`-` line in `git diff -- .github/` begins with
+  `#`. No logic, no trigger, no `paths-ignore`, no `-m doc_guard` filter, no env, no timeout.
+- The `docs-ci` meta-guards READ the real YAML and are green after the edit: **41 passed, 176
+  deselected** against `127.0.0.1:1`.
+- **This push WIPES.** `.github/workflows/**` is not in `ci.yml`'s `paths-ignore`, so the full suite
+  fires against the real cluster and `seed.seed()` empties it. Expected and unavoidable for a
+  workflow change; the restore (poll to stable -> both backfills in order -> verify with real
+  SELECTs) is planned into the push sequence, not discovered after it.
