@@ -26,6 +26,15 @@ on:
       # that ADDS this line still fires CI once, because it also edits this workflow file, which
       # matches none of these patterns (paths-ignore skips only when EVERY changed file matches).
       - '.mcp.json.example'
+      # Environment template (repo root, non-.md, no cluster surface — placeholders only, never a
+      # real secret). Committed because the OPENAI_API_KEY-must-be-PRESENT trap (app/config.py
+      # declares it with no default, so even the read-only verify_* scripts die at import without
+      # it) is undiagnosable from prose on a clean clone. Same literal exact-path entry as the line
+      # above — no wildcard — so a template-only edit routes offline instead of reseeding + WIPING
+      # the cluster. The commit that ADDS this line still fires CI once, for the same reason
+      # .mcp.json.example's did: it also edits this workflow file, which matches none of these
+      # patterns (paths-ignore skips only when EVERY changed file matches).
+      - '.env.example'
 
 # Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
 # both reseed the shared cluster and race (now a row-level write-write conflict rather than the
