@@ -20,6 +20,12 @@ on:
     paths-ignore:
       - 'frontend/**'
       - '*.md'
+      # Sanitized MCP config template (repo root, non-.md, no cluster surface). Committed so the
+      # README's MCP references resolve in a public clone; a literal exact-path entry (no wildcard)
+      # so an example-only edit routes offline instead of reseeding + WIPING the cluster. The commit
+      # that ADDS this line still fires CI once, because it also edits this workflow file, which
+      # matches none of these patterns (paths-ignore skips only when EVERY changed file matches).
+      - '.mcp.json.example'
 
 # Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
 # both reseed the shared cluster and race (now a row-level write-write conflict rather than the

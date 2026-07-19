@@ -1,0 +1,12 @@
+{
+  "_comment": "PROVISIONAL SCAFFOLDING (committed 2026-07-19). Sanitized template of the gitignored .mcp.json, committed so the README's MCP references resolve in a public clone. To use: copy to .mcp.json (which stays gitignored) and replace <YOUR_CLUSTER_ID> with your CockroachDB Cloud cluster id (Cloud console -> cluster -> Connect). The MCP endpoint authenticates via OAuth in-session; there is NO token or secret to store here. R1 (a later session) will actually exercise this MCP server and may revise this template, so treat it as honest-but-provisional until then. JSON has no comment syntax; if a strict parser rejects this file after you copy it, delete this _comment key.",
+  "mcpServers": {
+    "cockroachdb-cloud": {
+      "type": "http",
+      "url": "https://cockroachlabs.cloud/mcp",
+      "headers": {
+        "mcp-cluster-id": "<YOUR_CLUSTER_ID>"
+      }
+    }
+  }
+}
