@@ -8937,3 +8937,21 @@ structural half available for a comment.**
   fires against the real cluster and `seed.seed()` empties it. Expected and unavoidable for a
   workflow change; the restore (poll to stable -> both backfills in order -> verify with real
   SELECTs) is planned into the push sequence, not discovered after it.
+
+### THE PHANTOM `kind` COLUMN — a convenience-query false alarm, inoculated 2026-07-19
+`decisions` has **NO `kind` column, and never should** — the two-kind taxonomy is STRUCTURAL, derived
+from `aml_transaction_id`: **card = `aml_transaction_id IS NULL`, aml = `aml_transaction_id IS NOT NULL`.**
+- The **`?kind=aml|card` filter is real and works** via exactly that predicate: `routers/decisions.py`
+  declares it, `app/services/catalog.py::list_decisions` implements it as the
+  `WHERE aml_transaction_id IS [NOT] NULL` branch. It is **not** a column reference and cannot crash.
+- The **`ck_decisions_kind` CHECK is real and live** (`SHOW CREATE TABLE decisions`), enforcing the
+  taxonomy through `aml_transaction_id`/`merchant`/`confidence`/`amount_currency`/`txn_ref` — again,
+  **no `kind` column.** The constraint's NAME carries "kind"; the taxonomy needs no column of that name.
+- The README is **accurate as written** (the `/decisions` filter table: *"the two structural kinds …
+  `ck_decisions_kind` makes the taxonomy a database constraint"*). Nothing there claims a column.
+
+**DO NOT re-flag this.** `SELECT kind FROM decisions` errors with *"column kind does not exist"* BECAUSE
+THERE IS NO SUCH COLUMN BY DESIGN — that error is the **expected, correct** behavior, not a doc-vs-schema
+bug. An end-of-R4 probe ran exactly that convenience query, over-read the error, and flagged a
+non-problem; the reconciliation confirmed code + docs are both correct. Primary sources to re-verify:
+`SHOW CREATE TABLE decisions`, `catalog.list_decisions` (the `IS [NOT] NULL` branch).
