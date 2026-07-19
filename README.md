@@ -365,49 +365,117 @@ cluster, so the document and the running system cannot quietly disagree.
 
 ## Getting started
 
-**Prerequisites:** Python 3.12, Node 24 / npm 11, a CockroachDB (Cloud Serverless free tier works),
-and an OpenAI key. AWS (S3 + Lambda) and an NVIDIA/Ollama judge are optional (certificates and the
-grounding eval respectively).
+**Prerequisites:** Python 3.12, Node 24 / npm 11, a CockroachDB cluster (Cloud Serverless free
+tier works), and an OpenAI key. AWS (S3 + Lambda) is optional for running the app — see
+[Tests & evals](#tests--evals) for the one test that needs it.
 
-### Backend
+### 1 · Install
 
 ```bash
 python -m venv .venv
 .venv/Scripts/activate           # Windows;  source .venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
+```
 
-# Configure secrets (never commit .env)
-#   DATABASE_URL=cockroachdb+psycopg://USER:PASS@HOST:26257/defaultdb?sslmode=verify-full
-#   OPENAI_API_KEY=sk-...           (required for app import; only the agent/embed paths call it)
-#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION / S3_BUCKET   (optional — certificates)
-#   NVIDIA_API_KEY                  (optional — the grounding-faithfulness eval only)
+### 2 · Secrets
 
-alembic upgrade head               # apply migrations 0001–0010 to the cluster
-python -m seed.seed                # seed the genealogy (24 agents, 2 beliefs, 15 inheritance edges)
-                                   # — with their REAL embeddings; no follow-up command needed
+Copy [.env.example](.env.example) to `.env` and fill it in. `.env` is gitignored; never commit it.
+
+⚠️ **`OPENAI_API_KEY` must be PRESENT even for scripts that never call OpenAI.**
+`app/config.py` declares it with no default, so *any* module importing `app.db` — including the
+three read-only `verify_*` scripts — dies at import with a pydantic `ValidationError` if the
+variable is merely absent. It must **exist**; only the two ingest scripts need it to be **valid**.
+
+### 3 · The dataset (gitignored — it is not in the clone)
+
+The AML evidence layer is built from IBM's real HI-Small extract. Two files, both under
+`data/raw/`, both required by `scripts/ingest_aml.py`:
+
+| File | Bytes | sha256 |
+|---|---|---|
+| `data/raw/HI-Small_Trans.csv` | 475,664,283 | `b19d39f515523373f991b689c07e11e7b0b95c17a2c27a87d91584ae16c5b040` |
+| `data/raw/HI-Small_Patterns.txt` | 328,161 | `7c5029d7ff0baaf01dba98d9ac2c51c98de288bc37317f4ee5edc44eeef3cb37` |
+
+Source: **IBM Transactions for Anti Money Laundering (AML)** —
+[kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml)
+(IBM's own mirror index: [github.com/IBM/AML-Data](https://github.com/IBM/AML-Data), which also
+links an IBM Box copy). Verify with `sha256sum data/raw/HI-Small_*`.
+
+**The hashes are the arbiter, not the download link.** They pin the exact bytes every number in
+this repository was computed on — including the hold-out's 38/38. A different HI-Small copy may
+still be a legitimate file; it is simply not *this* one, and the eval's constants are asserted
+against *this* one.
+
+**You can skip this step.** The app runs without it — `alembic` + step 5's card backfill are
+enough for the genealogy, staleness curve, invalidation and console. What you lose is every
+`/aml/*` route, the AML console, and `scripts/eval_detection.py`. Step 5's AML backfill will
+refuse (exit 1) rather than half-build the world.
+
+### 4 · Schema
+
+```bash
+alembic upgrade head               # migrations 0001–0010
+```
+
+### 5 · Data — THE ORDER IS NOT FREE
+
+```bash
+# Requires step 3's dataset. Idempotent; survives reseeds (aml_* has no inbound FK).
+PYTHONPATH=. python scripts/ingest_aml.py
 
 # THESE TWO ARE ONE PROCEDURE, AND THE ORDER IS NOT FREE. `backfill_decisions` OPENS with a reseed,
 # and `seed.seed()` DELETEs every row of `decisions` — so running the card backfill SECOND would
 # destroy the AML decisions, and running it ALONE destroys them too. There is exactly one way to
 # build this world:
-python -m seed.backfill_decisions      # reseeds, then 4,000 card decisions + 8 perf windows (~4 min)
-python -m seed.backfill_aml_decisions  # APPENDS 1,500 AML decisions. Never reseeds.
-
-# It used to be THREE commands: a third re-embedded the beliefs, because the seed planted a
-# placeholder vector and the reseed re-planted it every time. That command was forgotten exactly
-# once and the honesty ledger silently became false. The seed now plants the real vectors from a
-# committed fixture, so the command is gone. A procedure with fewer steps is a procedure that lies
-# less often.
-
-# backfill_aml_decisions REFUSES to run (exit 1) if the card backfill hasn't — rather than silently
-# producing a half-populated world, which is the failure mode hardest to notice and easiest to demo
-# by accident. It CANNOT catch "stopped after command one": nothing runs to notice. That one is on
-# you, and it is why this comment exists.
-
-uvicorn app.main:app --reload      # serves on http://localhost:8000  (sets the Windows selector loop itself)
+PYTHONPATH=. python -m seed.backfill_decisions      # reseeds, then 4,000 card decisions + 8 windows (~4 min)
+PYTHONPATH=. python -m seed.backfill_aml_decisions  # APPENDS 1,500 AML decisions. Never reseeds.
 ```
 
-`GET http://localhost:8000/health` → `{"status": "ok"}`. Interactive API docs at `/docs`.
+`backfill_decisions` calls `seed.seed()` itself, so there is no separate seed step — and running
+`python -m seed.seed` *after* these would wipe both backfills.
+
+`backfill_aml_decisions` REFUSES to run (exit 1) if the card backfill hasn't — rather than silently
+producing a half-populated world, the failure mode hardest to notice and easiest to demo by
+accident. It CANNOT catch "stopped after command one": nothing runs to notice. That one is on you.
+
+*It used to be three commands; a third re-embedded the beliefs, because the seed planted a
+placeholder vector and re-planted it on every reseed. It was forgotten exactly once and the honesty
+ledger silently became false. The seed now plants the real vectors from a committed fixture. A
+procedure with fewer steps is a procedure that lies less often.*
+
+**Optional — the two RAG corpora.** No HTTP route reads either table, so an empty corpus produces
+no 500s and no degraded responses. Skip both unless you are running the agent or the evals.
+
+```bash
+PYTHONPATH=. python scripts/ingest_corpus.py        # 4 typology docs; needs ingest_aml. ~4 embed calls
+PYTHONPATH=. python scripts/ingest_regulatory.py    # 233 red flags; needs only step 4. ~233 embed calls
+```
+
+⚠️ `ingest_regulatory` skips on **any** non-zero row count, so a crash mid-load stays permanently
+partial — clear the table and re-run rather than re-running over it.
+
+### 6 · Run
+
+```bash
+PYTHONIOENCODING=utf-8 python -m scripts.serve --port 8000
+```
+
+⚠️ **On Windows, do NOT use `uvicorn app.main:app`.** uvicorn builds its event loop **before**
+importing the app and re-installs the Proactor policy, so `app/main.py`'s
+`WindowsSelectorEventLoopPolicy()` call lands too late. psycopg then raises `InterfaceError` and
+**every DB-backed route 500s while `/health` stays 200** — and a 500 carries no CORS header, so the
+browser reports *"blocked by CORS policy"* and you go hunting a CORS bug that does not exist.
+[`scripts/serve.py`](scripts/serve.py) sets the policy first and passes `loop="none"`.
+On macOS/Linux plain `uvicorn app.main:app --reload` is fine.
+
+**Verify with TWO checks, because `/health` alone proves nothing** — it touches no database:
+
+```
+GET http://localhost:8000/health   →  {"status": "ok"}     liveness only
+GET http://localhost:8000/agents   →  200 + real rows      the DB actually works
+```
+
+Interactive API docs at `/docs`.
 
 ### Frontend
 
@@ -418,13 +486,39 @@ npm run dev                        # http://localhost:5173  (VITE_API_BASE defau
 ```
 
 The backend CORS allow-list is exactly `localhost:5173` / `127.0.0.1:5173`, so the dev server must
-run on 5173.
+run on 5173. (vite silently moves to 5174 if a stale server holds 5173 — free the port.)
 
 ### Tests & evals
 
+> 🔴 **`pytest` DESTROYS the world you just built.** 24 of the 36 test files call `seed.seed()`,
+> which issues `DELETE FROM` on `decisions`, `belief_performance`, `beliefs`, `agents`,
+> `belief_inheritance` and `audit_log`. Run the suite and your console goes empty.
+>
+> **Either run the tests BEFORE step 5, or re-run both backfills after:**
+> `python -m seed.backfill_decisions` → `python -m seed.backfill_aml_decisions`.
+>
+> **`scripts/ingest_aml.py` survives** — `aml_*` is never deleted — so recovery is the two
+> backfills (~4 min), never a full rebuild or a re-download.
+
 ```bash
-pytest                                          # 217 tests against the real cluster
-PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # structural detection eval
+pytest                             # 217 tests against the real cluster — REQUIRES real S3, see below
+```
+
+**One test needs real AWS credentials:**
+`tests/test_atomic_invalidation.py::test_certificate_round_trips_from_s3_and_hash_verifies` does a
+genuine S3 `put_object` + `get_object` round-trip and asserts `certificate_status == "written"`.
+Nothing in the suite is mocked — the certificate's realness is the point. There is no `aws` marker,
+so exclude it by name:
+
+```bash
+pytest --deselect tests/test_atomic_invalidation.py::test_certificate_round_trips_from_s3_and_hash_verifies
+```
+
+The **app** degrades gracefully without AWS: `POST /beliefs/{id}/invalidate` still returns 200 with
+`certificate_status: "failed"`. Only that one test asserts the happy branch.
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py   # needs step 3's dataset
 ```
 
 ---
