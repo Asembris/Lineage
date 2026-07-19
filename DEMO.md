@@ -133,12 +133,17 @@ as stale.
 2. **Bring the stack up:**
 
    ```bash
-   PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000
+   PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -m scripts.serve --port 8000
    cd frontend && npm run dev        # http://localhost:5173  (CORS allows 5173 only)
    ```
 
-3. Confirm `GET http://localhost:8000/health` → `{"status":"ok"}` and the console loads at
-   `http://localhost:5173`.
+   ⚠️ **NOT `-m uvicorn app.main:app` on Windows.** uvicorn creates its loop before importing the
+   app and re-installs the Proactor policy, so every DB-backed route 500s while `/health` stays
+   200 — and the browser blames CORS. See `scripts/serve.py`.
+
+3. Confirm **both**: `GET http://localhost:8000/health` → `{"status":"ok"}` **and** a DB-backed
+   route — `GET http://localhost:8000/agents` → 200 with real rows. `/health` touches no database,
+   so on its own it is a false green. Then the console loads at `http://localhost:5173`.
 
 **Budget ≈ 95 seconds of narration.** The beat timings below sum to ~95s — Act 1 **40s** (beats 0–4)
 + the Bridge **10s** + Act 2 **40s** (beats 5–9) + closing **5s**. Stage directions and commands are
