@@ -9,7 +9,7 @@
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-&nbsp;![CockroachDB](https://img.shields.io/badge/CockroachDB-v25.4-6933FF?logo=cockroachlabs&logoColor=white)
+&nbsp;![CockroachDB](https://img.shields.io/badge/CockroachDB-v26.x-6933FF?logo=cockroachlabs&logoColor=white)
 &nbsp;![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
 &nbsp;![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 &nbsp;![AWS](https://img.shields.io/badge/AWS-S3%20%2B%20Lambda-232F3E?logo=amazonaws&logoColor=white)
@@ -163,7 +163,8 @@ Every capability maps to the exact module that uses it.
 | **Amazon S3** | `app/services/s3_audit.py:35,50` · `aws_client.py:74` | Real `put_object`/`get_object` for invalidation certificates, real TLS verification |
 | **AWS Lambda** | `lambda/certifier/{handler,build,deploy}.py` | Deployed `lineage-certifier` — independent AOST replay + hash re-derivation + S3 write on AWS compute |
 
-CockroachDB Cloud is **v25.4.10**, single-region `aws-eu-central-1`. An MCP Server for the cluster is
+CockroachDB Cloud Serverless is on the **v26.x** series (free tier, auto-upgraded; **v26.2.1** at
+time of writing), single-region `aws-eu-central-1`. An MCP Server for the cluster is
 configured in `.mcp.json.example` (the committed template; the live `.mcp.json` is gitignored); see the Technical Implementation note above for its honest scope.
 
 ---
@@ -419,7 +420,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py    # struct
 |---|---|
 | Language | Python 3.12 |
 | API | FastAPI (async) + Uvicorn |
-| Database | CockroachDB Cloud v25.4 (Postgres-wire), distributed vector index, `AS OF SYSTEM TIME` |
+| Database | CockroachDB Cloud Serverless, v26.x (Postgres-wire), distributed vector index, `AS OF SYSTEM TIME` |
 | DB access | SQLAlchemy 2.x async + psycopg 3 + `sqlalchemy-cockroachdb` dialect |
 | Migrations | Alembic (hand-written DDL) |
 | Agent / embeddings | OpenAI `gpt-4o-mini` + `text-embedding-3-small` |
