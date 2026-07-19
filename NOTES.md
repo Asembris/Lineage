@@ -46,7 +46,8 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
   The done-test only looks seconds back, well within GC.
 
 ### CONFIRMED via scripts/probe_crdb.py (direct psycopg connection, 2026-07-01)
-- **Cluster:** CockroachDB CCL **v25.4.10**, region `aws-eu-central-1` (Frankfurt).
+- **Cluster:** CockroachDB CCL **v26.x** (free-tier, auto-upgraded; **v26.2.1** as of 2026-07-19,
+  was v25.4.10 through Phase 1), region `aws-eu-central-1` (Frankfurt).
 - **VECTOR type:** works — `VECTOR(3)` DDL + `'[1,2,3]'` insert/select roundtrip OK.
 - **VECTOR INDEX:** `CREATE VECTOR INDEX` is **AVAILABLE on Basic tier** — Phase 2 vector
   search has no surprise. (Still deferring index creation to Phase 2.)
@@ -153,7 +154,7 @@ later sessions don't re-walk dead ends. Newest notes at the bottom of each secti
   `create_default_context()` + `load_default_certs(SERVER_AUTH)` (Windows ROOT store). CRDB is
   unaffected (port 26257, not intercepted) and keeps its own certifi handling in app/config.py.
 - Retrieval uses CRDB cosine vector search: `embedding <=> (:qvec)::VECTOR(1536)` ORDER BY,
-  over the agent's active held beliefs. Operators `<->`/`<=>`/`<#>` all work on v25.4.10.
+  over the agent's active held beliefs. Operators `<->`/`<=>`/`<#>` all work (verified on v25.4.10; still valid on the current v26.x).
 - Decision brain: gpt-4o-mini, strict json_schema response_format, temperature 0. is_fraud
   (ground truth) is stored but NEVER put in the prompt. Model returns exact driving_belief_id;
   we validate it against the retrieved candidates (no dangling refs) before persisting.
