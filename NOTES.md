@@ -8955,3 +8955,57 @@ THERE IS NO SUCH COLUMN BY DESIGN — that error is the **expected, correct** be
 bug. An end-of-R4 probe ran exactly that convenience query, over-read the error, and flagged a
 non-problem; the reconciliation confirmed code + docs are both correct. Primary sources to re-verify:
 `SHOW CREATE TABLE decisions`, `catalog.list_decisions` (the `IS [NOT] NULL` branch).
+
+### ⛔ NOTES:2717's "do NOT upgrade MCP to a usage claim" is SUPERSEDED — MCP WAS exercised, 2026-07-19
+**THIS ENTRY OVERRIDES THE STANDING INSTRUCTION ABOVE. DO NOT REVERT THE UPGRADE IT AUTHORIZES.**
+
+The earlier entry **THE MCP-SERVER / ccloud-CLI HONESTY CALL** (~NOTES:2709–2719) ends with:
+*"Do NOT let a later edit upgrade this to a usage claim — it would be disprovable in one question."*
+That instruction was **correct when written** and is **now factually false**. It was written when
+`grep mcp` over every `.py` returned zero hits and no MCP tool had ever been invoked. On
+**2026-07-19** the CockroachDB Cloud **Managed MCP Server** was genuinely exercised, and the upgrade
+is therefore **legitimate, not drift**.
+
+**What was actually done** (evidence: **[MCP_SESSION.md](MCP_SESSION.md)**, repo root, verbatim tool
+calls + responses, sanitized to `<YOUR_CLUSTER_ID>`):
+- Three read-only tools invoked OAuth-gated against the live cluster: **`select_query`**,
+  **`get_table_schema`**, **`explain_query`**. The three write tools the server exposes
+  (`insert_rows`, `create_table`, `create_database`) were **deliberately never called**.
+- `select_query` read belief `898ad0e5-b4f8-5863-abe3-4145c9b5af68`'s inheritance closure:
+  **9 agents (crimson, gen 0→7, fork at gen 5) · 8 closure edges, all 8 open · 2 living holders**
+  (`cd75b330…` gen 5, `3fb55cf8…` gen 7). **8 and 9 are not in conflict — they are the edge count
+  and the node count of the same closure: 8 `belief_inheritance` edges + the origin agent
+  (`108cf7f4…`, gen 0, which inherited from nobody) = 9 agents holding the belief.** Every doc
+  surface states them together with that reconciliation inline, so neither number can be read as
+  contradicting the other.
+- **Cross-checked against the system's own `GET /beliefs/{id}/lineage`: AGREE, exactly** — same 9
+  agent ids, same origin, same 2 alive, same `active` status. Two independent paths (Managed MCP
+  Server straight at the cluster vs. the app's SQLAlchemy recursive CTE), no drift.
+- `get_table_schema` was run **before** the reads, so column names were verified against the live
+  cluster rather than guessed. `explain_query` returned the real plan.
+
+**The upgrade this authorizes** (all three now say the same thing, and all three are TRUE):
+README "Technical Implementation" limitation cell · README **Sponsor-technology usage** table (new
+MCP row + the two-tool framing) · README honesty-ledger row `MCP Server / ccloud CLI` ·
+`frontend/src/components/HonestyLedger.tsx` (mirrors the README row, per its own docstring).
+Label moved from **"configured, not exercised"** → **"MCP exercised (read-only) · ccloud still unused"**.
+
+**THE CEILING — do not let a future edit push past it.** The evidence backs *exercised*, and stops
+there. Three claims remain **unbacked and must NOT be written**:
+1. **NO audit trail.** Every MCP response was a bare `{"rows":[…]}` payload — no identity, session,
+   principal, or request-id envelope reached the client. The server *is* OAuth-gated and Cockroach
+   Labs logs server-side, but **none of it was echoed back**, so `MCP_SESSION.md` §6 records the
+   absence explicitly. **"audit-logged MCP session" is an OVERCLAIM.** The accurate phrase is
+   **"OAuth-gated, read-only."**
+2. **NO runtime dependency.** Nothing in `app/` calls MCP; `grep mcp` over `.py` still returns zero
+   hits, and that is *correct*, not a gap. Write it as *"a read **of** the memory system via the
+   Managed MCP Server"* — never *"the agent's memory runs through MCP."*
+3. **It did not do the engineering.** Cluster-capability verification is still the direct psycopg
+   probes (`scripts/probe_crdb.py` et al.). The MCP read **corroborates** those findings; it does
+   not replace them, and the earlier entry's account of that history stays accurate.
+
+**ccloud CLI: still genuinely unused.** That half of the old entry is NOT superseded — leave it.
+
+**If a future session re-flags this as an overclaim:** read `MCP_SESSION.md` first. The reads are
+reproducible — re-run `select_query` with READ B's SQL and compare to `/beliefs/{id}/lineage`. A
+mismatch would be a real finding (cluster drift); agreement means the claim stands as written.

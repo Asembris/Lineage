@@ -12,7 +12,7 @@
  *    decisions/belief_performance populated-or-empty; the top-line provenance-audit
  *    verdict), so the ledger can't silently go stale when someone runs a backfill.
  *  - STATIC rows are permanent methodological facts (the GEval rubric is in-sample;
- *    MCP configured-not-exercised; …) that no endpoint can or should "answer".
+ *    the ccloud CLI is unused; …) that no endpoint can or should "answer".
  *
  * No new backend: it reuses GET /agents, /beliefs (already loaded by the console) plus
  * two existing reads for the one belief — GET /beliefs/{id}/performance and the
@@ -219,12 +219,31 @@ const ROWS: RowSpec[] = [
   },
   {
     item: "MCP Server / ccloud CLI",
-    label: "configured, not exercised",
+    label: "MCP exercised (read-only) · ccloud still unused",
     mode: "static",
     note: (
       <>
-        MCP Server declared in <code>.mcp.json</code>; verification done via direct SQL
-        probes; ccloud CLI not used.
+        This row read <em>"configured, not exercised"</em> until 2026-07-19, and that was
+        true when written. It is no longer: the CockroachDB Cloud <strong>Managed MCP
+        Server</strong> has since been genuinely exercised — <code>select_query</code>,{" "}
+        <code>get_table_schema</code> and <code>explain_query</code> invoked OAuth-gated
+        against the live cluster, reading belief <code>898ad0e5…</code>'s inheritance
+        closure (<strong>9 agents · 8 inheritance edges · 2 living holders</strong> — 8 edges
+        plus the origin node = 9 agents, node count and edge count of one closure) — a
+        result that{" "}
+        <strong>agrees exactly</strong> with this system's own <code>/lineage</code>{" "}
+        endpoint. Two independent paths, same memory state, no drift. Verbatim calls and
+        responses: <code>MCP_SESSION.md</code>. Three things are still <strong>not</strong>{" "}
+        claimed, because the transcript cannot back them. <strong>(1) No audit trail</strong>{" "}
+        — the responses were bare <code>{"{rows: […]}"}</code> payloads with no identity,
+        session or request-id envelope, so "OAuth-gated, read-only" is the accurate framing
+        and "audit-logged session" would be an overclaim. <strong>(2) No runtime
+        dependency</strong> — no write tool was invoked, none is reachable from any code
+        path, and the fleet does not run on MCP; this is a read <em>of</em> the memory
+        system, not a component <em>of</em> it. <strong>(3) It did not do the
+        engineering</strong> — cluster-capability verification was done with direct SQL
+        probes (<code>scripts/probe_crdb.py</code>); the MCP read corroborates those
+        findings rather than replacing them. ccloud CLI: still not used at all.
       </>
     ),
   },
