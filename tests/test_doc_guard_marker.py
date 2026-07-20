@@ -60,6 +60,7 @@ _REQUIRED = (
     "test_restore_instructions.py",
     "test_frontend_typecheck.py",
     "test_env_template.py",   # .env.example documents every no-default Settings field
+    "test_doc_anchors.py",    # no [text](#anchor) in the judge-facing docs is dead
     "test_no_surface_describes_conclusive_no_as_463_searches",  # the gloss guard
     "test_frontend_ci_actually_invokes_the_guard",              # composition meta-guard
     "test_frontend_ci_actually_invokes_the_geometry_guard",     # geometry meta-guard
