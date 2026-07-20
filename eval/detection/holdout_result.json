@@ -1,0 +1,497 @@
+{
+  "flag_capable": [
+    "CYCLE",
+    "SCATTER-GATHER"
+  ],
+  "manifest": {
+    "data/raw/HI-Small_Patterns.txt": {
+      "bytes": 328161,
+      "sha256": "7c5029d7ff0baaf01dba98d9ac2c51c98de288bc37317f4ee5edc44eeef3cb37"
+    },
+    "data/raw/HI-Small_Trans.csv": {
+      "bytes": 475664283,
+      "sha256": "b19d39f515523373f991b689c07e11e7b0b95c17a2c27a87d91584ae16c5b040"
+    },
+    "scripts/eval_detection.py": {
+      "bytes": 31864,
+      "git_blob_sha1": "6bf56ab20df306ea27f0cc380f971eeb6e2e14dd",
+      "sha256": "5937da1ebeafd00a15f5561a50f79283c252d85aff7051f236d24bcedce2cc7e"
+    }
+  },
+  "schema_version": "1.0",
+  "sets": {
+    "dev": {
+      "accounts": 648,
+      "benign": 1200,
+      "edges": 1500,
+      "format_crosstab": {
+        "ACH": {
+          "neg": 220,
+          "pos": 139
+        },
+        "Cash": {
+          "neg": 82,
+          "pos": 0
+        },
+        "Cheque": {
+          "neg": 313,
+          "pos": 0
+        },
+        "Credit Card": {
+          "neg": 222,
+          "pos": 0
+        },
+        "Reinvestment": {
+          "neg": 332,
+          "pos": 0
+        },
+        "Wire": {
+          "neg": 31,
+          "pos": 0
+        }
+      },
+      "head_to_head": {
+        "fn": 57,
+        "fp": 17,
+        "logreg_p_r_f1": [
+          0.6235294117647059,
+          0.762589928057554,
+          0.686084142394822
+        ],
+        "n_neg": 1200,
+        "n_pos": 139,
+        "single_rule_name": "payment_format",
+        "single_rule_p_r_f1": [
+          0.3871866295264624,
+          1.0,
+          0.5582329317269077
+        ],
+        "tp": 82
+      },
+      "instances": {
+        "CYCLE": [
+          1,
+          6,
+          18,
+          37,
+          62
+        ],
+        "GATHER-SCATTER": [
+          2,
+          4,
+          15,
+          28,
+          30
+        ],
+        "SCATTER-GATHER": [
+          17,
+          45,
+          54,
+          63,
+          66
+        ],
+        "STACK": [
+          3,
+          32,
+          33,
+          56,
+          95
+        ]
+      },
+      "label": "DEVELOPMENT (in-sample \u2014 design decisions saw this)",
+      "labeled": 300,
+      "measured_sound": [
+        "CYCLE",
+        "SCATTER-GATHER"
+      ],
+      "per_instance": {
+        "CYCLE": [
+          [
+            1,
+            10,
+            10
+          ],
+          [
+            6,
+            10,
+            10
+          ],
+          [
+            18,
+            10,
+            10
+          ],
+          [
+            37,
+            7,
+            7
+          ],
+          [
+            62,
+            6,
+            6
+          ]
+        ],
+        "GATHER-SCATTER": [
+          [
+            2,
+            5,
+            0
+          ],
+          [
+            4,
+            17,
+            17
+          ],
+          [
+            15,
+            8,
+            0
+          ],
+          [
+            28,
+            25,
+            25
+          ],
+          [
+            30,
+            22,
+            22
+          ]
+        ],
+        "SCATTER-GATHER": [
+          [
+            17,
+            32,
+            7
+          ],
+          [
+            45,
+            14,
+            7
+          ],
+          [
+            54,
+            6,
+            3
+          ],
+          [
+            63,
+            30,
+            15
+          ],
+          [
+            66,
+            14,
+            7
+          ]
+        ],
+        "STACK": [
+          [
+            3,
+            22,
+            1
+          ],
+          [
+            32,
+            20,
+            5
+          ],
+          [
+            33,
+            22,
+            0
+          ],
+          [
+            56,
+            12,
+            0
+          ],
+          [
+            95,
+            8,
+            0
+          ]
+        ]
+      },
+      "typologies": {
+        "CYCLE": {
+          "benign": 14,
+          "benign_total": 1200,
+          "cross": 0,
+          "cross_total": 257,
+          "own": 43,
+          "own_total": 43
+        },
+        "GATHER-SCATTER": {
+          "benign": 37,
+          "benign_total": 1200,
+          "cross": 6,
+          "cross_total": 223,
+          "own": 64,
+          "own_total": 77
+        },
+        "SCATTER-GATHER": {
+          "benign": 3,
+          "benign_total": 1200,
+          "cross": 0,
+          "cross_total": 204,
+          "own": 39,
+          "own_total": 96
+        },
+        "STACK": {
+          "benign": 2,
+          "benign_total": 1200,
+          "cross": 27,
+          "cross_total": 216,
+          "own": 6,
+          "own_total": 84
+        }
+      }
+    },
+    "hold_out": {
+      "accounts": 806,
+      "benign": 1328,
+      "edges": 1660,
+      "format_crosstab": {
+        "ACH": {
+          "neg": 122,
+          "pos": 124
+        },
+        "Cash": {
+          "neg": 97,
+          "pos": 0
+        },
+        "Cheque": {
+          "neg": 424,
+          "pos": 0
+        },
+        "Credit Card": {
+          "neg": 260,
+          "pos": 0
+        },
+        "Reinvestment": {
+          "neg": 387,
+          "pos": 0
+        },
+        "Wire": {
+          "neg": 38,
+          "pos": 0
+        }
+      },
+      "head_to_head": {
+        "fn": 43,
+        "fp": 5,
+        "logreg_p_r_f1": [
+          0.7692307692307693,
+          0.8064516129032258,
+          0.7874015748031495
+        ],
+        "n_neg": 1328,
+        "n_pos": 124,
+        "single_rule_name": "payment_format",
+        "single_rule_p_r_f1": [
+          0.5040650406504065,
+          1.0,
+          0.6702702702702703
+        ],
+        "tp": 81
+      },
+      "instances": {
+        "CYCLE": [
+          71,
+          74,
+          128,
+          130,
+          137
+        ],
+        "GATHER-SCATTER": [
+          46,
+          48,
+          76,
+          79,
+          81
+        ],
+        "SCATTER-GATHER": [
+          72,
+          83,
+          108,
+          124,
+          127
+        ],
+        "STACK": [
+          141,
+          145,
+          148,
+          175,
+          190
+        ]
+      },
+      "label": "HOLD-OUT (account-disjoint from the development set)",
+      "labeled": 332,
+      "measured_sound": [
+        "CYCLE",
+        "SCATTER-GATHER"
+      ],
+      "per_instance": {
+        "CYCLE": [
+          [
+            71,
+            4,
+            4
+          ],
+          [
+            74,
+            5,
+            5
+          ],
+          [
+            128,
+            7,
+            7
+          ],
+          [
+            130,
+            11,
+            11
+          ],
+          [
+            137,
+            11,
+            11
+          ]
+        ],
+        "GATHER-SCATTER": [
+          [
+            46,
+            26,
+            26
+          ],
+          [
+            48,
+            28,
+            0
+          ],
+          [
+            76,
+            13,
+            0
+          ],
+          [
+            79,
+            24,
+            24
+          ],
+          [
+            81,
+            19,
+            19
+          ]
+        ],
+        "SCATTER-GATHER": [
+          [
+            72,
+            12,
+            6
+          ],
+          [
+            83,
+            18,
+            9
+          ],
+          [
+            108,
+            6,
+            3
+          ],
+          [
+            124,
+            26,
+            13
+          ],
+          [
+            127,
+            24,
+            12
+          ]
+        ],
+        "STACK": [
+          [
+            141,
+            28,
+            3
+          ],
+          [
+            145,
+            16,
+            1
+          ],
+          [
+            148,
+            14,
+            2
+          ],
+          [
+            175,
+            26,
+            1
+          ],
+          [
+            190,
+            14,
+            0
+          ]
+        ]
+      },
+      "typologies": {
+        "CYCLE": {
+          "benign": 0,
+          "benign_total": 1328,
+          "cross": 0,
+          "cross_total": 294,
+          "own": 38,
+          "own_total": 38
+        },
+        "GATHER-SCATTER": {
+          "benign": 18,
+          "benign_total": 1328,
+          "cross": 2,
+          "cross_total": 222,
+          "own": 69,
+          "own_total": 110
+        },
+        "SCATTER-GATHER": {
+          "benign": 5,
+          "benign_total": 1328,
+          "cross": 0,
+          "cross_total": 246,
+          "own": 43,
+          "own_total": 86
+        },
+        "STACK": {
+          "benign": 0,
+          "benign_total": 1328,
+          "cross": 24,
+          "cross_total": 234,
+          "own": 7,
+          "own_total": 98
+        }
+      }
+    }
+  },
+  "split": {
+    "benign_edge_overlap": 0,
+    "graph_account_overlap": 9,
+    "graph_account_overlap_note": "Shared BENIGN COUNTERPARTY accounts, not ring accounts \u2014 a noise edge with one end on a dev account and the other on a hold-out account is eligible for both extracts. No transaction is shared (see the two edge overlaps above).",
+    "instance_account_overlap": 0,
+    "labeled_edge_overlap": 0,
+    "mechanism": "select_disjoint(blocks, PER_TYPOLOGY, reserved=<dev instance accounts>) \u2014 greedy, HI-Small_Patterns.txt file order, >=4 accounts, 5 per typology, skipping every block touching an account used by a development-set instance. Re-asserted on every run in scripts/eval_detection.py:main(), by the assertion 'hold-out instance overlaps the dev set \u2014 not a hold-out'. (Named, not line-numbered: a line number in a rarely-regenerated artifact is a citation that rots on the next edit.)"
+  },
+  "typology_order": [
+    "CYCLE",
+    "SCATTER-GATHER",
+    "GATHER-SCATTER",
+    "STACK"
+  ],
+  "what_this_is": "Frozen structural-witness detection result on IBM HI-Small. RAW COUNTS ONLY: every rate and Wilson bound is recomputed from these integers by scripts/verify_holdout.py, which needs no dataset. Produced by scripts/eval_detection.py --emit-json."
+}
