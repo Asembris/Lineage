@@ -5,7 +5,7 @@
 **Belief-inheritance forensics for AI fraud-detection fleets, on CockroachDB.**
 
 [![CI](https://github.com/Asembris/Lineage/actions/workflows/ci.yml/badge.svg)](https://github.com/Asembris/Lineage/actions/workflows/ci.yml)
-&nbsp;![tests](https://img.shields.io/badge/tests-217%20passing-brightgreen)
+&nbsp;![tests](https://img.shields.io/badge/tests-237%20passing-brightgreen)
 &nbsp;![license](https://img.shields.io/badge/license-MIT-blue)
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
@@ -288,7 +288,8 @@ The **hold-out is account-disjoint from every design decision**; the development
 labeled as such. Every count below is committed in
 [eval/detection/holdout_result.json](eval/detection/holdout_result.json) and re-derivable offline
 with `python scripts/verify_holdout.py` — see [the headline number](#the-headline-number-verifiable-from-this-clone-alone)
-for what that does and does not prove. The full honest picture — including SCATTER-GATHER's weaker, disclosed recall:
+for what that does and does not prove. The full honest picture — including SCATTER-GATHER's weaker,
+disclosed recall:
 
 | Typology | Dev recall | Dev precision | Hold-out recall | Hold-out precision |
 |---|---|---|---|---|
@@ -545,7 +546,7 @@ run on 5173. (vite silently moves to 5174 if a stale server holds 5173 — free 
 > backfills (~4 min), never a full rebuild or a re-download.
 
 ```bash
-pytest                             # 217 tests against the real cluster — REQUIRES real S3, see below
+pytest                             # 237 tests against the real cluster — REQUIRES real S3, see below
 ```
 
 **One test needs real AWS credentials:**
@@ -580,7 +581,7 @@ PYTHONIOENCODING=utf-8 PYTHONPATH=. python scripts/eval_detection.py   # needs s
 | AWS | S3 (certificates) + Lambda (certifier) |
 | Eval judge | NVIDIA NIM (nemotron) / Ollama (gemma) via DeepEval — never OpenAI |
 | Frontend | React 19 + Vite + TypeScript, framer-motion, react-three-fiber, oxlint |
-| Tests | pytest (217, live-cluster) |
+| Tests | pytest (237, live-cluster) |
 
 ---
 
@@ -621,7 +622,7 @@ CockroachDB/
 │                            probe_vector_opclass.py — the measurement behind migration 0010
 ├── lambda/certifier/        handler · build · deploy — the independent AOST-replay certifier
 ├── eval/grounding/          32-tuple golden set + 8 authored adversarial negatives
-├── tests/                   35 files, 217 tests (all live-cluster) — incl. test_oracle_boundary
+├── tests/                   38 files, 237 tests (all live-cluster) — incl. test_oracle_boundary
 │                            (the AST tripwire) and test_citations (no fabricated provenance)
 ├── frontend/                React 19 + Vite console — three views:
 │                            console (tree · feed · inspector) · consistency demo (2D + 3D)
