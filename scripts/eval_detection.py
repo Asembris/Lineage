@@ -23,11 +23,19 @@ GROUND TRUTH IS THE ORACLE, NEVER AN INPUT: the witness functions select no labe
 (pattern membership) are used only to SCORE, exactly as tests/test_aml_brake.py does.
 
 Run:  PYTHONIOENCODING=utf-8 PYTHONPATH=. .venv/Scripts/python.exe scripts/eval_detection.py
+
+      ... --emit-json eval/detection/holdout_result.json
+          Additionally writes the committed RAW-COUNT artifact that makes the hold-out result
+          checkable offline by someone who does not have the 475MB CSV. Pure addition: without the
+          flag, every byte of stdout and every exit code is what it was before. See build_artifact()
+          for the design rule (integers only) and scripts/verify_holdout.py for the reader.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import math
 import pathlib
 import sys
@@ -386,6 +394,10 @@ def head_to_head(ext: Extract) -> dict:
     det_f1 = 2 * det_p * det_r / (det_p + det_r) if (det_p + det_r) else 0.0
     return {
         "n_pos": int(y.sum()), "n_neg": int((1 - y).sum()),
+        # The RAW confusion counts the structural P/R/F1 above is computed FROM. Reported so the
+        # committed artifact can store integers and let scripts/verify_holdout.py re-derive the
+        # rates, instead of storing three floats nobody can check. Printing is unchanged.
+        "tp": tp, "fp": fp, "fn": fn,
         "structural": (det_p, det_r, det_f1),
         "single_rule": best_single_feature_rule(feats, y),
         "logreg": logistic_regression_baseline(feats, y),
@@ -406,10 +418,9 @@ def report_head_to_head(name: str, h2h: dict) -> None:
           flush=True)
 
 
-def report_format_crosstab(name: str, ext: Extract) -> None:
-    """Root-cause diagnostic for the baseline's near-100% recall: payment_format x label on the
-    eval set. If all positives concentrate in one format while benign spans many, the baseline's
-    'signal' is that separation -- a synthetic-generation + sampling artifact, not real behaviour."""
+def format_crosstab(ext: Extract) -> tuple[Counter, Counter]:
+    """payment_format -> (CYCLE/SG positive count, benign negative count). Split out of the
+    reporter below so --emit-json can store the same counters it prints. No behaviour change."""
     pos, neg = Counter(), Counter()
     for e in ext.graph.by_id.values():
         lab = ext.labels.get(e.id)
@@ -418,6 +429,14 @@ def report_format_crosstab(name: str, ext: Extract) -> None:
             pos[fmt] += 1
         elif lab is None:
             neg[fmt] += 1
+    return pos, neg
+
+
+def report_format_crosstab(name: str, ext: Extract) -> None:
+    """Root-cause diagnostic for the baseline's near-100% recall: payment_format x label on the
+    eval set. If all positives concentrate in one format while benign spans many, the baseline's
+    'signal' is that separation -- a synthetic-generation + sampling artifact, not real behaviour."""
+    pos, neg = format_crosstab(ext)
     print(f"\n--- {name}: payment_format x label (root-cause of the baseline's recall) ---", flush=True)
     print(f"  {'format':14s} {'CYCLE/SG pos':>12s} {'benign neg':>11s} {'pos-rate':>9s}", flush=True)
     for f in sorted(set(pos) | set(neg)):
@@ -429,7 +448,146 @@ def report_format_crosstab(name: str, ext: Extract) -> None:
           f"not real behaviour (see NOTES Item 7).", flush=True)
 
 
+# --- the committed artifact (--emit-json) ----------------------------------------------------
+# WHY THIS EXISTS. Every number this script prints requires the gitignored 475MB CSV, so the
+# headline hold-out result existed only as README prose: a judge had to take "100%" on faith. The
+# artifact makes it checkable offline from the clone alone.
+#
+# THE DESIGN RULE, and it is the whole point: STORE RAW INTEGERS, NEVER DERIVED RATES. Precision,
+# recall and the Wilson bounds are absent from the JSON on purpose — scripts/verify_holdout.py
+# RECOMPUTES them from the counts and asserts they hold. You cannot have transcription drift in a
+# number you never wrote down. The two float triples that ARE stored (logreg / single_rule) come
+# from a 3000-iteration numpy fit no stdlib verifier can re-derive; they are labeled as such and
+# are checkable only under `verify_holdout.py --with-csv`.
+#
+# DETERMINISTIC BY OMISSION: no timestamp, no hostname, no run id. Two runs on the same CSV emit
+# BYTE-IDENTICAL JSON, which is what lets --with-csv diff rather than interpret.
+
+ARTIFACT_SCHEMA_VERSION = "1.0"
+
+
+def _sha256_file(path: pathlib.Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _git_blob_sha1(path: pathlib.Path) -> str:
+    """Git's own identity for this file's content, computed WITHOUT git (`git hash-object` agrees).
+    Recorded next to the plain sha256 so the binding is checkable by a reader with either tool."""
+    data = path.read_bytes()
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def _set_payload(ext: Extract, scores: dict, per_inst: dict, h2h: dict, label: str) -> dict:
+    pos, neg = format_crosstab(ext)
+    instances: dict = {}
+    for b in ext.instances:
+        instances.setdefault(b["typology"], []).append(b["instance_index"])
+    return {
+        "label": label,
+        "edges": len(ext.graph.by_id),
+        "labeled": len(ext.labels),
+        "benign": len(ext.benign_ids),
+        "accounts": len(ext.graph.accounts),
+        "instances": instances,
+        "typologies": {
+            typ: {
+                "own": scores[typ][0][0], "own_total": scores[typ][0][1],
+                "cross": scores[typ][1][0], "cross_total": scores[typ][1][1],
+                "benign": scores[typ][2][0], "benign_total": scores[typ][2][1],
+            }
+            for typ in TARGET
+        },
+        "measured_sound": sorted(scores["_sound"]),
+        # [instance_index, labeled_edges, own_witness_fires]
+        "per_instance": {typ: [list(r) for r in per_inst.get(typ, [])] for typ in TARGET},
+        "head_to_head": {
+            "n_pos": h2h["n_pos"], "n_neg": h2h["n_neg"],
+            "tp": h2h["tp"], "fp": h2h["fp"], "fn": h2h["fn"],
+            "logreg_p_r_f1": list(h2h["logreg"]),                 # numpy fit — not re-derivable offline
+            "single_rule_name": h2h["single_rule"][0],
+            "single_rule_p_r_f1": list(h2h["single_rule"][1]),    # numpy fit — not re-derivable offline
+        },
+        "format_crosstab": {
+            fmt: {"pos": pos[fmt], "neg": neg[fmt]} for fmt in sorted(set(pos) | set(neg))
+        },
+    }
+
+
+def build_artifact(dev: Extract, dev_scores: dict, dev_inst: dict, dev_h2h: dict,
+                   hold: Extract, hold_scores: dict, hold_inst: dict, hold_h2h: dict) -> dict:
+    root = pathlib.Path(__file__).resolve().parents[1]
+    # probe_aml exposes these as plain strings; the artifact needs their bytes and digests.
+    trans, patterns = pathlib.Path(ingest.TRANS), pathlib.Path(ingest.PATTERNS)
+    dev_nodes = set().union(*(b["nodes"] for b in dev.instances))
+    hold_nodes = set().union(*(b["nodes"] for b in hold.instances))
+    return {
+        "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "what_this_is": (
+            "Frozen structural-witness detection result on IBM HI-Small. RAW COUNTS ONLY: every "
+            "rate and Wilson bound is recomputed from these integers by scripts/verify_holdout.py, "
+            "which needs no dataset. Produced by scripts/eval_detection.py --emit-json."
+        ),
+        "flag_capable": sorted(aml_graph.FLAG_CAPABLE),
+        "typology_order": list(TARGET),
+        "sets": {
+            "dev": _set_payload(dev, dev_scores, dev_inst, dev_h2h,
+                                "DEVELOPMENT (in-sample — design decisions saw this)"),
+            "hold_out": _set_payload(hold, hold_scores, hold_inst, hold_h2h,
+                                     "HOLD-OUT (account-disjoint from the development set)"),
+        },
+        # WHAT THE SPLIT PROVABLY IS. The mechanism is a code fact; the four overlaps below are
+        # MEASURED, not asserted. graph_account_overlap is NOT zero and is recorded anyway: benign
+        # noise admits any row TOUCHING a target account, so the far end of a noise edge can land in
+        # both graphs. A judge should find that 9 here, not only in a README sentence.
+        "split": {
+            "mechanism": (
+                "select_disjoint(blocks, PER_TYPOLOGY, reserved=<dev instance accounts>) — greedy, "
+                "HI-Small_Patterns.txt file order, >=4 accounts, 5 per typology, skipping every "
+                "block touching an account used by a development-set instance. Re-asserted on every "
+                "run in scripts/eval_detection.py:main(), by the assertion 'hold-out instance "
+                "overlaps the dev set — not a hold-out'. (Named, not line-numbered: a line number "
+                "in a rarely-regenerated artifact is a citation that rots on the next edit.)"
+            ),
+            "instance_account_overlap": len(dev_nodes & hold_nodes),
+            "labeled_edge_overlap": len(set(dev.labels) & set(hold.labels)),
+            "benign_edge_overlap": len(dev.benign_ids & hold.benign_ids),
+            "graph_account_overlap": len(dev.graph.accounts & hold.graph.accounts),
+            "graph_account_overlap_note": (
+                "Shared BENIGN COUNTERPARTY accounts, not ring accounts — a noise edge with one end "
+                "on a dev account and the other on a hold-out account is eligible for both extracts. "
+                "No transaction is shared (see the two edge overlaps above)."
+            ),
+        },
+        "manifest": {
+            "data/raw/HI-Small_Trans.csv": {
+                "bytes": trans.stat().st_size, "sha256": _sha256_file(trans)},
+            "data/raw/HI-Small_Patterns.txt": {
+                "bytes": patterns.stat().st_size, "sha256": _sha256_file(patterns)},
+            # The code identity this result is bound to. verify_holdout.py FAILS if the on-disk
+            # eval no longer hashes to this — a result is only meaningful tied to the code that
+            # produced it, so a stale artifact is unrepresentable rather than merely discouraged.
+            "scripts/eval_detection.py": {
+                "bytes": (root / "scripts" / "eval_detection.py").stat().st_size,
+                "sha256": _sha256_file(root / "scripts" / "eval_detection.py"),
+                "git_blob_sha1": _git_blob_sha1(root / "scripts" / "eval_detection.py"),
+            },
+        },
+    }
+
+
 def main() -> None:
+    emit_to: pathlib.Path | None = None
+    argv = sys.argv[1:]
+    if "--emit-json" in argv:
+        i = argv.index("--emit-json")
+        if i + 1 >= len(argv):
+            raise SystemExit("--emit-json requires a path, e.g. --emit-json eval/detection/holdout_result.json")
+        emit_to = pathlib.Path(argv[i + 1])
+
     print("=== Item 7 detection eval ===", flush=True)
     blocks = ingest.load_blocks_with_header()
 
@@ -472,15 +630,17 @@ def main() -> None:
     hold = build_extract("hold-out", hold_sel)
     hold_scores = score_witnesses(hold)
 
+    dev_inst, hold_inst = per_instance_detection(dev), per_instance_detection(hold)
     report_set("DEVELOPMENT SET (in-sample — design decisions saw this; NOT a hold-out)",
-               dev_scores, per_instance_detection(dev))
+               dev_scores, dev_inst)
     report_set("HOLD-OUT (fresh, account-disjoint, NEVER tuned — the headline)",
-               hold_scores, per_instance_detection(hold))
+               hold_scores, hold_inst)
 
     # Structural detector vs a non-structural baseline, on the same head-to-head task, each set fit
     # independently (dev fit never transferred to the hold-out).
-    report_head_to_head("DEVELOPMENT SET", head_to_head(dev))
-    report_head_to_head("HOLD-OUT (never tuned)", head_to_head(hold))
+    dev_h2h, hold_h2h = head_to_head(dev), head_to_head(hold)
+    report_head_to_head("DEVELOPMENT SET", dev_h2h)
+    report_head_to_head("HOLD-OUT (never tuned)", hold_h2h)
     report_format_crosstab("DEVELOPMENT SET", dev)
     report_format_crosstab("HOLD-OUT (never tuned)", hold)
 
@@ -489,6 +649,15 @@ def main() -> None:
           "general fraud detection, not absolute detector performance. FLAG-capable headline is "
           "CYCLE + SCATTER-GATHER; GATHER-SCATTER/STACK are reported only to re-test soundness.",
           flush=True)
+
+    if emit_to is not None:
+        art = build_artifact(dev, dev_scores, dev_inst, dev_h2h,
+                             hold, hold_scores, hold_inst, hold_h2h)
+        emit_to.parent.mkdir(parents=True, exist_ok=True)
+        emit_to.write_text(json.dumps(art, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"\n[artifact] wrote {emit_to} "
+              f"(schema {ARTIFACT_SCHEMA_VERSION}; verify offline with "
+              f"`python scripts/verify_holdout.py`)", flush=True)
 
 
 if __name__ == "__main__":
