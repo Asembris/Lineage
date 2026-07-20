@@ -1,7 +1,7 @@
 """THE SAFETY-PIN for the CI split — the only thing standing between a docs commit and a cluster wipe.
 
 `docs-ci.yml` runs `pytest -m doc_guard` on every docs-only push, offline, so a NOTES/README commit
-no longer re-fires the 211-test cluster suite (measured: a docs-only push wiped the cluster in
+no longer re-fires the 237-test cluster suite (measured: a docs-only push wiped the cluster in
 ~7-8 min, NOTES "A FABRICATED DESCRIPTION OF A PRIMARY SOURCE"). That is safe ONLY as long as no
 `@doc_guard` test touches the cluster. If one did, it would call `seed.seed()` — which DELETEs every
 decision — on every docs commit. This module forbids that.
@@ -61,6 +61,16 @@ _REQUIRED = (
     "test_frontend_typecheck.py",
     "test_env_template.py",   # .env.example documents every no-default Settings field
     "test_doc_anchors.py",    # no [text](#anchor) in the judge-facing docs is dead
+    "test_holdout_artifact.py",  # the committed hold-out result recomputes from its raw counts
+    # ...and, BY NAME, the two guards inside it that keep the README and the artifact from drifting
+    # apart. The file-level entry above would still pass if someone deleted just these two functions,
+    # and they are the load-bearing ones: the first DERIVES the headline (38/38, the 90.8% Wilson
+    # floor) from the committed counts and requires the README to state it, the second requires the
+    # README to point a judge at the verifier at all. Without them the artifact could quietly stop
+    # backing the number the first screen advertises -- which is the exact failure this whole
+    # artifact exists to make impossible.
+    "test_readme_headline_matches_the_committed_artifact",
+    "test_readme_points_a_judge_at_the_verifier",
     "test_no_surface_describes_conclusive_no_as_463_searches",  # the gloss guard
     "test_frontend_ci_actually_invokes_the_guard",              # composition meta-guard
     "test_frontend_ci_actually_invokes_the_geometry_guard",     # geometry meta-guard
@@ -131,8 +141,8 @@ _BACKEND_CI = _ROOT / ".github" / "workflows" / "ci.yml"
 def test_docs_ci_runs_only_the_marked_guards_never_the_whole_suite():
     """The split's whole safety rests on docs-ci running `pytest -m doc_guard`, not a bare `pytest`.
 
-    A future edit that drops the `-m doc_guard` filter would silently run all 211 tests in docs-ci —
-    and with docs-ci's dead-host DATABASE_URL the 185 cluster tests would fail the job (loud, not a
+    A future edit that drops the `-m doc_guard` filter would silently run all 237 tests in docs-ci —
+    and with docs-ci's dead-host DATABASE_URL the 176 cluster tests would fail the job (loud, not a
     wipe), but the DOC guards would stop being the point and the offline contract would be broken. So
     this reads the real yaml and pins the filter. (Reads the file, like the composition/geometry
     meta-guards — a docstring promise is not a guard.)
@@ -142,7 +152,7 @@ def test_docs_ci_runs_only_the_marked_guards_never_the_whole_suite():
 
     assert "pytest -m doc_guard" in ci, (
         "docs-ci.yml no longer runs `pytest -m doc_guard`. A bare `pytest` there runs the whole "
-        "211-test suite; the split's offline guarantee is gone."
+        "237-test suite; the split's offline guarantee is gone."
     )
     # The DATABASE_URL the job actually SETS must be the dead host, not a real secret — an offline
     # job that reaches the real cluster could reseed it on a docs push. Inspected per-line and
@@ -180,7 +190,7 @@ def test_ci_yml_skips_the_cluster_suite_on_root_doc_pushes():
     assert "paths-ignore:" in ci, "ci.yml no longer uses paths-ignore."
     assert "'*.md'" in ci, (
         "ci.yml's paths-ignore no longer lists '*.md', so a root-doc-only push still fires the "
-        "211-test cluster suite and WIPES the cluster — the exact regression this split removes."
+        "237-test cluster suite and WIPES the cluster — the exact regression this split removes."
     )
     assert "'**/*.md'" not in ci, (
         "ci.yml ignores '**/*.md' (recursive), which would wrongly skip the suite on a "
