@@ -9009,3 +9009,81 @@ there. Three claims remain **unbacked and must NOT be written**:
 **If a future session re-flags this as an overclaim:** read `MCP_SESSION.md` first. The reads are
 reproducible — re-run `select_query` with READ B's SQL and compare to `/beliefs/{id}/lineage`. A
 mismatch would be a real finding (cluster drift); agreement means the claim stands as written.
+
+## ====== THE HOLD-OUT ARTIFACT: THE HEADLINE NUMBER, VERIFIABLE OFFLINE (2026-07-20) ======
+
+**The gap this closed.** The project's highest-value number — CYCLE hold-out recall 38/38, precision
+38/38, 95% Wilson floor 90.8% — was produced by `scripts/eval_detection.py`, which needs the
+gitignored 475MB IBM CSV. So it existed ONLY as README prose, CI tested only the pure math on a toy
+43/43 example, and a skeptical judge had to take "100%" on faith. Every other claim in this repo is
+checkable; the best one was not. Shipped: `eval/detection/holdout_result.json` (raw counts),
+`scripts/verify_holdout.py` (recomputes them), `tests/test_holdout_artifact.py` (CI runs it).
+
+**THE DESIGN RULE — store integers, never rates.** No precision, recall or Wilson bound is in the
+JSON. The verifier re-derives all of them from the counts and asserts they hold. You cannot have
+transcription drift in a number you never wrote down. The two baseline float triples (logreg,
+best-single-rule) come from a 3000-iteration numpy fit no stdlib verifier can reproduce; they are
+stored, labeled as such, and EXCLUDED from mode A's recomputation rather than rubber-stamped.
+
+**WHAT IS PROVABLE, AND THE LINE.** The artifact proves the arithmetic and the SPLIT. It cannot
+prove "never tuned on the hold-out" — a claim about development HISTORY that no committed file can
+establish — and the README now says so in those words, pointing at *THE CONTAMINATION QUESTION*
+above. Do NOT let a future edit upgrade this to "proven never-tuned."
+
+**THE MEASUREMENT THAT CHANGED THE WORDING.** Probed the dev/hold-out relationship directly instead
+of trusting the `assert` at face value:
+```
+labeled edge overlap 0 · benign edge overlap 0 · instance-account overlap 0 · GRAPH-account overlap 9
+```
+**"The two sets share no account" would have been FALSE.** `stream_csv` admits any benign row
+*touching* a target account, so the far end of a noise edge can land in both graphs — 9 shared benign
+COUNTERPARTY accounts (of 648 / 806). No ring account and no transaction is shared. All four numbers
+are in the artifact's `split` block so a judge finds the 9 in the data, not only in prose.
+
+**Wilson, twice, on purpose.** `verify_holdout.wilson_bounds` solves the QUADRATIC's roots;
+`eval_detection.wilson_ci` computes centre +/- half. Two arrangements agreeing is a real check;
+re-importing the eval's function would only prove it equals itself. Cross-pinned on every (k,n).
+
+**THE BINDING, AND ITS TRAP.** The manifest records `sha256(scripts/eval_detection.py)`; the verifier
+FAILS if the on-disk script no longer matches, so a stale artifact cannot describe an older eval. Cost
+accepted deliberately: every future eval edit needs a CSV-holding machine to regenerate.
+**`core.autocrlf=true` nearly made this false-alarm** — a fresh Windows clone would materialize CRLF,
+change every line ending, and the guard would report THE EVAL SCRIPT HAS CHANGED about a file nobody
+touched. Fixed by making the premise TRUE (`.gitattributes` pins both hash-bound files `eol=lf`), not
+by softening the message. A guard that false-alarms on a clean clone is one the next person deletes.
+
+**No dataset fixture, deliberately.** The manifest's hashes sidestep redistribution entirely, and the
+without-CSV verifier needs no sample. The IBM/Kaggle license terms for redistributing excerpts were
+NOT investigated — because nothing needs an excerpt, the question never arises. Do not create it.
+
+**Vacuity proved in two stages.** Naive forgery (`own` 38->37) is caught by a NEIGHBOURING IDENTITY
+(per-instance fires sum to 38) before the headline check runs; a careful forgery that also reconciles
+the per-instance sums is caught by the headline check. Both are permanent tmpdir tests.
+
+**Schema gotcha, recorded because it cost a cycle.** `kind` and `witness_outcome` are NOT columns on
+`decisions`. `kind` is a derived taxonomy enforced by the `ck_decisions_kind` CHECK over
+`aml_transaction_id IS NULL`; the basis tag is stored in `txn_ref` as `aml:MATCH` /
+`aml:CONCLUSIVE_NO` / `aml:INCONCLUSIVE`. Both are accurate as API-response descriptions — reading
+them as column names produces `UndefinedColumn`.
+
+**Test counts corrected to MEASURED values: 237 tests / 38 files / 61 doc_guard / 176 cluster.**
+README said 217 in four places and "35 files"; both were stale BEFORE this work (228 -> 237 was this
+session's 9). The 176 was already right — every test added since was a doc_guard. Historical
+citations ("89 passed" at 2m39s; "CI af3cd46, 215 passed") were LEFT ALONE: a dated measurement is
+provenance, not a number to bump.
+
+## ====== CI JOB TIME — MEASURED, NOT ESTIMATED (2026-07-20) ======
+
+**CI (ci.yml full suite) measured at 6m on push `1a22b9f`; docs-ci at 40s.** The 15-minute timeout is
+therefore **~2.5x measured headroom (15/6)**, not the estimated "2-3x" recorded when the timeout was
+set (NOTES *CI-speed cleanup*, "honest ~2-3x headroom over the EXPECTED CI job time"). **This is now a
+MEASURED figure, not an estimate** — the estimate happened to be right, which is luck, not evidence.
+
+**ci.yml's own comment still says "expected" and has NOT been corrected — on purpose.** Editing
+`ci.yml` fires the full suite and WIPES the cluster (~6 min of restore: `backfill_decisions` ->
+`backfill_aml_decisions`). Correct it to this measured 6m the **NEXT time `ci.yml` is edited for
+another reason**, riding a wipe already being paid for. Do NOT spend a dedicated wipe on a comment.
+
+**Also still unmeasured, and NOT to be "fixed" by inference:** the `2m39s / 89 passed` pair. That is
+a local pytest wall time from 2026-07-10, not a CI job time, and 6m is not its successor — CI adds
+runner->Frankfurt latency and pip install on top. The two numbers measure different things.
