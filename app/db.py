@@ -42,3 +42,13 @@ SessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with SessionLocal() as session:
         yield session
+
+
+def get_engine() -> AsyncEngine:
+    """FastAPI dependency returning the shared engine.
+
+    Exists so the readiness probe (/health/ready) resolves its engine through DI rather
+    than the module global: a test can override it with a deliberately-broken engine to
+    prove the probe returns 503 on a real unreachable DB — the false-green we are fixing.
+    """
+    return engine

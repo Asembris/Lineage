@@ -9174,3 +9174,51 @@ creates a row DELETEs it by the exact returned `decision_id` in a `finally`; the
 restore `beliefs.status` and the closure edges the same way. Verified 5,500 / 1,500 / 8 windows /
 0 invalidated / 1 distinct `decided_at` **before and after** the file runs. It deliberately does NOT
 reseed — a reseed here would destroy both backfills (*THE TWO-BACKFILL LANDMINE*).
+
+## J4 — readiness endpoint (/health/ready): killing the false-green (2026-07-20)
+
+`GET /health` was a constant `{"status":"ok"}` with no DB touch (`app/main.py:71-73`) — a liveness
+check masquerading as readiness, the same false-green class as the Windows event-loop trap
+(`/health` 200 while every DB route 500s). AUDIT.md §10 named it. Fixed by the **production-standard
+split, not by changing /health**.
+
+### The design — Option A (split), /health byte-for-byte unchanged
+- **/health stays a pure-liveness constant.** This is load-bearing, not laziness: the whole Windows-trap
+  diagnostic (`scripts/serve.py`, README/DEMO) is the differential *"/health 200 + /agents 500 = event-loop
+  trap, not a dead cluster."* If /health did a DB round-trip it would ALSO 500 under the trap and that
+  signal would be gone. Do NOT add a DB check to /health.
+- **/health/ready is the real check:** `SELECT 1` wrapped in `asyncio.wait_for(2.0)` (one bound covering
+  BOTH a hung connect and a hung query). Reachable → 200 `{"status":"ready","db":"ok"}`; unreachable/timeout
+  → **503** `{"status":"not_ready","db":"unreachable"}` (catches `asyncio.TimeoutError`/`OSError`/
+  `SQLAlchemyError` — the parent of `DBAPIError`, so it covers the `OperationalError`/`InterfaceError`
+  a psycopg connection failure actually surfaces as). It MUST be able to return non-200 — that is the fix.
+- **DB-only. S3 is excluded by design** — readiness = "can I serve," served routes need the DB synchronously
+  and never need S3 synchronously (the cert-write path already degrades to `status:"failed"` on its own).
+  Gating traffic on a non-serving dependency is a self-inflicted failure mode.
+
+### The one-line gotcha that will bite if forgotten
+`/health/ready` had to be added to `_RATE_LIMIT_EXEMPT` alongside `/health` (`app/main.py`). The set is
+matched by EXACT path; an ALB/ECS polling readiness from one source IP would otherwise exhaust the 60/min
+per-IP limit and 429 the very probe that decides whether to route traffic.
+
+### DEPLOY-DOC NOTE for R3 (ECS/ALB wiring)
+`/health/ready` exists for ECS/ALB; **recommend a 15–30s poll interval** — DB-only, S3 excluded by design,
+2s timeout. Cost is negligible: `SELECT 1` reads no table, and the engine already runs `pool_pre_ping=True`
+so every existing request pays a `SELECT 1` on checkout — readiness adds no novel cost category. Set the
+interval sanely so idle polling neither burns the free-tier RU allowance nor keeps a serverless cluster
+perpetually awake. The endpoint is deployment-INDEPENDENT (identical local and prod) and doubles as R3's
+container health-check.
+
+### VACUITY IS THE ACCEPTANCE BAR (and it was proven)
+`tests/test_readiness.py` — the 503 test is the one with teeth (a constant-200 handler would pass a naive
+green-only test). Proof run: stubbed the handler to a constant `200 {"status":"ready","db":"ok"}` →
+`test_readiness_503_when_db_unreachable` FLIPPED to failing (`assert 200 == 503`, got the constant);
+restored the real check → both pass. The test distinguishes a real DB check from a constant — a readiness
+test that can't is the false-green one layer up.
+
+### Non-dirtying (rides the same wipe as the other cluster tests)
+Green test: `SELECT 1` against the live cluster, **no seed, no writes** — state-independent (passes against
+ANY reachable cluster, not coupled to 5,500/8/0). Red test: injects a broken engine (`127.0.0.1:1`,
+`connect_timeout 1`) via `app.dependency_overrides[get_engine]` and NEVER touches the real cluster; the
+override is cleared in `finally` so a failed assertion cannot leak it into a later test. Adds zero
+cluster-dirtying.
