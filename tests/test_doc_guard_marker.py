@@ -59,6 +59,7 @@ _REQUIRED = (
     "test_citations.py",
     "test_restore_instructions.py",
     "test_frontend_typecheck.py",
+    "test_env_template.py",   # .env.example documents every no-default Settings field
     "test_no_surface_describes_conclusive_no_as_463_searches",  # the gloss guard
     "test_frontend_ci_actually_invokes_the_guard",              # composition meta-guard
     "test_frontend_ci_actually_invokes_the_geometry_guard",     # geometry meta-guard
