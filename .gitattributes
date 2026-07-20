@@ -1,0 +1,21 @@
+# WHY THIS FILE EXISTS: it protects a CONTENT HASH from the platform it is checked out on.
+#
+# eval/detection/holdout_result.json records the sha256 of scripts/eval_detection.py, so a result
+# can never silently describe a different version of the code that produced it
+# (scripts/verify_holdout.py fails hard on a mismatch, and CI runs it on every push).
+#
+# That binding is only stable if the file's BYTES are the same everywhere. This repo is developed on
+# Windows with `core.autocrlf=true`, which rewrites LF -> CRLF in the working copy on checkout. The
+# committed content is LF, and the Linux CI runner checks out LF -- so CI agrees with the recorded
+# hash today. But a fresh clone on Windows would materialize CRLF, changing every line ending and
+# therefore the sha256, and `verify_holdout.py` would report THE EVAL SCRIPT HAS CHANGED about a
+# file nobody touched. A guard that false-alarms on a clean clone gets deleted by the next person
+# who trusts it, so the premise is made true rather than the message softened.
+#
+# `eol=lf` pins these two to LF on EVERY platform, which is also what lets a reader reproduce the
+# manifest with plain `sha256sum` or `git hash-object` and get the same answer on any machine.
+#
+# Deliberately NARROW. A repo-wide `* text=auto` would renormalize files this change has no business
+# touching; only the two files the hash binding actually spans are pinned.
+scripts/eval_detection.py       eol=lf
+eval/detection/holdout_result.json eol=lf
