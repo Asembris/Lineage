@@ -20,6 +20,46 @@
 
 ---
 
+## The headline number, verifiable from this clone alone
+
+On the account-disjoint hold-out, the frozen structural detector's CYCLE witness fired on **every one
+of the 38 labeled ring edges (38/38 recall), and every fire was a true ring member (38/38
+precision)** — **one sample of n = 38**, not two independent draws, with a **95% Wilson lower bound of
+90.8%**. That floor is printed next to the result because 38 samples is 38 samples.
+
+```bash
+python scripts/verify_holdout.py        # no dataset, no venv setup, no config, no network
+```
+
+This recomputes every derived figure — precisions, recalls, Wilson bounds — from the **raw integer
+counts** committed in [eval/detection/holdout_result.json](eval/detection/holdout_result.json), and
+fails if any of them disagrees with what the file claims. Nothing derived is stored: a rate you can
+re-derive from committed integers is checkable by anyone; a rate someone typed is not. CI runs it on
+every push. Full reproduction from the 475MB source is `--with-csv`, which checks the
+[dataset hashes](#3--the-dataset-gitignored--it-is-not-in-the-clone) first and then re-runs the whole
+eval and diffs it field-for-field.
+
+**Exactly what the artifact proves.** The arithmetic, and the **split**. The hold-out instances were
+selected by `select_disjoint(..., reserved=<dev instance accounts>)` in `HI-Small_Patterns.txt` file
+order, excluding every pattern block touching an account any development-set instance used — an
+assertion that runs on every eval run ([scripts/eval_detection.py](scripts/eval_detection.py)).
+Measured and recorded in the artifact's `split` block: the two sets share **zero transactions**,
+labeled or benign, and **zero ring accounts**. *(They do share* **9** *benign counterparty accounts
+out of 648 and 806 — the far end of a noise edge can land in both graphs. Stated because it is true,
+not because it moves the number; it is in the committed JSON, not just in this sentence.)*
+
+**It cannot prove "never tuned on the hold-out."** That is a claim about development history, and no
+committed file can establish it. The honest record of what did and did not touch each set is
+[NOTES.md](NOTES.md) → *THE CONTAMINATION QUESTION*, where the development set is labeled **in-sample**
+because it is.
+
+> ⚠️ Scored against pattern-typology **ring membership**, not general fraud, and against a
+> **deliberately adversarial** benign set (noise anchored to the same accounts). The hold-out's 100%
+> precision reflects a benign draw that fired zero false witnesses; the stable claim is *high
+> precision, perfect recall* with the 90.8% floor beside it — not a trumpeted "100%".
+
+---
+
 ## The problem
 
 AI fraud-detection agents spawn, work, and die. When an agent retires it passes its learned
@@ -245,7 +285,10 @@ GET /decisions?driving_belief_id=<azure>&witness_outcome=INCONCLUSIVE&limit=1   
 ### The structural detection eval (per-edge, ring-membership ground truth, 95% Wilson CI)
 
 The **hold-out is account-disjoint from every design decision**; the development set is in-sample and
-labeled as such. The full honest picture — including SCATTER-GATHER's weaker, disclosed recall:
+labeled as such. Every count below is committed in
+[eval/detection/holdout_result.json](eval/detection/holdout_result.json) and re-derivable offline
+with `python scripts/verify_holdout.py` — see [the headline number](#the-headline-number-verifiable-from-this-clone-alone)
+for what that does and does not prove. The full honest picture — including SCATTER-GATHER's weaker, disclosed recall:
 
 | Typology | Dev recall | Dev precision | Hold-out recall | Hold-out precision |
 |---|---|---|---|---|
