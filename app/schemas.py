@@ -514,3 +514,79 @@ class AmlInterrogationResponse(BaseModel):
     transactions: dict[uuid.UUID, AmlTransactionOut]
     accounts: dict[uuid.UUID, AmlAccountOut]
     as_of: str | None
+
+
+class LiveDecisionBelief(BaseModel):
+    """The inherited memory the live decision acted on, and where it came from."""
+
+    id: uuid.UUID
+    rule_text: str
+    formed_at: dt.datetime
+    status: str
+    originating_agent_id: uuid.UUID
+    originating_agent_generation: int
+    originating_agent_bloodline: str
+    # 'dead' for azure-0. The living decider never met the agent whose rule it just applied.
+    originating_agent_status: str
+    inheritance_edge_count: int
+
+
+class LiveDecisionAgent(BaseModel):
+    id: uuid.UUID
+    generation: int
+    bloodline: str
+    status: str
+
+
+class LiveDecisionResponse(BaseModel):
+    """One LIVE governed decision: the deterministic witness ran just now and a real row was written.
+
+    ================== READ `is_new_row` EXACTLY AS IT IS NAMED ==================
+    `is_new_row` is TRUE OF THE ROW, and only of the row. It does NOT mean "no agent had ever ruled
+    on this transaction": on the seeded world every one of the 1,500 ingested edges already carries a
+    BACKFILLED decision, so that stronger claim would be simply false. `prior_decisions_for_this_
+    transaction` says how many rulings already existed, and `prior_decision_ids` names them — the
+    response discloses the prior row rather than concealing it.
+
+    The honest narration is therefore **"this ROW was written just now, and it agrees with the prior
+    verdict"** — which is a DEMONSTRATION OF DETERMINISM, not a novelty claim. The same frozen,
+    label-free witness re-derived the same verdict from the same unlabeled graph, live, on request.
+    `verdict_agrees_with_prior` states that as data (null when there is genuinely no prior).
+
+    ============================ WHAT `is_fraud` IS HERE ============================
+    An AUDIT STAMP, attached in a strictly separate second phase AFTER the verdict existed, only
+    because `decisions.is_fraud` is NOT NULL. The decider never saw it and structurally cannot:
+    `decide()` takes a `Graph` and an `Edge`, and neither type has anywhere to put a label
+    (tests/test_oracle_boundary.py). Reading it back beside the verdict is scoring, not deciding.
+
+    And the verdict alone is not the story — `witness_outcome` is the BASIS. Two outcomes map to
+    `approve`, and the larger one (INCONCLUSIVE, 65.3% of the extract) means "we could not tell",
+    not "this is clean". See DecisionOut's docstring before quoting any AML approval.
+    """
+
+    decision_id: uuid.UUID
+    # True of the ROW this call inserted. See the class docstring — this is not a novelty claim.
+    is_new_row: bool
+    row_written_at: dt.datetime
+    decided_at: dt.datetime
+
+    transaction_id: uuid.UUID
+    verdict: str
+    witness_outcome: str
+    # The real `aml_transactions` ids the witness cites — re-derivable, each resolvable through
+    # GET /aml/transactions/{id}. Empty unless the outcome is MATCH.
+    witness_txn_ids: list[uuid.UUID]
+    boundary_account: uuid.UUID | None
+    txn_ref: str
+    amount: float
+    amount_currency: str
+
+    prior_decisions_for_this_transaction: int
+    prior_decision_ids: list[uuid.UUID]
+    # None when there is no prior decision at all; otherwise whether this live verdict matches the
+    # most recent one. On the seeded world this is the determinism beat.
+    verdict_agrees_with_prior: bool | None
+
+    belief: LiveDecisionBelief
+    deciding_agent: LiveDecisionAgent
+    is_fraud: bool
