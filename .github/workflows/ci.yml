@@ -35,6 +35,24 @@ on:
       # .mcp.json.example's did: it also edits this workflow file, which matches none of these
       # patterns (paths-ignore skips only when EVERY changed file matches).
       - '.env.example'
+      # The hold-out artifact trio. All three are OFFLINE by construction and have NO cluster
+      # surface: a JSON of raw integer counts, a stdlib-only recomputation of them, and the
+      # @doc_guard test that runs the recomputation (pinned cluster-free by
+      # tests/test_doc_guard_marker.py, which runs the marked set against a dead host). docs-ci.yml
+      # lists these same three paths, so an edit to any of them still gets GUARDED — it routes to
+      # the offline job instead of reseeding and WIPING the cluster.
+      #
+      # THREE LITERAL EXACT PATHS, no wildcard — the same shape as the two entries above, and for
+      # the same reason. `tests/**` would be catastrophic here (it would skip the cluster suite on
+      # any test change); `eval/**` would wrongly skip it on the grounding-eval fixtures. Each entry
+      # was verified to match exactly one file and to contain no glob character.
+      #
+      # The commit that ADDS these lines still fires CI once, because it also edits this workflow
+      # file, which matches none of these patterns (paths-ignore skips only when EVERY changed file
+      # matches).
+      - 'eval/detection/holdout_result.json'
+      - 'scripts/verify_holdout.py'
+      - 'tests/test_holdout_artifact.py'
 
 # Cancel an in-flight run when a newer push lands on the same ref. Two concurrent runs would
 # both reseed the shared cluster and race (now a row-level write-write conflict rather than the
@@ -50,7 +68,7 @@ jobs:
     # The full suite runs SEQUENTIALLY against the real Frankfurt cluster + S3. Each reseeding
     # test resets via ordered DELETEs (seed.seed(), ~1s), NOT TRUNCATE — that swap cut the suite
     # from ~36 min to 2m39s locally (measured 2026-07-10, 89 passed — historical, deliberately NOT
-    # carried forward: the suite is 217 now, but 217 tests were never timed at 2m39s and a number
+    # carried forward: the suite is 237 now, but 237 tests were never timed at 2m39s and a number
     # you have not measured does not get restated at a new-looking value. Do NOT "fix" the 89; to
     # update this pair, re-time the suite — which costs a full run and a cluster wipe). The slowest
     # tests are now the inherently-timed ones (demo/SSE fan-out ~10s, real S3 round-trip ~9s, eventual
@@ -65,7 +83,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
-      # Required only so app.config imports; NO test makes a real OpenAI call (all 217 are
+      # Required only so app.config imports; NO test makes a real OpenAI call (all 237 are
       # deterministic / OpenAI-free). A dummy value is deliberate — do NOT add the real key.
       OPENAI_API_KEY: sk-dummy-ci-openai-not-used
     steps:
