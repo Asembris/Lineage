@@ -9087,3 +9087,90 @@ another reason**, riding a wipe already being paid for. Do NOT spend a dedicated
 **Also still unmeasured, and NOT to be "fixed" by inference:** the `2m39s / 89 passed` pair. That is
 a local pytest wall time from 2026-07-10, not a CI job time, and 6m is not its successor — CI adds
 runner->Frankfurt latency and pip install on top. The two numbers measure different things.
+
+## ====== J1 — THE LIVE GOVERNED DECISION ROUTE (2026-07-20) ======
+
+`POST /decisions/aml/{txn_id}` runs the DETERMINISTIC, label-free witness (`aml_seam.decide` — the
+SAME function `backfill_aml_decisions` ran) at HTTP request time and writes a real `decisions` row
+citing a real `aml_transactions` edge through the seam's DB-enforced FK. Console-over-backfilled-state
+becomes *the agent acts on its memory, live*. No LLM: `evaluate_transaction` still has ZERO
+application callers, and this route needed none of it.
+
+**WHY IT IS NOT `POST /aml/transactions/{id}/decide`, WHICH WAS THE OBVIOUS SHAPE.**
+`tests/test_aml_routes.py::test_the_aml_surface_is_read_only_and_never_reaches_the_paid_llm_path`
+asserts every route whose path starts `/aml` is **GET-or-HEAD**. The obvious shape trips that guard
+on its FIRST clause — the read-only one, not the LLM one. The guard was NOT weakened; the route moved.
+A `decisions` INSERT is a MOAT operation, so it belongs on the decisions surface — which is exactly
+the argument `app/routers/decisions.py` already made for putting the reverse lookup there. **Reading
+the guard's precise invariant, rather than assuming "it forbids AML writes", is what made this a
+zero-cost placement decision instead of a guard edit.** The LLM clause forbids exactly one function;
+it says nothing about the deterministic decider, which application code may call freely.
+
+**THE `is_fraud` PROBLEM, AND WHY A THIRD FILE IS NOW ALLOWLISTED.** `decisions.is_fraud` is NOT
+NULL, so a live row CANNOT be written without a label — the one thing the deciding path may not read.
+`app/services/aml_live_decide.py` therefore mirrors the backfill exactly: **phase 1 decide** (from a
+`Graph` that has nowhere to put a label, by type), **phase 2 label** (one named `_LABELS_SQL`, aliased
+to `ground_truth` so the oracle's name appears exactly once in the file). It is in **DECIDING_PATH**
+(so the walk visits it) **and** in **ALLOWLIST** (so the visit permits it), pinned by
+`test_the_live_decider_reads_the_label_only_to_attach_ground_truth`. Listing it in ALLOWLIST alone
+would have granted a permission no walk ever exercises — **silently unguarded, which is worse than a
+violation**, and `test_the_allowlist_is_exactly_three_files...` now asserts against exactly that.
+VACUITY PROVEN, not assumed: a second label read as an SQL string trips it at `aml_live_decide.py:273`,
+and a `row.is_laundering` attribute access trips it at `:274`. Both demonstrated, then reverted.
+
+The rejected alternative was a migration making `is_fraud` nullable for live rows. Honest about real
+operation (a label arrives later), but it changes the moat's shape and makes a live row
+schema-DISTINGUISHABLE from a backfilled one — the one property this route exists to have.
+
+**THE INVALIDATED-BELIEF REFUSAL IS THE POINT, NOT A VALIDATION NICETY.** The route refuses (409) if
+the driving belief is not `active`, if the agent is not `alive`, or if it holds no live
+`belief_inheritance` edge. That turns Phase 3's atomic invalidation from a count in a certificate into
+a **behaviour change**: invalidate the belief, and the living agent becomes unable to act on it.
+The holder check subsumes the status check today (one commit closes belief + every edge); both are
+kept because they fail for different reasons, and a future partial revocation would separate them.
+
+**`is_new_row: true` IS TRUE OF THE ROW, AND THE PHRASING IS LOAD-BEARING.** All 1,500 ingested edges
+already carry a backfilled decision, so *"this decision did not exist before this call"* is **FALSE**
+for every possible input and must never be narrated. The response discloses
+`prior_decisions_for_this_transaction` + `prior_decision_ids` and asserts
+`verdict_agrees_with_prior`. The honest line is **"this ROW was written just now, and it agrees with
+the prior verdict"** — determinism DEMONSTRATED (same frozen witness, same unlabeled graph, months
+apart), not novelty claimed. Overclaiming here would have been free and invisible; it is the exact
+shape of the 728 / phantom-script corruptions this project keeps re-learning.
+
+### THE CENSUS IS SAFE, AND THAT IS AN EARLIER DECISION PAYING OUT
+A live decide adds a row to `decisions`, so a judge deciding one transaction shifts the table's count.
+It CANNOT shift **57/463/980**: `test_the_witness_census_over_the_real_extract_is_57_463_980` runs the
+decider over `aml_transactions` (reference data) and never counts `decisions` at all. That was forced
+by the *"NO TEST MAY DEPEND ON A BACKFILL"* lesson — learned by breaking it, when the first draft
+asserted `total == 5500` against live rows and failed on test ORDERING. **The rule written to fix a
+flaky test is what makes the headline numbers immune to a live write two rungs later.**
+
+**5,500 IS THE MEASURED SET, AND THE DOCS NOW SAY SO.** Reworded to *"5,500 **backfilled** decisions"*
+at DEMO's three sites (pre-flight, reset note, LIVE-beat re-run record) + a note that a live decide
+appends. **README needed no change — it never claimed 5,500** (its honesty ledger already reads
+populated-or-empty live from the cluster, which is why it could not go stale). **ARCHITECTURE.md's
+`5,500 (100% of table)` was DELIBERATELY LEFT ALONE**: it is a captured `EXPLAIN` row-count estimate
+from a dated before/after measurement of the 0008 partial index, not a fingerprint claim. Editing a
+recorded measurement to match today's cluster would be falsifying provenance — the same posture as
+leaving the historical `89 passed` / `2m39s` citations alone.
+
+### THE BASE-RATE MIRAGE: ONE INSTANT, PLUS LIVE DECISIONS
+`count(DISTINCT decided_at) = 1` over the AML rows was the structural reason no fake decay curve could
+be drawn from this belief (see *THE BASE-RATE MIRAGE*). **A live decision writes `decided_at = now()`,
+so that count is 1 only until the route is used.** The claim weakens from *"structurally unavailable"*
+to *"one instant, plus however many live decisions have been served"*.
+**THE PROHIBITION IS UNCHANGED AND IS NOT SOFTENED BY THIS:** `belief_performance` is NEVER computed
+for the azure belief. A second `decided_at` is **not** license to draw a curve — the belief's error
+rate is FLAT (per-window recall 1.000), it is IMPERFECT, NOT STALE, and windowing a handful of live
+demo decisions against 1,500 backfilled ones at one instant would manufacture exactly the artifact
+the fixed timestamp existed to make impossible. If a future session finds itself with n distinct
+`decided_at` values and reaches for `recompute_belief_performance`: **that is the mirage, arriving by
+a new door.**
+
+### TESTING THIS ROUTE MUTATES THE LIVE CLUSTER
+`tests/test_live_decision.py` is the ONLY test in the suite that writes a decision. Every test that
+creates a row DELETEs it by the exact returned `decision_id` in a `finally`; the invalidation tests
+restore `beliefs.status` and the closure edges the same way. Verified 5,500 / 1,500 / 8 windows /
+0 invalidated / 1 distinct `decided_at` **before and after** the file runs. It deliberately does NOT
+reseed — a reseed here would destroy both backfills (*THE TWO-BACKFILL LANDMINE*).

@@ -122,10 +122,18 @@ as stale.
    ```
 
    Deterministic (~4–5 min total): restores 24 agents, **2 active beliefs** (crimson card + azure
-   laundering), **15** inheritance edges (8 crimson + 7 azure), **5,500** decisions (4,000 card +
-   1,500 AML citing real IBM transactions), and 8 crimson performance windows (confidence
+   laundering), **15** inheritance edges (8 crimson + 7 azure), **5,500 backfilled** decisions
+   (4,000 card + 1,500 AML citing real IBM transactions), and 8 crimson performance windows (confidence
    `0.924 → 0.528`, byte-identical every run). The azure belief has **0** performance windows,
    deliberately — see NOTES "THE BASE-RATE MIRAGE".
+
+   > **"BACKFILLED" IS LOAD-BEARING.** 5,500 is the size of the MEASURED SET — what the two
+   > backfills write. `POST /decisions/aml/{txn_id}` (the live governed decision) APPENDS a real row
+   > to the same table, so a cluster that has served live decisions sits above 5,500 and is not
+   > corrupt: it is the measured set plus n live additions, distinguishable by `decided_at` (every
+   > backfilled AML row shares the one fixed instant `2026-07-12T12:00Z`). The census **57/463/980**
+   > is unaffected either way — it is asserted by running the decider over `aml_transactions`, the
+   > reference data, and never counts the `decisions` table at all.
 
    **This is the same procedure as the between-takes reset below.** There is exactly one way to
    rebuild this world, and it is these two commands in this order.
@@ -442,8 +450,9 @@ met**, seven generations up a spine of dead agents. Every hop is a real row.
 > > plants the real vectors from a committed fixture, so the step is gone rather than emphasised.
 >
 > That restores 24 agents, **two active beliefs** (crimson card + azure laundering), **15**
-> inheritance edges (8 crimson + 7 azure), **5,500** decisions (4,000 card + 1,500 AML citing real
-> IBM rows), and 8 crimson performance windows (curve `0.924 → 0.528`). The azure belief keeps **0**
+> inheritance edges (8 crimson + 7 azure), **5,500 backfilled** decisions (4,000 card + 1,500 AML
+> citing real IBM rows — a live `POST /decisions/aml/{id}` appends beyond that; see the pre-flight
+> note), and 8 crimson performance windows (curve `0.924 → 0.528`). The azure belief keeps **0**
 > performance windows — deliberately; see NOTES *"THE BASE-RATE MIRAGE"*. ~4–5 min, deterministic.
 > **You cannot re-record Beats 6–9 without it** — a dead belief has no staleness curve and the
 > Invalidate returns `409 already-invalidated`. Run the three **sequentially**; never fire two at
@@ -535,7 +544,7 @@ plan-gated frontend ladder, per Item 5's and Item 9's own sizing), not folded in
 
 Re-ran every LIVE beat's command against **current code** after G3/G4 (the second belief + the
 grounded backfill + the verdict-aware counterfactual). Cluster at the time: head 0007, 24 agents,
-**2 beliefs**, 15 inheritance edges, **5,500 decisions** (4,000 card + 1,500 AML), 8 crimson perf
+**2 beliefs**, 15 inheritance edges, **5,500 backfilled decisions** (4,000 card + 1,500 AML), 8 crimson perf
 windows, 0 azure perf windows. *(Migration head is now **0008** — the seam's read surface: the
 partial index behind the reverse lookup, and the structural basis tag. No beat's result moved.)*
 

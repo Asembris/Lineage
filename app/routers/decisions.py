@@ -14,10 +14,10 @@ work, under the prefix whose whole discipline is that it does not go there. See 
 
 import uuid
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas import DecisionListResponse, DecisionOut
-from app.services import catalog
+from app.schemas import DecisionListResponse, DecisionOut, LiveDecisionResponse
+from app.services import aml_live_decide, catalog
 
 router = APIRouter(tags=["decisions"])
 
@@ -86,3 +86,36 @@ async def list_decisions(
         witness_outcome=witness_outcome,
         is_fraud=is_fraud,
     )
+
+
+@router.post("/decisions/aml/{txn_id}", response_model=LiveDecisionResponse)
+async def decide_aml_transaction_live(txn_id: uuid.UUID) -> LiveDecisionResponse:
+    """THE LIVE GOVERNED DECISION: azure-7 applies its inherited belief to one real edge, now.
+
+    The deterministic, label-free witness (`aml_seam.decide` — the SAME function the backfill ran)
+    evaluates the transaction against the unlabeled money-flow graph, and a real `decisions` row is
+    written citing the real `aml_transactions` row through the seam's database-enforced FK. Schema-
+    identical to a backfilled decision in every respect except `decided_at`, which is now.
+
+    NOT the LLM. `aml_agent.evaluate_transaction()` has zero application callers and this route adds
+    none — the witness is free, deterministic and replayable, which is the point of it.
+
+    THE WRITE IS GOVERNED, AND CAN BE REFUSED:
+      * 404 — the transaction is not in the AML evidence layer.
+      * 409 — the driving belief has been INVALIDATED. The agent may no longer act on it. This is
+              POST /beliefs/{id}/invalidate taking effect at the living agent's hands: memory
+              revoked atomically, behaviour changed observably.
+      * 409 — the agent is not alive, or holds no live `belief_inheritance` edge for the belief.
+              A decision must come from a living holder or it is not inherited memory at all.
+
+    Read `is_new_row` as named: it is true of the ROW, not a claim that no prior ruling existed.
+    See LiveDecisionResponse's docstring — the honest narration is "this row was written just now,
+    and it agrees with the prior verdict", which demonstrates determinism rather than novelty.
+    """
+    try:
+        result = await aml_live_decide.decide_live(txn_id)
+    except aml_live_decide.TransactionNotFound:
+        raise HTTPException(status_code=404, detail="transaction not in the AML evidence layer")
+    except (aml_live_decide.BeliefInvalidated, aml_live_decide.AgentNotAHolder) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return LiveDecisionResponse(**result)
