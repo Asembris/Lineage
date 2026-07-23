@@ -41,6 +41,15 @@ scratchpad/
 lambda/*/package/
 lambda/*/*.zip
 
+# --- Design-port SPECIFICATION (kept on disk, never committed) ---
+# The 806KB self-extracting Claude-Design bundle is the visual SPEC for the remaining unshipped
+# design-port slices (S4 console polish, S6 trace/invalidate motion, S7 consistency scrubber, S8
+# interrogation, S9 ledger). Its portable assets are already consumed (fonts -> frontend/public/fonts/,
+# emblem inlined in LineageEmblem.tsx) and its demo literals are denied by the fabricated-data guard,
+# so the bundle itself is a reference, not a shippable artifact. Ignored so it stops cluttering
+# `git status` while staying on disk. See DESIGN_PORT_DIAGNOSIS.md.
+/Lineage - Supervisor Console.html
+
 
 audit.md
 FRONTEND.md

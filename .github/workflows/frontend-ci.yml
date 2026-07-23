@@ -61,6 +61,20 @@ jobs:
       - name: Composition guard (the oracle boundary, in the component tree)
         run: npm run guard:composition
 
+      # THE FABRICATED-DATA GUARD — the DC design-port's demo literals may never enter frontend/src.
+      #
+      # The design port (DESIGN_PORT_DIAGNOSIS.md) copies the DC bundle's VISUAL design, but that
+      # bundle hardcodes a demo dataset that is wrong in ways that look right (an invented azure
+      # belief id, a fabricated confidence-curve middle, invented dates/IBANs/HLC/amounts, a made-up
+      # supervisor name). This is a string denylist scan — offline, sub-second, no cluster — and it
+      # runs HERE for the same reason the composition guard does: ci.yml declares
+      # `paths-ignore: ['frontend/**']`, so a frontend-only push (exactly the push that could paste a
+      # DC literal) never runs the backend suite. The guard re-proves itself on a committed fixture
+      # every run (scripts/fixtures/fabricated-data.fixture.txt): a gutted guard, or one that
+      # over-reaches onto legit math, fails its own self-test.
+      - name: Fabricated-data guard (DC demo literals must not reach frontend/src)
+        run: npm run guard:data
+
       - name: Lint (oxlint)
         run: npm run lint
 
