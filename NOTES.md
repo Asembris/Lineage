@@ -9222,3 +9222,26 @@ ANY reachable cluster, not coupled to 5,500/8/0). Red test: injects a broken eng
 `connect_timeout 1`) via `app.dependency_overrides[get_engine]` and NEVER touches the real cluster; the
 override is cleared in `finally` so a failed assertion cannot leak it into a later test. Adds zero
 cluster-dirtying.
+
+---
+
+## Frontend design-port S4 — console visual polish (done) + one banked follow-up
+
+S4 restyled the four core console surfaces to the DC spec's exact values: decision-feed rows
+(3-line record + per-row confidence bar, fraud shown as an always-on badge so selection can take the
+left rule without hiding fraud), genealogy tree (bloodline band plates, per-generation GEN
+gridlines, living-node halo PULSE == DUR.pulse, hover ancestry-preview dimming over real parent_id
+edges), inspector (DC hairline stat grid — kept all FIVE real stats incl. "dead", the DC's four
+omitted it because its fabricated fleet had no dead count; belief status PILL with our --alive/--alert
+colours, not the DC's sub-AA --bone/--ash), and the time-travel sparkline finish (55% --alive hold in
+the gradient, left→right clip-sweep via transform:scaleX, progressive dots, --bone active ring,
+baseline). Every AA-relevant DC value that used --ash for a FACT (feed dt·txn, band label, GEN label,
+legend hint) was kept at --ghost per the AA-coherence pass; noted inline in each file.
+
+BANKED FOLLOW-UP (not done, deliberately deferred): the DC layers its whole BODY on --void with
+--surface / --surface-2 as the raised layers; ours renders panels on --surface. Adopting --void
+panels would make the --surface-2 cards pop as the DC intends — but it touches shared App.css .panel
+across all three regions AND surfaces that were OUT of S4 scope (evidence, ledger, consistency), so
+it could regress contrast where S4 did not look. It is a deliberate whole-app decision that needs its
+own item with a full contrast re-measure (same discipline as the AA-coherence pass). Do it as its own
+PR, not folded into a surface restyle.
