@@ -188,8 +188,9 @@
   stroke-linejoin: round;
 }
 
+/* Mid-window dots read --ghost (a fact, AA), the ends carry the state colours. */
 .tt__dot {
-  fill: var(--ash);
+  fill: var(--ghost);
   stroke: var(--void);
   stroke-width: 0.5;
 }
@@ -202,9 +203,20 @@
   fill: var(--alert);
 }
 
-.tt__dot--active {
+/* The active end's cold ring (DC :1405). --bone, non-scaling so it stays circular under the
+   stretched viewBox. */
+.tt__dot-ring {
+  fill: none;
   stroke: var(--bone);
-  stroke-width: 0.8;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The chart floor. Cold hairline, present from the first frame. */
+.tt__baseline {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .tt__derivation {

@@ -128,6 +128,8 @@ function Curve({
     ? "confidence across generation windows, healthy to stale, with 95% Wilson confidence intervals"
     : "confidence across generation windows, healthy to stale; confidence intervals withheld";
 
+  const baseY = y(0); // the confidence-0 floor
+
   return (
     <svg
       className="tt__curve"
@@ -137,20 +139,37 @@ function Curve({
       aria-label={label}
     >
       <defs>
+        {/* --alive HOLDS to 55% then ramps to --alert (DC lin-spark) — a spatial gradient, static,
+            so it obeys "colours snap" (it is not lerped over time). */}
         <linearGradient id="tt-grad" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="var(--alive)" />
+          <stop offset="55%" stopColor="var(--alive)" />
           <stop offset="100%" stopColor="var(--alert)" />
         </linearGradient>
+        {/* The left→right sweep. A clip rect grown via transform:scaleX from the left edge — the
+            ribbon and dots are revealed in order as it passes them. transform/opacity/pathLength
+            only; nothing here interpolates a colour. */}
+        <clipPath id="tt-sweep" clipPathUnits="userSpaceOnUse">
+          <motion.rect
+            x={0}
+            y={0}
+            width={W}
+            height={H}
+            style={{ transformBox: "fill-box", transformOrigin: "left" }}
+            initial={reduce ? { scaleX: 1 } : { scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: reduce ? 0 : DUR.sweep, ease: EASE.inOut }}
+          />
+        </clipPath>
       </defs>
-      {ribbon && (
-        <motion.path
-          d={ribbon}
-          className="tt__band"
-          initial={reduce ? { opacity: 1 } : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: reduce ? 0 : DUR.sweep, ease: EASE.inOut }}
-        />
-      )}
+
+      {/* the chart floor — always present */}
+      <line className="tt__baseline" x1={padX} y1={baseY} x2={W - padX} y2={baseY} />
+
+      {/* the Wilson corridor, revealed left→right by the sweep */}
+      {ribbon && <path d={ribbon} className="tt__band" clipPath="url(#tt-sweep)" />}
+
+      {/* the confidence line draws itself left→right via pathLength, in sync with the sweep */}
       <motion.path
         d={d}
         className="tt__curve-line"
@@ -159,20 +178,28 @@ function Curve({
         animate={{ pathLength: 1 }}
         transition={{ duration: reduce ? 0 : DUR.sweep, ease: EASE.inOut }}
       />
-      {windows.map((w, i) => (
-        <circle
-          key={i}
-          cx={x(i)}
-          cy={y(w.confidence)}
-          r={i === activeIndex ? 2.6 : 1.4}
-          className={
-            "tt__dot" +
-            (i === 0 ? " tt__dot--alive" : "") +
-            (i === n - 1 ? " tt__dot--alert" : "") +
-            (i === activeIndex ? " tt__dot--active" : "")
-          }
-        />
-      ))}
+
+      {/* window dots — first healthy (--alive), last stale (--alert), the rest --ghost; the active
+          end carries a cold --bone ring. Revealed by the same sweep clip as they are passed. */}
+      <g clipPath="url(#tt-sweep)">
+        {windows.map((w, i) => (
+          <g key={i}>
+            {i === activeIndex && (
+              <circle className="tt__dot-ring" cx={x(i)} cy={y(w.confidence)} r={3} />
+            )}
+            <circle
+              cx={x(i)}
+              cy={y(w.confidence)}
+              r={1.6}
+              className={
+                "tt__dot" +
+                (i === 0 ? " tt__dot--alive" : "") +
+                (i === n - 1 ? " tt__dot--alert" : "")
+              }
+            />
+          </g>
+        ))}
+      </g>
     </svg>
   );
 }
