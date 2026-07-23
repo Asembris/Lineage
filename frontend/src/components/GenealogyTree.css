@@ -62,11 +62,32 @@
   stroke-width: 2.5;
 }
 
+/* Living-node halo — a soft --alive disc (blurred via #tree-halo) that PULSES (DC lin-live, 1.5s ==
+   DUR.pulse). Under reduced-motion the animation is dropped and the resting disc remains — the same
+   final frame, no travel. Animates opacity + transform:scale only; no colour is interpolated. */
 .tree__halo {
-  fill: none;
-  stroke: var(--alive);
-  stroke-width: 1.5;
+  fill: var(--alive);
   opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tree__node--alive .tree__halo {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: tree-live 1.5s ease-in-out infinite; /* keep in sync with lib/motion.ts DUR.pulse */
+  }
+}
+
+@keyframes tree-live {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.14);
+  }
 }
 
 .tree__node--alive .tree__gen {
@@ -75,6 +96,44 @@
 
 .tree__node--alive .tree__id {
   fill: var(--bone);
+}
+
+/* --- Hover ancestry preview ----------------------------------------------- */
+/* The <g> opacity dims off-chain nodes/edges to 0.16 inline (data-driven). These rules carry only
+   the WARMTH of the chain, and they sit AFTER the alive block so hover wins over alive, while
+   in-chain does NOT override an alive node's --alive ring (:not(--alive)), matching the DC's
+   precedence (hover > alive > in-chain). Colours snap; only opacity animates. */
+.tree__node {
+  cursor: pointer;
+}
+
+.tree__hit {
+  fill: transparent;
+}
+
+.tree__node--inchain:not(.tree__node--alive) .tree__dot {
+  stroke: var(--bone);
+}
+
+.tree__node--inchain:not(.tree__node--alive) .tree__gen,
+.tree__node--inchain:not(.tree__node--alive) .tree__id {
+  fill: var(--bone);
+}
+
+.tree__node--hover .tree__dot {
+  stroke: var(--bone);
+  stroke-width: 3;
+}
+
+.tree__node--hover .tree__gen,
+.tree__node--hover .tree__id {
+  fill: var(--bone);
+}
+
+/* A chain edge under the hovered node warms to --bone (still cold — warmth proper is Trace's). */
+.tree__edge--chain {
+  stroke: var(--bone);
+  stroke-width: 2.5;
 }
 
 /* --- Trace overlay (the one place warmth appears) ------------------------- */
@@ -171,33 +230,38 @@
   fill: var(--alive);
 }
 
-/* --- Band labels + axis --------------------------------------------------- */
+/* --- Bloodline bands + GEN gridlines --------------------------------------- */
 
-.tree__band-label {
-  fill: var(--ash);
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-}
-
-.tree__axis-rule {
+/* A faint --surface plate behind each bloodline (cold, decorative). */
+.tree__band {
+  fill: var(--surface);
+  opacity: 0.55;
   stroke: var(--line);
   stroke-width: 1;
 }
 
-.tree__axis-caption {
-  fill: var(--ash);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-anchor: start;
+/* Band label is a heading, not chrome: --ghost (5.83:1), not --ash (3.06:1, sub-AA). DC uses --ash
+   at this size; we keep --ghost per the AA-coherence pass. */
+.tree__band-label {
+  fill: var(--ghost);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
 }
 
-.tree__axis-label {
-  fill: var(--ash);
+.tree__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.22;
+}
+
+/* A GEN axis label is a fact: --ghost, not --ash. */
+.tree__grid-label {
+  fill: var(--ghost);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
 }
 
 /* --- Legend (HTML overlay, crisp text) ------------------------------------ */
@@ -217,6 +281,12 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+/* The hover affordance, pushed to the far end of the legend. --ghost, not DC's --ash (sub-AA). */
+.tree__legend-hint {
+  margin-left: auto;
+  color: var(--ghost);
 }
 
 .tree__key {
