@@ -1,0 +1,30 @@
+Fabricated-data guard self-test fixture — NOT scanned by the src walk.
+The guard's selfTest() scans THIS file and asserts it finds EXACTLY the planted
+leaks below, at the marked lines, and leaves the anchoring-negative controls alone.
+A guard that cannot be shown to fail is theatre; one that false-fails on correct
+work gets deleted (the mirror-image failure this project has paid for before).
+
+--- PLANTED LEAKS (each must be caught; line numbers are pinned in EXPECTED) ---
+const azureBelief = "b7f2c1a9";
+const formedEarly = "2025-11-02";
+const formedLate = "2025-12-14";
+const supervisor = "s.okonkwo";
+const loaderTxn = "txn_5f2c81";
+const ibanDe = "DE89·3704·••••·4471";
+const ibanGb = "GB29·NWBK·••••·0088";
+const hlc = "7f3c·001a4b2e";
+const claimId = "clm_00a1";
+const amount = "$1,904,789.00";
+const curveA = 0.902;
+const curveB = 0.861;
+const curveC = 0.803;
+const curveD = 0.717;
+const bareAmount = "1904789";
+
+--- ANCHORING NEGATIVES (legit math / real values; must NOT be caught) ---
+const opacity = 10.717;
+const scale = 0.7175;
+const bigger = "19047890";
+const bareUnquoted = 1904789;
+const realEndpoint = 0.924;
+const realDip = 0.556;
