@@ -96,6 +96,10 @@ function DecisionRow({
       onFocusReturned();
     }
   }, [returnFocusTxn, d.aml_transaction_id, onFocusReturned]);
+  // The per-row confidence bar is a real reading of d.confidence — a card decision's model
+  // confidence, or nothing for an AML row (its structural witness is deterministic, so confidence
+  // is null and there is no bar to draw). --ghost fill: it is a magnitude, not a signal.
+  const confKnown = d.confidence !== null;
   return (
     <li className="feed__item">
       <button
@@ -106,56 +110,71 @@ function DecisionRow({
         aria-pressed={selected}
         onClick={() => onSelect(d.id)}
       >
-        <span className="feed__time">
-          <span className="feed__date">{date}</span>
-          <span className="feed__clock">{time}</span>
-        </span>
-        <span className="feed__amount">{formatAmount(d.amount, d.amount_currency)}</span>
-
-        <span className="feed__where">
-          {/* merchant is null for AML decisions (a bank-to-bank transfer has no merchant). An em
-              dash keeps the absence visible. */}
+        {/* Line 1 — merchant (or the em dash for a bank-to-bank AML transfer) · amount */}
+        <span className="feed__line feed__line--head">
           <span className="feed__merchant">{d.merchant ?? "—"}</span>
-          {/* THE ROW MUST NAME WHAT THE DECISION WAS ABOUT, and for an AML row `txn_ref` is NOT it:
-              0008 makes txn_ref carry the BASIS (`aml:INCONCLUSIVE`), and the real reference is the
-              FK. Without the transaction, every AML row showed one shared `decided_at`, no merchant,
-              no confidence and the same basis string — so rows differing only in a repeated amount
-              were VISUALLY IDENTICAL. Measured on the real feed: 12 of the 1,500. A supervisor
-              could not tell them apart, and the id is the one thing that always can. */}
-          <span className="feed__txn">
-            {d.aml_transaction_id ? `txn ${fragId(d.aml_transaction_id)}` : d.txn_ref}
+          <span className="feed__amount">{formatAmount(d.amount, d.amount_currency)}</span>
+        </span>
+
+        {/* Line 2 — when · what-it-was-about (left) · fraud / basis / verdict (right).
+            THE ROW MUST NAME WHAT THE DECISION WAS ABOUT, and for an AML row `txn_ref` is NOT it:
+            0008 makes txn_ref carry the BASIS (`aml:INCONCLUSIVE`), and the real reference is the
+            FK. Without the transaction, every AML row showed one shared `decided_at`, no merchant,
+            no confidence and the same basis string — 12 of the 1,500 were VISUALLY IDENTICAL. */}
+        <span className="feed__line feed__line--meta">
+          <span className="feed__when">
+            {date} {time} · {d.aml_transaction_id ? `txn ${fragId(d.aml_transaction_id)}` : d.txn_ref}
+          </span>
+          <span className="feed__tags">
+            {/* Fraud is now shown as an always-on dot+badge here (not only as the left rule), so a
+                selected fraud row still reads as fraud even though selection takes the left rule. */}
+            {d.is_fraud && (
+              <span className="feed__fraud">
+                <span
+                  className="feed__fraud-dot"
+                  role="img"
+                  aria-label="labelled fraud"
+                  title="labelled fraud"
+                />
+                <span className="feed__fraud-badge" aria-hidden="true">
+                  fraud
+                </span>
+              </span>
+            )}
+            {/* THE BASIS. An AML `approve` without it is unreadable: CONCLUSIVE_NO means "there is
+                no cycle" (447 of its 463 are self-loops, never searched at all; only 16 were),
+                INCONCLUSIVE means "we could not determine" — 463 and 980 rows of the SAME verdict.
+                Card decisions have no witness and get nothing here. */}
+            {d.witness_outcome && (
+              <span
+                className={`feed__basis feed__basis--${d.witness_outcome.toLowerCase()}`}
+                title={BASIS_TITLE[d.witness_outcome]}
+              >
+                {d.witness_outcome === "CONCLUSIVE_NO" ? "no cycle" : d.witness_outcome.toLowerCase()}
+              </span>
+            )}
+            <span className={`feed__verdict feed__verdict--${d.verdict}`}>{d.verdict}</span>
           </span>
         </span>
-        <span className="feed__tags">
-          {/* THE BASIS. An AML `approve` without it is unreadable: CONCLUSIVE_NO means "there is
-              no cycle" (447 of its 463 are self-loops, never searched at all; only 16 were),
-              INCONCLUSIVE means "we could not determine" — and they are 463 and 980 rows of the
-              SAME verdict. Card decisions have no witness and get nothing here. */}
-          {d.witness_outcome && (
-            <span
-              className={`feed__basis feed__basis--${d.witness_outcome.toLowerCase()}`}
-              title={BASIS_TITLE[d.witness_outcome]}
-            >
-              {d.witness_outcome === "CONCLUSIVE_NO" ? "no cycle" : d.witness_outcome.toLowerCase()}
-            </span>
-          )}
+
+        {/* Line 3 — confidence bar · confidence value · belief marker */}
+        <span className="feed__line feed__line--conf">
+          <span className="feed__confbar-track">
+            {confKnown && (
+              <span
+                className="feed__confbar"
+                style={{ width: `${Math.round((d.confidence as number) * 100)}%` }}
+              />
+            )}
+          </span>
+          <span className={`feed__conf${confKnown ? "" : " feed__conf--none"}`}>
+            {formatConfidence(d.confidence)}
+          </span>
           {beliefDriven && (
             <span className="feed__belief" title="belief-driven decision">
               belief
             </span>
           )}
-          {d.is_fraud && (
-            <span
-              className="feed__fraud-dot"
-              role="img"
-              aria-label="labelled fraud"
-              title="labelled fraud"
-            />
-          )}
-          <span className={`feed__verdict feed__verdict--${d.verdict}`}>
-            {d.verdict}
-          </span>
-          <span className="feed__conf">{formatConfidence(d.confidence)}</span>
         </span>
       </button>
 
