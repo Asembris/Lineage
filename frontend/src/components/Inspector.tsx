@@ -24,11 +24,24 @@ import type { InvalidateHandlers } from "./Invalidate";
 import { fragId, formatCount, formatDate } from "../lib/format";
 import "./Inspector.css";
 
-/** A single stat: a mono value over an uppercase label. "—" when not yet ready. */
-function Stat({ value, label }: { value: string; label: string }) {
+/** A single stat: a mono value over an uppercase label. "—" when not yet ready. `tone` tints the
+ *  value (alive → --alive); `wide` spans both columns of the hairline grid so an odd 5th tile
+ *  (we keep the real "dead" count, unlike the DC's 4) sits on its own full row rather than leaving
+ *  a hollow cell. */
+function Stat({
+  value,
+  label,
+  tone,
+  wide,
+}: {
+  value: string;
+  label: string;
+  tone?: "alive";
+  wide?: boolean;
+}) {
   return (
-    <div className="stat">
-      <span className="stat__value">{value}</span>
+    <div className={`stat${wide ? " stat--wide" : ""}`}>
+      <span className={`stat__value${tone ? ` stat__value--${tone}` : ""}`}>{value}</span>
       <span className="stat__label">{label}</span>
     </div>
   );
@@ -59,7 +72,7 @@ function FleetSummary(props: {
       <h3 className="inspector__heading">Fleet</h3>
       <div className="stat-grid">
         <Stat value={n(agents?.count)} label="agents" />
-        <Stat value={n(alive)} label="alive" />
+        <Stat value={n(alive)} label="alive" tone="alive" />
         <Stat value={n(dead)} label="dead" />
         <Stat value={n(decisions?.total)} label="decisions" />
         <Stat
@@ -69,6 +82,7 @@ function FleetSummary(props: {
               : `${formatCount(activeBeliefs ?? 0)} / ${formatCount(beliefs.count)}`
           }
           label="beliefs active"
+          wide
         />
       </div>
     </section>
@@ -80,15 +94,16 @@ function BeliefCard({ b }: { b: Belief }) {
   return (
     <li className={`belief${invalidated ? " belief--invalidated" : ""}`}>
       <div className="belief__head">
-        <span className={`belief__status belief__status--${b.status}`}>
-          {b.status}
+        <span className="belief__id" title={`belief ${b.id}`}>
+          {fragId(b.id)}
         </span>
-        <span className="belief__origin" title={`originating agent ${b.originating_agent_id}`}>
-          {fragId(b.originating_agent_id)}
-        </span>
+        <span className={`belief__status belief__status--${b.status}`}>{b.status}</span>
       </div>
       <p className="belief__rule">{b.rule_text}</p>
       <div className="belief__meta">
+        <span title={`originating agent ${b.originating_agent_id}`}>
+          origin {fragId(b.originating_agent_id)}
+        </span>
         <span>formed {formatDate(b.formed_at)}</span>
         {b.invalidated_at && (
           <span className="belief__invalidated">
