@@ -46,6 +46,13 @@ export const DUR = {
  *  `times` prop accepts it without a readonly-tuple cast. */
 export const BLOOM_TIMES = [0, 0.5, 1];
 
+/** Keyframe timing for a SETTLE — the DC's `lin-settle` (design-port S6): an element arrives large
+ *  and shrinks into place while fading in, reaching full opacity at 60% and finishing the scale
+ *  travel at 100%. Distinct from BLOOM_TIMES: a bloom is symmetric (peaks mid-way and eases back),
+ *  a settle is monotone and ARRIVES. Used by Trace's origin ignite, where the origin must land and
+ *  STAY lit rather than flash. */
+export const SETTLE_TIMES = [0, 0.6, 1];
+
 /*
  * LOADER — the startup cinematic's self-contained WAAPI timeline (design-port S3,
  * DESIGN_PORT_DIAGNOSIS.md §6). This is a DELIBERATE, DOCUMENTED EXCEPTION to the DUR/EASE
