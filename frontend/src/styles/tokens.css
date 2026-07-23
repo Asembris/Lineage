@@ -28,6 +28,17 @@
   --alert: #e5484d; /* invalidation / fraud */
   --alert-dim: #3a1518; /* alert background wash */
 
+  /* BRAND — the emblem/loader ONLY. NOT signal colours. (design-port S2)
+     Two hues the DC emblem introduces that are NOT in the palette above: teal for the emblem's
+     attestation spine/diamond, and a warm off-white for its shield strokes. They are named
+     --brand-* precisely so they can never be mistaken for signal: the ONLY files permitted to
+     reference them are LineageEmblem.tsx (the mark) and Loader.tsx/Loader.css (the startup seal,
+     which reuses the mark). They must NEVER touch --alive/--trace/--origin/--alert semantics, the
+     genealogy tree, the feed, the evidence surface, or any button/hover — nothing that carries
+     meaning. Teal on a signal surface would read as a state the console does not have. */
+  --brand-teal: #53b8c6; /* emblem attestation spine + diamonds; loader seal accents */
+  --brand-parchment: #f2f0e8; /* emblem shield strokes; loader wordmark */
+
   /* Type roles (FRONTEND.md): display sparing, body tight, data always mono.
      The three families are now self-hosted (styles/fonts.css, design-port S1);
      the system stacks below are genuine fallbacks behind the real faces. */

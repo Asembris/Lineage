@@ -27,15 +27,24 @@
 
 .console__brand {
   display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+/* The real emblem mark (design-port S2). Sized to the wordmark's cap-height so the two read as one
+   lockup; its colours come from the scoped --brand-* tokens inside the SVG, never from here. */
+.console__mark {
+  display: block;
+  height: 1.4rem;
+  width: auto;
+  flex: 0 0 auto;
 }
 
 .console__title {
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   margin: 0;
   color: var(--bone);
 }
