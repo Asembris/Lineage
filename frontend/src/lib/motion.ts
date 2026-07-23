@@ -45,3 +45,58 @@ export const DUR = {
 /** Keyframe timing for a symmetric [start, peak, settle] bloom. Plain number[] so framer-motion's
  *  `times` prop accepts it without a readonly-tuple cast. */
 export const BLOOM_TIMES = [0, 0.5, 1];
+
+/*
+ * LOADER — the startup cinematic's self-contained WAAPI timeline (design-port S3,
+ * DESIGN_PORT_DIAGNOSIS.md §6). This is a DELIBERATE, DOCUMENTED EXCEPTION to the DUR/EASE
+ * vocabulary above, exactly like the 3D scene's rAF loop: the loader is a one-shot orchestrated
+ * sequence of ~15 beats driven by `element.animate()` (ms + cubic-bezier), not the framer-motion
+ * tween set the console body uses. Its beats are NAMED HERE rather than left as bare literals inside
+ * Loader.tsx — the precise drift Frontend Phase 6 fixed — so the whole timeline reads in one place.
+ *
+ * Vocabulary is still honoured where it matters: every animation is transform / opacity /
+ * strokeDashoffset only, every easing is a tween (no springs), and NO colour is interpolated. The
+ * two eases below are the cubic-bezier equivalents of EASE.out / EASE.inOut.
+ *
+ * All values in MILLISECONDS (WAAPI's unit), unlike DUR above (framer-motion seconds).
+ */
+export const LOADER = {
+  // Beat 1 — decision lock: the four provenance strata register in 3-D; the subject diamond scales in.
+  strataDur: 700,
+  strataStagger: 90,
+  diamondInDur: 500,
+  // Beat 2 — provenance separation: the three real labels fade up.
+  labelStart: 680,
+  labelStagger: 150,
+  labelDur: 360,
+  // Beat 3 — backward trace to origin: an amber path draws via strokeDashoffset.
+  traceStart: 1200,
+  traceDur: 1200,
+  // Beat 4 — origin resolved: the origin diamond blooms in.
+  originAt: 2340,
+  originDur: 460,
+  // Beat 5 — evidence compresses away: the HUD fades and scales to 0.85.
+  compressAt: 2550,
+  compressDur: 500,
+  // Beat 6 — identity seal: the emblem scales in, the wordmark fades up.
+  sealAt: 2820,
+  sealDur: 620,
+  // Beat 7 — console ownership: the handoff line sweeps, then the overlay fades and disposes.
+  handoffAt: 3460,
+  handoffDur: 620,
+  fadeAt: 3900,
+  fadeDur: 330,
+  completeAt: 4230,
+  // Safety — a watchdog that guarantees the loader never traps the user even if a beat stalls.
+  watchdog: 5200,
+  // Reduced-motion path (~500 ms): logo → transfer line → ownership, no camera travel, same final frame.
+  reducedSealDur: 260,
+  reducedHandoffAt: 220,
+  reducedHandoffDur: 200,
+  reducedFadeAt: 380,
+  reducedFadeDur: 160,
+  reducedCompleteAt: 520,
+  // Tween eases — cubic-bezier equivalents of EASE.out / EASE.inOut (no springs, ever).
+  ease: "cubic-bezier(0.22, 1, 0.36, 1)",
+  easeInOut: "cubic-bezier(0.65, 0, 0.35, 1)",
+} as const;
