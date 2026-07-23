@@ -9245,3 +9245,62 @@ across all three regions AND surfaces that were OUT of S4 scope (evidence, ledge
 it could regress contrast where S4 did not look. It is a deliberate whole-app decision that needs its
 own item with a full contrast re-measure (same discipline as the AA-coherence pass). Do it as its own
 PR, not folded into a surface restyle.
+
+---
+
+## Frontend design-port S6 — trace/invalidate motion polish, and the camera CUT
+
+**THE CAMERA IS CUT. Do not rebuild it.** The DC animates the genealogy `viewBox` to zoom to the
+selected bloodline (`frameTo`/`vbTarget`, template.html:673-694; asymptotic `v += (target-v)*0.16`,
+1400ms cap, reduced-motion snap, "⤢ fit all" reset). It was investigated and rejected on MEANING, not
+on cost: our tree is ~24 nodes over 2 bloodlines and already fits at laptop height by design, and both
+orchestrated moments depend on seeing the WHOLE COLD TREE. Trace is "warmth spreading backward through
+a cold, dead tree" — you have to see the cold tree it spreads through — and the atomic flip is
+"everything corrected at one commit". Zooming to one bloodline crops the other bloodline and the
+generational span, i.e. it crops exactly the context that makes both land. The camera solves "the tree
+is too big to fit", which is not a problem we have. It is also a NEW FEATURE and a NEW motion idiom
+(asymptotic ease, outside the DUR/EASE vocabulary) that would need a documented scoped exception like
+the r3f rAF loop. If it is ever revived, the only honest form is holder-framing on invalidate ALONE,
+routed through a named lib/motion.ts constant. NOTE for whoever checks: the camera does NOT interact
+with the geometry guard — geometry.spec.ts measures only the `.kill__*` buttons and `.geo`/`.geo__edge`
+witness drawing, and asserts nothing about the tree's viewBox or node positions. The guard was never
+the reason to cut it.
+
+WHAT SHIPPED — the trace origin's FINISH only. The backward-walk cadence already matched the DC
+exactly (its `hopStart i*150ms` / `hopDur 160ms` == our STAGGER/EDGE_DUR), so nothing there moved. The
+origin used to FLASH: it scaled up through an overshoot (1 -> 1.12 -> 1) while a fixed-radius glow
+peaked at 0.8 and dimmed BACK to 0.55 — read literally, "the origin ignited and then partly went out",
+the opposite of the claim. Now it is monotone, per the DC: the bloom disc grows outward and HOLDS at
+0.78, and the node arrives large and settles in (`lin-settle`: scale 1.9 -> 1, opacity full at 60%,
+`SETTLE_TIMES` in lib/motion.ts — a settle ARRIVES, where a BLOOM_TIMES bloom is symmetric).
+
+WHAT DID NOT SHIP, AND WHY — InvalidateOverlay.tsx has ZERO changes this session.
+- Armed pulse: the DC's `lin-armed` is opacity-only (.5->1->.5, no scale). Porting that was proposed
+  and OVERRULED, correctly: the armed state is the one moment the UI says something is LIVE and
+  DANGEROUS (a holder acting on a rotten belief at this instant), opacity-only reads as an element
+  DIMMING, opacity+scale reads as a PULSE. The DC can be more clinical because its armed state is a
+  mockup with no consequence; ours precedes an irreversible fleet-wide write. Kept [0.3,0.6,0.3] +
+  [1,1.08,1] at DUR.pulse.
+- Corrected flip: the DC uses 700ms; we KEEP DUR.bloom (0.5s). DUR.bloom is the documented anchor that
+  syncs Trace-ignite <-> Invalidate-correct, and our vocabulary beats a DC literal. The atomic
+  simultaneity (one shared transition, NO per-node stagger) is untouched — that is the database's
+  truth rendered, not a style choice, and a stagger would make the UI say something false.
+- Dashed --bone holder rings (the DC draws them on living holders): CUT. During arming the message is
+  exactly one thing, and a second cold ring underneath dilutes rather than clarifies.
+
+THE GATE, AND THE NON-EVENT. The DC's gate layout turned out to be the SAME stack we already had
+(Confirm full-width above, Cancel full-width below), so the feared visual-vs-geometry conflict never
+materialised — only colour/type/one added line changed. Micro-header names the stakes before the
+sentence; the DC sets it in --alert, which is 4.13:1 on --alert-dim and BELOW the 4.5:1 floor, so the
+words are --ghost (5.28:1) and only the glyph keeps --alert (S4's substitution pattern). Cancel took
+the DC's --ash border / --bone text (6.32 -> 12.04:1) because it is the SAFE action sitting on the
+remembered position and should read as present, not de-emphasised.
+
+REDUCED-MOTION: THE PNG BAR DOES NOT APPLY TO THIS SURFACE, and that is worth recording so nobody
+"fixes" it. S4 could achieve byte-identical motion/reduced PNGs; the tree CANNOT, because it contains
+INFINITE pulses by design (`tree-live` on living-node halos, gated behind `no-preference`, plus the
+armed --alert halo at DUR.pulse). Proven, not assumed: two captures of the SAME state in the SAME
+motion preference differ from each other, so there is no settled frame to be byte-identical to. What
+WAS verified is the thing that actually matters — every element S6 changed is measurably identical
+across preferences (glow opacity 0.78 / origin opacity 1 / transforms settled / 7 edges fully drawn,
+byte-equal in both).
