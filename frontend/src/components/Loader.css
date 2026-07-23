@@ -1,0 +1,161 @@
+/*
+ * Loader — startup cinematic styling (design-port S3, DESIGN_PORT_DIAGNOSIS.md §6).
+ *
+ * A fixed, pointer-events:none overlay above the app. Every child's INITIAL state here is the
+ * hidden/pre-animation frame, so nothing flashes before its WAAPI beat runs (Loader.tsx drives the
+ * reveals). Colours: warm trace/origin for the backward-trace beat (reserved warmth, honoured — it
+ * IS a trace to an origin), the scoped --brand-* tokens for the emblem/seal/handoff. Nothing here
+ * touches console hover/button styling.
+ */
+
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--void);
+}
+
+/* --- The HUD (compresses away at beat 5) ---------------------------------- */
+
+.loader__stage {
+  position: relative;
+  width: min(900px, 92vw);
+  height: min(520px, 62vh);
+  perspective: 1100px;
+}
+
+.loader__strata {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
+}
+
+/* Four provenance planes that register in 3-D. Faint, parchment-tinted, never a signal colour. */
+.loader__plane {
+  position: absolute;
+  width: 46%;
+  height: 26%;
+  opacity: 0; /* beat-1 animation reveals to ~0.4 */
+  border: 1px solid color-mix(in srgb, var(--brand-parchment) 22%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--brand-parchment) 4%, transparent);
+}
+.loader__plane:nth-child(1) { transform: translateY(-84px); }
+.loader__plane:nth-child(2) { transform: translateY(-28px); }
+.loader__plane:nth-child(3) { transform: translateY(28px); }
+.loader__plane:nth-child(4) { transform: translateY(84px); }
+
+.loader__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.loader__trace-path {
+  fill: none;
+  stroke: var(--trace);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1; /* with pathLength=1, one unit = full length */
+  stroke-dashoffset: 1; /* hidden until beat 3 draws it to 0 */
+  opacity: 0;
+}
+
+.loader__diamond {
+  opacity: 0; /* revealed by its beat */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.loader__diamond--subject {
+  fill: var(--brand-teal);
+}
+.loader__diamond--origin {
+  fill: var(--origin);
+}
+
+.loader__labels {
+  position: absolute;
+  left: 4%;
+  bottom: 6%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.loader__label {
+  opacity: 0; /* beat-2 fade-up */
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--ghost);
+}
+
+/* --- Identity seal (beat 6) ----------------------------------------------- */
+
+.loader__seal {
+  position: absolute;
+  opacity: 0; /* beat-6 reveal */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.loader__emblem {
+  display: block;
+  height: 4.25rem;
+  width: auto;
+}
+
+.loader__wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.loader__brand {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: 0.28em;
+  /* the wordmark is brand chrome, not signal text — scoped brand parchment, not --bone */
+  color: var(--brand-parchment);
+  /* the tracking pushes the last glyph off-centre; nudge it back under the emblem */
+  padding-left: 0.28em;
+}
+
+.loader__sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+  color: var(--ghost);
+  padding-left: 0.34em;
+}
+
+/* --- Console-ownership handoff line (beat 7) ------------------------------ */
+
+.loader__handoff {
+  position: absolute;
+  bottom: 20%;
+  width: min(420px, 46vw);
+  height: 2px;
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--brand-teal),
+    transparent
+  );
+}

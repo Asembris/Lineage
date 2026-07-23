@@ -8,6 +8,7 @@ import { ConsistencyDemo } from "./components/ConsistencyDemo";
 import { HonestyLedger } from "./components/HonestyLedger";
 import { AmlConsole } from "./components/AmlConsole";
 import { LineageEmblem } from "./components/LineageEmblem";
+import { Loader } from "./components/Loader";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -130,6 +131,12 @@ function App() {
   const { agents, decisions, beliefs, counts, witnessCounts, loadMore, loadingMore } =
     useConsoleData(kind, witness);
   const [view, setView] = useState<View>({ kind: "console" });
+
+  // The startup cinematic (design-port S3). A self-contained overlay above the app that disposes
+  // itself and flips this false — it mounts no audit/evidence component and reads no data, so it is
+  // invisible to the composition guard and never blocks the console (pointer-events:none).
+  const [intro, setIntro] = useState(true);
+  const dismissIntro = useCallback(() => setIntro(false), []);
 
   // The seam's focus handoff (return leg). When the evidence view closes, focus should return to the
   // "see why" row it came from, not vanish to <body> (verified by a tab-walk: it did). App remembers
@@ -295,6 +302,7 @@ function App() {
 
   return (
     <div className="console">
+      {intro && <Loader onComplete={dismissIntro} />}
       <header className="console__header">
         <div className="console__brand">
           <LineageEmblem className="console__mark" />
