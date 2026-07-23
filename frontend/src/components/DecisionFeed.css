@@ -15,22 +15,20 @@
   display: block;
 }
 
-/* The row is a real button so Investigate is keyboard-reachable; the reset keeps
-   it visually identical to the Phase-2 record, then adds interaction states. */
+/* The row is a real button so Investigate is keyboard-reachable. Three stacked lines (DC density,
+   template.html:527-553 / rowStyle:1562): merchant·amount / when·txn·tags / confidence bar. */
 .feed__row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
-  gap: 0.2rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   width: 100%;
-  padding: 0.5rem 0.85rem;
+  padding: 9px 12px 9px 13px;
   border: none;
   border-bottom: 1px solid var(--line);
-  /* transparent rule reserves the space so fraud rows don't shift horizontally */
-  border-left: 2px solid transparent;
+  /* 3px transparent rule reserves the space so fraud/selected rows don't shift horizontally */
+  border-left: 3px solid transparent;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 0.76rem;
   text-align: left;
   color: inherit;
   cursor: pointer;
@@ -52,94 +50,90 @@
   outline-offset: -2px;
 }
 
-/* The one always-on signal in the feed: a labelled-fraud decision. */
+/* A labelled-fraud decision. Shown redundantly as the always-on dot+badge on line 2, so selection
+   (which takes the left rule for --bone) can never hide the fraud flag. */
 .feed__row--fraud {
   border-left-color: var(--alert);
 }
 
-/* Selection — a raised surface + a cold --bone inset bar. Kept cold on purpose:
-   warmth is reserved for Trace. The inset bar sits inside the border box, so a
-   selected fraud row still shows its red border-left rule alongside it. */
+/* Selection — a raised surface + a 3px --bone left rule (DC :1566). Cold on purpose: warmth is
+   reserved for Trace. Ordered AFTER --fraud so a selected fraud row shows the --bone rule; the
+   fraud badge on line 2 keeps the fraud legible regardless. */
 .feed__row--selected,
 .feed__row--selected:hover {
   background: var(--surface-2);
-  box-shadow: inset 2px 0 0 0 var(--bone);
+  border-left-color: var(--bone);
 }
 
 .feed__row--selected .feed__merchant {
   color: var(--bone);
 }
 
-/* --- Line 1: time (left) · amount (right) --------------------------------- */
+/* --- The three lines ------------------------------------------------------ */
 
-.feed__time {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.5rem;
+.feed__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-/* The feed's fact-carrying text is --ghost, not --ash. MEASURED: --ash is 3.06:1 on --surface —
-   below WCAG AA — and a date/txn-id/basis is a FACT, not chrome (Rung 2's rule: quiet is for
-   borders, never for a word). This surface predates that pass, which only ran on .aml. --ghost is
-   5.83:1: still cold, still secondary, now legible. --ash survives here as BORDERS and hover only. */
-.feed__date {
-  color: var(--ghost);
+.feed__line--head {
+  align-items: baseline;
+  justify-content: space-between;
 }
 
-.feed__clock {
+.feed__line--meta {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Line 1 — merchant (a name → body font, per DC) · amount (data → mono). */
+.feed__merchant {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--bone);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .feed__amount {
-  justify-self: end;
+  font-family: var(--font-mono);
+  font-size: 13px;
   color: var(--bone);
   font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
 }
 
-/* --- Line 2: merchant · txn (left) · tags (right) ------------------------- */
-
-.feed__where {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+/* Line 2 — when + what-it-was-about. FACT-carrying text is --ghost, not --ash. MEASURED: --ash is
+   3.06:1 on --surface (sub-AA); DC uses --ash (#5A6678) here, we keep --ghost (5.83:1). A
+   date/txn-id is a FACT; quiet (--ash) is for borders, never a word. */
+.feed__when {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 
-.feed__merchant {
-  color: var(--ghost);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.feed__txn {
-  color: var(--ghost);
-  font-size: 0.68rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .feed__tags {
-  justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 5px;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
-/* Belief-driven subset marker — quiet, cold. (The inherited/not tag and the
-   belief detail itself are the Phase-3 investigate flow; this only flags that a
-   real driving_belief_id is present.) */
-.feed__belief {
-  color: var(--ghost);
-  font-size: 0.64rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 0.02rem 0.28rem;
+.feed__fraud {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .feed__fraud-dot {
@@ -151,22 +145,74 @@
   flex: 0 0 auto;
 }
 
-.feed__verdict {
-  color: var(--ghost);
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
+.feed__fraud-badge {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--alert);
 }
 
-/* Verdicts stay cold — no warmth in the feed. 'blocked' is the fleet stopping a
-   txn; a slightly brighter tone distinguishes it without spending a signal color. */
+.feed__verdict {
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+
+/* Verdicts stay cold — no warmth in the feed. 'blocked' is the fleet stopping a txn; a slightly
+   brighter tone distinguishes it without spending a signal color. */
 .feed__verdict--blocked {
   color: var(--bone);
 }
 
+/* Line 3 — the per-row confidence bar. Track is --surface-2; fill is --ghost (a magnitude, not a
+   signal). Width is d.confidence*100% set inline; an AML row (null confidence) draws no fill. */
+.feed__line--conf {
+  gap: 8px;
+}
+
+.feed__confbar-track {
+  flex: 1 1 auto;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.feed__confbar {
+  display: block;
+  height: 100%;
+  background: var(--ghost);
+  border-radius: 2px;
+}
+
 .feed__conf {
-  color: var(--ghost);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--bone);
   font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+/* No confidence (AML): the em dash reads --ghost, not --bone — there is no magnitude to assert. */
+.feed__conf--none {
+  color: var(--ghost);
+}
+
+/* Belief-driven subset marker — quiet, cold. Flags that a real driving_belief_id is present. */
+.feed__belief {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ghost);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 4px;
+  flex: 0 0 auto;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -302,10 +348,10 @@
  * --------------------------------------------------------------------------------------------- */
 .feed__basis {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 2px;
   border: 1px solid var(--line);
   color: var(--ghost);
