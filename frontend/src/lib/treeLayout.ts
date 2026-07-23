@@ -54,7 +54,7 @@ export interface TreeLayout {
 const COL_W = 98;
 const MARGIN_X = 104; // room for the band label on the left
 const MARGIN_RIGHT = 56;
-const MARGIN_TOP = 46;
+const MARGIN_TOP = 76; // room for the per-generation GEN labels + band-rect top (design-port S4)
 const LANE_H = 82;
 const BAND_GAP = 58;
 const AXIS_GAP = 46;

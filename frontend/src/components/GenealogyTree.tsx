@@ -11,7 +11,7 @@
  * positions) is derived here from the layout; playback lives in TraceOverlay.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { AgentsData } from "../hooks/useConsoleData";
 import type { UUID } from "../api/types";
 import { computeTreeLayout, type TreeEdge, type TreeLayout } from "../lib/treeLayout";
@@ -118,6 +118,58 @@ export function GenealogyTree({
     [layout, invalidation],
   );
 
+  // Hover ancestry-preview (design-port S4). Hovering a node dims everything OFF its real ancestry
+  // chain and warms the chain to --bone — a cold, momentary "where did this line come from". The
+  // chain is walked over REAL parent_id edges (data.agents); no relationship is invented.
+  const [hoverNode, setHoverNode] = useState<UUID | null>(null);
+  const parentOf = useMemo(() => {
+    const m = new Map<UUID, UUID>();
+    for (const a of data.agents) if (a.parent_id) m.set(a.id, a.parent_id);
+    return m;
+  }, [data.agents]);
+  const ancestry = useMemo(() => {
+    if (!hoverNode) return new Set<UUID>();
+    const out = new Set<UUID>();
+    let cur: UUID | undefined = hoverNode;
+    let guard = 0;
+    while (cur && guard++ < 64) {
+      out.add(cur);
+      cur = parentOf.get(cur);
+    }
+    return out;
+  }, [hoverNode, parentOf]);
+  const hovering = hoverNode !== null;
+  const chainEdges = useMemo(() => {
+    const s = new Set<string>();
+    ancestry.forEach((id) => {
+      const p = parentOf.get(id);
+      if (p) s.add(`${p}->${id}`);
+    });
+    return s;
+  }, [ancestry, parentOf]);
+  const dimOf = (id: UUID) => (hovering && !ancestry.has(id) ? 0.16 : 1);
+
+  // Band boxes + GEN gridline extents, derived from the real layout (not the DC's hardcoded
+  // 86..606 / GEN 0-7). Bands are cold decorative rects; the GEN axis rides the real generations.
+  const bandBoxes = useMemo(
+    () =>
+      layout.bands.map((b, i) => {
+        const ns = layout.nodes.filter((n) => n.bandIndex === i);
+        const xs = ns.map((n) => n.x);
+        const ys = ns.map((n) => n.y);
+        return {
+          bloodline: b.bloodline,
+          x0: Math.min(...xs) - 40,
+          x1: Math.max(...xs) + 40,
+          y0: Math.min(...ys) - 36,
+          y1: Math.max(...ys) + 34,
+        };
+      }),
+    [layout],
+  );
+  const gridTop = Math.min(...bandBoxes.map((b) => b.y0));
+  const gridBot = Math.max(...bandBoxes.map((b) => b.y1));
+
   return (
     <div className="tree">
       <svg
@@ -127,50 +179,101 @@ export function GenealogyTree({
         role="img"
         aria-label={`Agent genealogy: ${layout.bands.length} bloodlines, ${data.count} agents, ${alive} alive.`}
       >
-        {/* edges under nodes */}
+        <defs>
+          {/* soft glow for the living-node halo */}
+          <filter id="tree-halo" x="-120%" y="-120%" width="340%" height="340%">
+            <feGaussianBlur stdDeviation="4" />
+          </filter>
+        </defs>
+
+        {/* bloodline bands — a faint --surface plate per bloodline, label top-left inside it */}
         <g>
-          {layout.edges.map((e) => (
-            <path
-              key={e.key}
-              d={edgePath(e)}
-              className={`tree__edge${e.isBranch ? " tree__edge--branch" : ""}`}
-            />
+          {bandBoxes.map((b) => (
+            <g key={b.bloodline}>
+              <rect
+                className="tree__band"
+                x={b.x0}
+                y={b.y0}
+                width={b.x1 - b.x0}
+                height={b.y1 - b.y0}
+                rx={12}
+              />
+              <text className="tree__band-label" x={b.x0 + 14} y={b.y0 + 22}>
+                {b.bloodline.toUpperCase()}
+              </text>
+            </g>
           ))}
         </g>
 
-        {/* band labels + a faint main-line rule per bloodline */}
+        {/* GEN gridlines — one vertical rule + top label per real generation */}
         <g>
-          {layout.bands.map((b) => (
-            <text
-              key={b.bloodline}
-              x={layout.labelX}
-              y={b.labelY}
-              className="tree__band-label"
-              dominantBaseline="middle"
-            >
-              {b.bloodline.toUpperCase()}
-            </text>
+          {layout.generations.map((g) => (
+            <g key={g.g}>
+              <line
+                className="tree__grid"
+                x1={g.x}
+                y1={gridTop - 6}
+                x2={g.x}
+                y2={gridBot + 6}
+              />
+              <text className="tree__grid-label" x={g.x} y={gridTop - 18} textAnchor="middle">
+                GEN {g.g}
+              </text>
+            </g>
           ))}
+        </g>
+
+        {/* edges under nodes — dimmed off the hovered ancestry, warmed to --bone on it */}
+        <g>
+          {layout.edges.map((e) => {
+            const [pa, ch] = e.key.split("->") as [UUID, UUID];
+            const inChain = chainEdges.has(e.key);
+            return (
+              <path
+                key={e.key}
+                d={edgePath(e)}
+                className={`tree__edge${e.isBranch ? " tree__edge--branch" : ""}${
+                  inChain ? " tree__edge--chain" : ""
+                }`}
+                opacity={Math.min(dimOf(pa), dimOf(ch))}
+              />
+            );
+          })}
         </g>
 
         {/* nodes */}
         <g>
-          {layout.nodes.map((n) => (
-            <g
-              key={n.agent.id}
-              className={n.isAlive ? "tree__node tree__node--alive" : "tree__node tree__node--dead"}
-              transform={`translate(${n.x} ${n.y})`}
-            >
-              {n.isAlive && <circle className="tree__halo" r={18} />}
-              <circle className="tree__dot" r={13} />
-              <text className="tree__gen" dominantBaseline="central">
-                {n.agent.generation}
-              </text>
-              <text className="tree__id" y={30} dominantBaseline="hanging">
-                {n.idFrag}
-              </text>
-            </g>
-          ))}
+          {layout.nodes.map((n) => {
+            const id = n.agent.id;
+            const inChain = ancestry.has(id);
+            const isHover = hoverNode === id;
+            const cls =
+              "tree__node " +
+              (n.isAlive ? "tree__node--alive" : "tree__node--dead") +
+              (inChain ? " tree__node--inchain" : "") +
+              (isHover ? " tree__node--hover" : "");
+            return (
+              <g
+                key={id}
+                className={cls}
+                transform={`translate(${n.x} ${n.y})`}
+                opacity={dimOf(id)}
+                onMouseEnter={() => setHoverNode(id)}
+                onMouseLeave={() => setHoverNode(null)}
+              >
+                {/* transparent hit target — a generous hover radius so the preview is easy to trigger */}
+                <circle className="tree__hit" r={26} />
+                {n.isAlive && <circle className="tree__halo" r={22} filter="url(#tree-halo)" />}
+                <circle className="tree__dot" r={13} />
+                <text className="tree__gen" dominantBaseline="central">
+                  {n.agent.generation}
+                </text>
+                <text className="tree__id" y={30} dominantBaseline="hanging">
+                  {n.idFrag}
+                </text>
+              </g>
+            );
+          })}
         </g>
 
         {/* trace overlay — warmth on top of the cold tree, only when tracing */}
@@ -183,49 +286,19 @@ export function GenealogyTree({
         {invalidation && invalGeo && (
           <InvalidateOverlay geo={invalGeo} phase={invalidation.phase} playToken={invalidation.playToken} />
         )}
-
-        {/* generation axis */}
-        <g>
-          <line
-            className="tree__axis-rule"
-            x1={layout.labelX}
-            y1={layout.axisY - 20}
-            x2={layout.width - 24}
-            y2={layout.axisY - 20}
-          />
-          <text
-            x={layout.labelX}
-            y={layout.axisY}
-            className="tree__axis-caption"
-            dominantBaseline="middle"
-          >
-            GEN
-          </text>
-          {layout.generations.map((g) => (
-            <text
-              key={g.g}
-              x={g.x}
-              y={layout.axisY}
-              className="tree__axis-label"
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {g.g}
-            </text>
-          ))}
-        </g>
       </svg>
 
       <div className="tree__legend" aria-hidden="true">
         <span className="tree__legend-item">
-          <span className="tree__key tree__key--alive" /> alive
+          <span className="tree__key tree__key--alive" /> living
         </span>
         <span className="tree__legend-item">
-          <span className="tree__key tree__key--dead" /> dead
+          <span className="tree__key tree__key--dead" /> dead ancestor
         </span>
         <span className="tree__legend-item">
           <span className="tree__key tree__key--branch" /> branch
         </span>
+        <span className="tree__legend-hint">hover a node → ancestry preview</span>
       </div>
     </div>
   );
