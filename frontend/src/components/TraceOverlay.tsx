@@ -15,14 +15,31 @@
  */
 
 import { motion, useReducedMotion } from "framer-motion";
-import { BLOOM_TIMES, DUR, EASE } from "../lib/motion";
+import { DUR, EASE, SETTLE_TIMES } from "../lib/motion";
 
 // Trace-local cadence knobs (the warmth-walk feel; NOTES.md calls these out for live tuning).
+// The walk cadence already matched the DC exactly (its hopStart i*150ms / hopDur 160ms); only the
+// origin's FINISH differed, and that is what design-port S6 replaced.
 const STAGGER = 0.15; // per-hop delay
 const EDGE_DUR = 0.16; // one edge's pathLength draw
 const EDGE_FADE = 0.04; // the near-instant opacity flash alongside the draw
 const NODE_DUR = 0.14; // a chain node tinting to --trace
 const IGNITE_DUR = DUR.bloom; // the origin bloom — shared with Invalidate's corrected halo
+
+/*
+ * THE ORIGIN'S FINISH (design-port S6, DC `lin-settle` + its bloom disc).
+ *
+ * The origin used to flash: it scaled UP through an overshoot (1 → 1.12 → 1) while a fixed-radius
+ * glow peaked at 0.8 and then DIMMED BACK to 0.55. Read literally, that says the origin ignited and
+ * then partly went out — the opposite of the claim the moment makes. The DC's is monotone: the disc
+ * grows outward and STAYS lit, and the node arrives LARGE and settles down into place.
+ *
+ * Both are transform/opacity only, and both are monotone, so prefers-reduced-motion collapses to a
+ * byte-identical final frame by construction — there is no peak to miss, only the resting state.
+ */
+const SETTLE_FROM = 1.9; // DC lin-settle: the origin node arrives at 1.9x and shrinks into place
+const GLOW_FROM = 0.42; // the bloom disc's start radius as a fraction of its final (DC 16 → 50)
+const GLOW_OPACITY = 0.78; // DC bloom disc opacity at full ignite — reached, then HELD
 
 export interface TraceEdgeGeo {
   key: string;
@@ -107,26 +124,33 @@ export function TraceOverlay({
         .filter((n) => n.isOrigin)
         .map((o) => (
           <g key={o.id} transform={`translate(${o.x} ${o.y})`}>
+            {/* The bloom disc grows outward and HOLDS at full ignite — monotone, so the resting
+                state IS the end state under either motion preference. */}
             <motion.circle
               className="tree__trace-glow"
-              r={22}
-              initial={{ opacity: 0, scale: 0.65 }}
-              // reduced-motion settles on the SAME resting opacity as the full-motion end
-              // keyframe (0.55), so both paths land on one identical final state.
-              animate={{ opacity: reduce ? 0.55 : [0, 0.8, 0.55], scale: 1 }}
+              r={26}
+              initial={{ opacity: 0, scale: GLOW_FROM }}
+              animate={{ opacity: GLOW_OPACITY, scale: 1 }}
               transition={
-                reduce
-                  ? { duration: 0 }
-                  : { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out, times: BLOOM_TIMES }
+                reduce ? { duration: 0 } : { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out }
               }
             />
+            {/* lin-settle: arrives at 1.9x and shrinks in, opacity full at 60% of the travel. */}
             <motion.g
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: reduce ? 1 : [1, 1.12, 1] }}
+              initial={{ opacity: 0, scale: SETTLE_FROM }}
+              animate={{ opacity: reduce ? 1 : [0, 1, 1], scale: 1 }}
               transition={
                 reduce
                   ? { duration: 0 }
-                  : { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out, times: BLOOM_TIMES }
+                  : {
+                      opacity: {
+                        delay: originDelay,
+                        duration: IGNITE_DUR,
+                        ease: EASE.out,
+                        times: SETTLE_TIMES,
+                      },
+                      scale: { delay: originDelay, duration: IGNITE_DUR, ease: EASE.out },
+                    }
               }
               onAnimationComplete={fireOnce}
             >
