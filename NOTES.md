@@ -9304,3 +9304,25 @@ motion preference differ from each other, so there is no settled frame to be byt
 WAS verified is the thing that actually matters — every element S6 changed is measurably identical
 across preferences (glow opacity 0.78 / origin opacity 1 / transforms settled / 7 edges fully drawn,
 byte-equal in both).
+
+### KNOWN FLAKE in the geometry guard — recognize it, do NOT chase it, do NOT add retries
+
+Observed once in 5 full runs during S6: **1 failed / 39 passed**, in
+`the witness geometry › the drawing matches the wire: PARALLEL transactions`, project **1440x900**
+(full-motion), failing at **geometry.spec.ts:193:14 — `await page.goto("/")`** inside the
+`interrogate()` helper. Nothing had changed on that path (the S6 diff was TraceOverlay + the
+invalidate gate); three subsequent full runs were 40/40, and BOTH governed-write tests passed in
+every single run including the failing one.
+
+This is EXACTLY the shape playwright.config.ts already documents in its `workers: 1` comment — the
+`vite preview` static server intermittently not answering, killing tests on
+`page.goto: Test timeout of 30000ms exceeded`. The one thing worth adding: the config attributes it
+to the default 6 parallel workers and records 5/5 clean after serializing, but **this occurred WITH
+`workers: 1`** — so serializing reduced the rate, it did not eliminate it. Assume ~1 run in 5 rather
+than "fixed".
+
+`retries: 0` stays deliberate ("a geometry assertion is deterministic; a retry would only hide a real
+flake"). The correct response to hitting this is: re-run ONCE and read WHERE it died. A failure at
+`page.goto` in a setup helper is this flake. A failure inside an `expect(...)` — especially either
+governed-write assertion, or an edge-count/subject-marker assertion — is a REAL regression and must
+never be re-run away.
