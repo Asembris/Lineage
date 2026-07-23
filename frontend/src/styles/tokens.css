@@ -29,8 +29,8 @@
   --alert-dim: #3a1518; /* alert background wash */
 
   /* Type roles (FRONTEND.md): display sparing, body tight, data always mono.
-     Real web fonts are wired in a later phase; these carry sensible fallbacks
-     so the token names are stable now. */
+     The three families are now self-hosted (styles/fonts.css, design-port S1);
+     the system stacks below are genuine fallbacks behind the real faces. */
   --font-display: "Space Grotesk", "Geist", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo,
