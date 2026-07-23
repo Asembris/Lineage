@@ -70,17 +70,40 @@
   }
 }
 
+/* THE STAKES, NAMED FIRST (design-port S6). A mono uppercase micro-label above the rule, so the
+   irreversibility is stated before the sentence it applies to rather than only inside the scope
+   copy below. The DC sets this in --alert; --alert on --alert-dim is 4.13:1, below the 4.5:1 floor,
+   and this is a readable fact — so the words take --ghost (5.28:1) and only the ⚠ glyph keeps
+   --alert, as a symbol that carries no reading. */
+/* Sized to hold ONE line in the Inspector column. At 0.65rem/0.12em the label wrapped and orphaned
+   the word "DELETING" — a warning that breaks across lines reads as overflow rather than as a
+   deliberate label. 0.6rem/0.09em is the DC's own ~9px micro-label scale and fits with margin. */
+.kill__irreversible {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+
+.kill__irreversible-mark {
+  color: var(--alert);
+}
+
 /* THE RULE BEING DELETED — the sentence, not the hash. Set in the belief's own voice (body face,
-   --bone, quoted behind an --alert rule) so it reads as the THING under the knife, distinct from
-   the scope copy below, which is the CONSEQUENCE. Rendered in full: no line-clamp, no ellipsis,
-   no max-height. Truncating the sentence a supervisor is about to irreversibly delete would be a
-   lie of omission at the exact moment the stakes peak. */
+   --bone, ITALIC, quoted behind an --alert rule) so it reads as the THING under the knife — a
+   quoted sentence in the belief's voice — distinct from the scope copy below, which is the
+   CONSEQUENCE. Rendered in full: no line-clamp, no ellipsis, no max-height. Truncating the sentence
+   a supervisor is about to irreversibly delete would be a lie of omission at the exact moment the
+   stakes peak. */
 .kill__rule {
   margin: 0 0 0.6rem;
   padding: 0.4rem 0 0.4rem 0.6rem;
   border-left: 2px solid var(--alert);
   font-family: var(--font-body);
   font-size: 0.84rem;
+  font-style: italic;
   line-height: 1.45;
   color: var(--bone);
 }
@@ -141,14 +164,18 @@
   cursor: default;
 }
 
-/* Full-width, so it covers the arm button's footprint EXACTLY — that coverage is the mechanism. */
+/* Full-width, so it covers the arm button's footprint EXACTLY — that coverage is the mechanism.
+   Border --ash and text --bone per the DC: Cancel is the SAFE action sitting on the remembered
+   position, so it should read as a present, legible control rather than a de-emphasised one.
+   (--ghost 6.32:1 -> --bone 12.04:1 on --void.) Width/order/flex are UNCHANGED — the geometry
+   invariant lives in those, and this touches only colour. */
 .kill__cancel {
   flex: 0 0 auto;
   width: 100%;
   padding: 0.5rem 0.9rem;
   background: transparent;
-  color: var(--ghost);
-  border: 1px solid var(--line);
+  color: var(--bone);
+  border: 1px solid var(--ash);
   border-radius: 4px;
   font-family: var(--font-body);
   font-size: 0.8rem;
@@ -156,8 +183,7 @@
 }
 
 .kill__cancel:hover:not(:disabled) {
-  color: var(--bone);
-  border-color: var(--ash);
+  border-color: var(--bone);
 }
 
 .kill__confirm:focus-visible,

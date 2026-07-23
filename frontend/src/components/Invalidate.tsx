@@ -172,6 +172,16 @@ export function InvalidateBlock({
   const busy = ui.status === "invalidating";
   return (
     <div className="kill kill--armed">
+      {/* The stakes, named before the sentence they apply to (design-port S6). The DC sets this line
+          in --alert; at 4.13:1 on --alert-dim that is below AA, and this is a readable fact, not
+          decoration — so the WORDS are --ghost (5.28:1) and only the ⚠ glyph, a symbol carrying no
+          reading, keeps --alert. Same substitution the S4 pass made for the DC's --ash facts. */}
+      <p className="kill__irreversible">
+        <span className="kill__irreversible-mark" aria-hidden="true">
+          ⚠
+        </span>{" "}
+        irreversible · read the rule you are deleting
+      </p>
       {/* THE SENTENCE BEING DELETED. Every number justifying the kill was already on screen at the
           moment of confirmation — the curve, the interval, the Fisher criterion — and the thing
           being killed was NOT: the gate named it only as `898ad0`, a hash, not a rule. A supervisor
