@@ -7,6 +7,7 @@ import { Inspector } from "./components/Inspector";
 import { ConsistencyDemo } from "./components/ConsistencyDemo";
 import { HonestyLedger } from "./components/HonestyLedger";
 import { AmlConsole } from "./components/AmlConsole";
+import { LineageEmblem } from "./components/LineageEmblem";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -296,6 +297,7 @@ function App() {
     <div className="console">
       <header className="console__header">
         <div className="console__brand">
+          <LineageEmblem className="console__mark" />
           <h1 className="console__title">LINEAGE</h1>
           <span className="console__tagline">supervisor console</span>
         </div>
