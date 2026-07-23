@@ -10,6 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "guard:composition": "node scripts/composition-guard.mjs",
+    "guard:data": "node scripts/no-fabricated-data.mjs",
     "guard:geometry": "playwright test"
   },
   "dependencies": {
