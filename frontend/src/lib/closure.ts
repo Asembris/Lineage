@@ -89,3 +89,27 @@ export function witnessSeq(
   const s = samples.find((x) => x.open_edges <= threshold);
   return s ? s.seq : null;
 }
+
+/**
+ * Indices of every sample that OBSERVABLY DIFFERS from the one before it — the reader saw the
+ * closure change between these two reads. Index 0 is always included: the run's first observation.
+ *
+ * WHAT THIS IS NOT, AND WHY IT MATTERS. These are NOT commit points and are never labelled as such.
+ * A change is observer-resolution-limited: two holder edges closing between two reads appear as ONE
+ * drop, and the belief row's own commit is not visible as an `open_edges` change at all. Counting
+ * these would land near 8 and visibly contradict `summary.commit_points: 9`, which is the
+ * authoritative figure and comes off the wire. So the UI navigates by these and NEVER tallies them.
+ *
+ * (The DC spec has no such hazard because it controls its own fake clock — its rail is captioned
+ * "nine points" over eight fabricated holder times plus a fabricated belief time. Ours is an
+ * observation of a real fan-out, at a real sampling interval, and says only what it saw.)
+ */
+export function changeIndices(samples: ConsistencySampleEvent[]): number[] {
+  const out: number[] = [];
+  samples.forEach((s, i) => {
+    if (i === 0 || s.open_edges !== samples[i - 1].open_edges || s.state !== samples[i - 1].state) {
+      out.push(i);
+    }
+  });
+  return out;
+}
