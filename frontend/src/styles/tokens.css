@@ -37,6 +37,7 @@
      genealogy tree, the feed, the evidence surface, or any button/hover — nothing that carries
      meaning. Teal on a signal surface would read as a state the console does not have. */
   --brand-teal: #53b8c6; /* emblem attestation spine + diamonds; loader seal accents */
+  --brand-teal: #53b8c6; /* emblem attestation spine + diamonds; loader seal accents */
   --brand-parchment: #f2f0e8; /* emblem shield strokes; loader wordmark */
 
   /* Type roles (FRONTEND.md): display sparing, body tight, data always mono.
@@ -46,4 +47,32 @@
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo,
     monospace;
+}
+
+/* LOADER PALETTE — the startup cinematic ONLY. NOT signal colours. (loader-conformance port)
+   The DC loader spec ("The Decision Autopsy", LINEAGE_LOADER_HANDOFF.md §3) introduces its own
+   forensic palette — a coherent teal, a single causal amber, a deep void, a cold plane hairline.
+   These are its EXACT hexes, introduced as --loader-* so a porter can never reach for a signal token
+   to stand in for one.
+
+   WHY SCOPED TO .loader, NOT :root. --brand-* above are convention-scoped (a comment says "only the
+   emblem/loader may use them"). This block goes further: defining the tokens ON THE OVERLAY SELECTOR
+   makes them LITERALLY invisible to the rest of the console — a rule anywhere outside `.loader` that
+   wrote `color: var(--loader-amber)` would resolve to nothing. That is the guarantee the reserved-
+   warmth rule needs: loader amber (#f2a43a, one hue for trace AND origin) is NOT the console's belief
+   trace (--trace #e0a23f) or its origin ignite (--origin #e07b3f); loader teal (#42ddb3) is NOT
+   --alive (#3fe0a8). They must never be used to repoint those signal tokens. The ONLY files that may
+   reference --loader-* are Loader.tsx / Loader.css (the overlay). The emblem keeps --brand-* (its two
+   hues render identically to the spec's), so the seal inside the overlay draws from --brand-*, and
+   everything else in the overlay draws from --loader-*. */
+.loader {
+  --loader-void: #071019; /* backdrop core (opaque; dissolves at the reveal) */
+  --loader-teal: #42ddb3; /* the selected decision / coherent state — subject diamond core */
+  --loader-teal2: #53b8c6; /* transfer line + emblem accent (== --brand-teal) */
+  --loader-amber: #f2a43a; /* the causal trace AND the origin ignite — one hue for both */
+  --loader-line: rgba(118, 143, 174, 0.28); /* cold plane hairline */
+  --loader-plane0: rgba(66, 221, 179, 0.35); /* the nearest provenance plane's teal edge */
+  --loader-trace-base: #41536b; /* the dim companion under the amber active trace */
+  --loader-muted: #7f8fa7; /* label kickers */
+  --loader-value: #dfe7ef; /* label values */
 }
