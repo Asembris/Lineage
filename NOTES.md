@@ -9326,3 +9326,93 @@ flake"). The correct response to hitting this is: re-run ONCE and read WHERE it 
 `page.goto` in a setup helper is this flake. A failure inside an `expect(...)` — especially either
 governed-write assertion, or an edge-count/subject-marker assertion — is a REAL regression and must
 never be re-run away.
+
+## Frontend design-port S7 — consistency scrubber/inspection over the REAL SSE (2026-07-24)
+
+The DC's consistency surface is **100% simulation** — decoded and confirmed: `cTimeline()`
+(template.html:1838) hardcodes fabricated ms (`EVH:[640,820,1000,1180,1360,1540,1720,1900]`,
+`END:2500`, `TORN0:640/TORN1:1900` → a 1260ms window), holder state is `t >= T.EVH[i]`, and `cT` is
+a requestAnimationFrame playhead over it. There is no stream behind it. So S7 ported the DC's
+CONTROLS and never its clock: every control addresses a RECORDED observer sample of our real
+destructive `GET /demo/consistency/stream`. Seven commits, each a control.
+
+**THE REFACTOR FIRST (the load-bearing one).** 2D DrainMeter and 3D scene each derived
+`samples[samples.length-1]` independently and agreed only because both always showed the tail. A
+scrubber breaks that instantly (meter on inspected, scene on latest). Moved the derivation to
+`lib/closure.ts` (`closureView()` → one `ClosureView`) and handed it to BOTH renderers. The scene's
+prop went from `samples[]` to `view: ClosureView`. Disagreement is now unrepresentable, not
+tested-for — and it SHOWS: toggling to 3D on inspected sample #5 keeps the scene on #5 (1 corrected /
+7 torn), where before it would have jumped to the all-green tail. `closure.ts` documents why no
+interpolation is possible: only samples are addressable, so an intermediate frame has no
+representation to be invented in.
+
+**Scrubber** = `<input type=range>` over sample INDEX, step=1. Native keyboard/AT for free; the
+no-synthesized-samples rule is enforced by the control's SHAPE (no continuous domain) rather than by
+remembering it. Real cadence survives even spacing because the readout carries each sample's own
+`elapsed_ms` off the wire. `◀ prev/next change ▶` seek to samples where `(open_edges,state)` differs
+from the prior read — labelled CHANGES, **never counted**: a change is observer-resolution-limited
+(two edges between two reads = one drop; the belief-row commit isn't an `open_edges` change at all),
+so a tally would land near 8 and contradict the wire's authoritative `summary.commit_points:9`. While
+streaming, scrubbing back pins an index, offers "return to live", and suspends the log auto-scroll.
+
+**Seek-to-torn** (the DC's "pause at torn", which restarts its sim and freezes at a fabricated
+`tornMid`). Present on BOTH paths, enabled iff `samples.some(s=>s.state==='SPLIT')` — **never**
+`strategy==='strong'`. Gating on the strategy would make the UI ASSERT the atomic claim; gating on
+the samples makes it TEST it (if atomic ever committed a torn read, the button lights up and seeks to
+the proof). On strong it is disabled and carries the finding as a counted result: "no torn sample
+exists in this run — 0 of N observer samples were SPLIT. That absence is the result." Keeping it
+visible on both paths is the point: eventual→atomic shows the same control go from a live target to a
+counted zero, which IS the proof; hiding it erases the finding.
+
+**Holder inspection in 2D** — the DC rail is hover-only over 8 hardcoded handles; ours is the
+keyboard-complete path (FRONTEND.md: 2D complete, 3D the gated enhancement). Meter cells become
+buttons ONLY once `GET /beliefs/{id}/lineage` resolves; identity is the real `inherited_at` binding
+the 3D scene already uses (load-bearing: the fan-out closes `ORDER BY inherited_at`). Selection is now
+ONE shared state across renders, so the toggle preserves the open holder; `HolderDetail` renders in
+both and separates its two clocks — "closure edge · as of #N" (moves with the scrubber) vs "first
+observed closed at · whole run" (does not). The `useEffect` that cleared selection on leaving 3D now
+clears only the 3D-only hover.
+
+**Observer-sample selection** — the DC needs two fields (`cT`+`cObsSel`) because its playhead is
+continuous fake time and its 12 marks are separate fake events; a real sample is both, so log rows
+write the SAME `inspected` index the range does. One value, two addresses — no sync code to disagree.
+Reverse link (holder→row) via `witnessSeq`, now selection-driven and live in both renders.
+
+**Polish** ported DC structure+colour, not its 8.5–9.5px type (same call as S4/S6). Closed two live
+AA gaps in passing: the SPLIT chip's words → `--ghost` 5.28:1 (DC's `--alert`-on-`--alert-dim` is
+4.13:1, the S6 substitution); the 1-vs-9 cards → `--void` inset, making the big `--alert` 9 read
+4.94:1 (was 4.08:1 on `--surface-2`) — a **local** inset, explicitly NOT the banked whole-app `--void`
+body layering. `tabular-nums` is load-bearing here, not cosmetic: every mono figure changes as the
+scrubber steps.
+
+**Commit 7 — guard:data** now denies the fabricated timeline, anchored as the 8-NUMBER SEQUENCE
+(`640,820,…,1900`). A lone 640 or 2500 is innocent (timeout/px/interval) and must not false-fail; the
+ordered sequence is an unambiguous DC fingerprint. Fixture gained the array (self-test → 16 planted)
++ two negatives (bare 2500, bare 640). Proven out-of-band: planting the array in src fails the build
+and flags only the array line, not the adjacent bare integers.
+
+**VERIFICATION.** Geometry **40/40 before AND after** (this surface is outside its scope — it
+measures only `.kill__*` + `.geo`/`.geo__edge`; confirmed, not assumed). tsc/oxlint/vite
+build/guard:composition/guard:data all clean. Screenshots at 1440×900, eventual+strong ×
+motion+reduced, **zero page errors** in all four. Reduced-motion split PROVEN as S6 did: NON-SPLIT
+frames byte-identical across prefs; on a SPLIT frame the meter's pre-existing `cx-split-pulse` means
+no settled frame (two motion captures 450ms apart differ), but every S7-CHANGED element (the whole
+`.cx-scrub` region) is byte-identical across prefs, and the reduced meter collapses the pulse
+(two reduced captures identical).
+
+**THE SCREENSHOT HARNESS — a real near-miss worth recording.** This surface only renders after a
+DESTRUCTIVE run, which this session forbids, and there is no consistency fixture in `tests-e2e/`. So
+screenshots were driven by a **scratchpad-only** SSE replay server (never in `frontend/src`, never
+committed): EVENTUAL = the verbatim NOTES "Frontend Phase 4" wire capture (25 samples, 141/360/610…
+elapsed_ms, first SPLIT seq 3, summary 9/18/25/6719; RECONSTRUCTED only the elided middle open_edges
+tuples and seq 22–24 ms, consistent with every recorded anchor); STRONG = SHAPE ONLY (NOTES has no
+strong capture — every atomic frame is labelled "harness-driven shape, not a measurement"). Non-stream
+endpoints served from the REAL committed `console.json` fixture, so holder identity is real.
+**THE NEAR-MISS:** the harness first bound port **8000 — the same port the real `uvicorn app.main`
+was already serving.** The first curl hit the REAL backend. Caught it via `netstat` (three listeners
+on :8000), killed the harness, and verified the console cluster was UNTOUCHED (5500/24/2, and the
+real belief_performance curve `0.924,0.952,0.876…` intact — the demo-db isolation held, this was a
+read, not a wipe). Rebound the harness on **:8123** and confirmed verbatim values before proceeding.
+LESSON: a scratchpad server MUST pick a non-default port; :8000 is the backend's and colliding there
+is how a "frontend-only" session could have wiped the cluster. It didn't, but only because the
+collision was noticed.
