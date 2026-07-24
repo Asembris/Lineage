@@ -9416,3 +9416,26 @@ read, not a wipe). Rebound the harness on **:8123** and confirmed verbatim value
 LESSON: a scratchpad server MUST pick a non-default port; :8000 is the backend's and colliding there
 is how a "frontend-only" session could have wiped the cluster. It didn't, but only because the
 collision was noticed.
+
+### RULE — ANY SCRATCHPAD HARNESS BINDS A NON-DEFAULT PORT (:8123, NEVER :8000). PRE-FLIGHT WITH netstat.
+
+Banking the S7 near-miss above as a standing rule, because it is a REPEATABLE TRAP, not a one-off:
+the real backend (`uvicorn app.main:app`) listens on **:8000**, and that app serves the DESTRUCTIVE
+endpoints (`GET /demo/consistency/stream` = truncate + reseed + real invalidation; the governed
+`POST /beliefs/{id}/invalidate`). A scratchpad server — SSE replay, mock API, anything — that binds
+:8000 does NOT get a bind error if the backend is already up; it becomes a SECOND listener, and the
+OS hands connections to one of them nondeterministically. So a harness on :8000 will **silently proxy
+real traffic to the real destructive app**, and a "frontend-only, no-cluster-wipe" session can trip
+the reseed it was built to avoid. (In S7 it was a read, so nothing broke — luck, not design.)
+
+THE RULE, for the next session spinning up any local server:
+1. **Bind a non-default port.** :8123 is the house choice for scratchpad harnesses. NEVER :8000.
+2. **Pre-flight the port with netstat BEFORE driving any traffic** — confirm you are the only
+   listener and you own the pid:
+       netstat -ano | grep LISTENING | grep ":8123"
+   (One line, your python pid. If :8000 shows up in your plan at all, stop and re-point.)
+3. Point the built app at it explicitly: `VITE_API_BASE=http://localhost:8123 npm run build`.
+4. If there is ANY doubt the harness touched :8000, do a read-only re-count afterwards
+   (decisions/agents/beliefs counts + the real belief_performance curve) to prove no wipe.
+
+This is the cross-session-surfaced form of memory `scratchpad-server-never-port-8000`.
