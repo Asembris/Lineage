@@ -9558,3 +9558,80 @@ catches**; it only surfaces on the next `*.md` or backend push. Here the S8 push
 NOTES.md, so docs-ci ran and caught it before it could hide. A frontend-only session touching this
 surface should run `pytest -m doc_guard` locally (offline, dead-host) rather than trust that
 frontend-ci covers the prose invariants — it does not.
+
+## Frontend design-port S9 — the ledger: mostly CUT, then a thin honest restyle (2026-07-24)
+
+The last port slice, and the one the diagnosis pre-flagged as most likely to be CUT (§7 ranked it
+★/high, "no API; fabrication risk"). The triage confirmed it. **The finding is an ONTOLOGY MISMATCH,
+and it makes the cuts necessary, not reluctant.** The DC ledger (`buildClaims()` / `renderLedger()`,
+template.html:701-739, 2022-2212) is a **claims registry**: 14 hardcoded quantitative facts
+(`clm_00a1…clm_0131`), each dressed in an invented attestation chain — a `blake3·` seal, a `wk_…`
+writer key, an `rt_01` root-of-trust, a per-claim `VERIFIED/ANOMALOUS` verdict, and (for one) an
+`s3://lineage-certs/…` cert path. **None of it has an endpoint.** Our `HonestyLedger` is a *different
+thing*: ~20 real methodological disclosures mirroring README row-for-row, four reading the live cluster.
+
+**CUT in full (confirmed by the user):** the claims registry itself, the per-claim verification trail
+(`provMs`), the escalate/attest drawers (`escalate`/`attestOpen`), the `verified`/`anomalous` filters,
+the anomaly stepper (`anomStep`), and the two-pane list+drawer layout. Row **selection** (`ledgerSel`)
+is also effectively cut: in the DC, selection exists only to open the attestation drawer; our notes are
+already inline, so a selection→drawer buys an empty drawer. Search/filter (`ledgerQuery`/`ledgerFilter`)
+is buildable over our own rows but **low-value** on a ~20-row surface with inline notes, and it pushes
+toward the DC's registry framing we just rejected — so it was cut too (building the registry's furniture
+after cutting the registry would be adopting its shape without its substance).
+
+**THE PROVENANCE-TRAIL DISTINCTION — real-but-separate future work, NOT fabrication. Read this before
+"finishing the ledger's provenance UI."** The DC's per-*claim* step-by-step trail is invented. BUT a
+per-*edge* trail over the one belief's inheritance closure would be **honest and backed by real data**:
+`ProvenanceAuditResponse` already carries `edges: list[ProvenanceEdgeReport]` and `anomalies:
+list[ProvenanceEdgeReport]` (`app/schemas.py:91,108,124-125`) — the A1–A4 per-edge verdicts the
+top-line CLEAN/ANOMALOUS/INCONCLUSIVE summarizes. It was CUT this session for three converging reasons,
+and the distinction matters so a future session finds it rather than rediscovering the endpoint and
+assuming nobody noticed:
+  1. **It changes a PINNED scoping decision.** The ledger surfaces provenance-audit as a *top-line
+     verdict only, a data-point, not a per-edge UI* — pinned in THREE places: the `HonestyLedger.tsx`
+     docstring, `README.md:240` ("ledger *(top-line verdict only)*"), and `api/types.ts:109-118` which
+     *deliberately omits* the `edges[]` field the backend serves. A per-edge trail unwinds all three.
+  2. **It is an S8-scale FEATURE, not S9 re-skin polish** — a new per-edge surface consuming API fields
+     the frontend type doesn't expose today, with its own layout, states, and guard exposure.
+  3. **DEFAULT-TO-CUT.** The slice's remit was visual re-skin, not new features; "out of scope" is the
+     correct verdict for a real capability that belongs to a deliberate future decision, not this one.
+If you build it: restore `edges[]`/`anomalies[]` to the frontend `ProvenanceAuditResponse` type, move
+the README/docstring "top-line only" line in the same commit (lockstep), and treat it as its own gated
+PR. It is honest work — just not a re-skin.
+
+**WHAT SHIPPED — two commits, styling-only, entirely from our own live rows:**
+- **The denylist (build, standalone, most durable).** `blake3`, `wk_`, `rt_01`, `s3://lineage-certs/`
+  added to `no-fabricated-data.mjs`. `wk_`/`rt_01` are **lookbehind-anchored** (`(?<![A-Za-z0-9])`) so
+  innocent substrings can't false-fail — self-test proves it with two new negatives (`"part_01"`≠rt_01,
+  `"mohawk_style"`≠wk_). 20 planted caught / 10 negatives spared. `clm_00`, `s.okonkwo`, the HLC were
+  already denied from earlier slices.
+- **The restyle.** (1) LIVE/STATIC marker: a cold pulsing **--bone** dot on LIVE ("never frozen") and a
+  static ▣ on STATIC — the asymmetry IS the live-vs-frozen meaning. Pure CSS `::before`, so it lands in
+  the legend AND every row at once; the dot is --bone, **never --alive**, so it cannot read as a second
+  alert channel (the rule the whole surface keeps). (2) `font-variant-numeric: tabular-nums` on the live
+  readings. (3) A subtle **--surface** hover lift (a reading aid, **snapped** per colour-snap; rows stay
+  non-interactive). (4) A staggered enter (`--row-i` capped at 12) replacing the flat opacity fade.
+
+**INVARIANTS.** No `--trace/--origin/--alive/--alert` introduced (dot --bone, hover --surface); the one
+earned --alert (ANOMALOUS provenance) untouched; `--ash` carries no text. **No data-layer change** —
+`useSeamCensus`/`useLedgerLive`/the live counts are untouched, so every LIVE row still reads the cluster
+(verified: the TSX diff is the `CSSProperties` import + one `<li>` style, nothing else). Styling-only, so
+README lockstep is not at risk. All motion gated behind `prefers-reduced-motion: no-preference`; the
+un-animated rest state IS the reduced-motion final frame (both `animation:` sites confirmed inside a
+no-preference block — same structural proof the pre-existing `.ledger` reveal used for this surface).
+
+**GUARDS.** geometry **40/40 before AND after** (all four projects — the ledger is not in geometry.spec,
+so this proves no regression, not coverage); guard:composition PASS (94 components); guard:data PASS
+(20/10); tsc/oxlint/vite build clean; `pytest -m doc_guard` **63 passed** locally (the S8 routing-gap
+lesson — frontend-ci can't run it, and the ledger is the most prose-dense surface in the app). AA, all
+≥4.5:1: --ghost on --void 6.32:1, --ghost on --surface 5.83:1, --bone on --surface 11.09:1; the pulsing
+dot and hover fill are non-text.
+
+### RULE — the ledger describes the WHOLE system's honesty; it is not a per-claim registry
+Banking S9's finding so it is not re-litigated. Our honesty ledger and the DC's claims registry are
+different ontologies: ours is methodological disclosure (mirrored to README row-for-row), the DC's is a
+per-fact attestation chain. Do not port the registry's affordances (per-claim verdict, seal, writer key,
+root-of-trust, search/filter-as-registry) onto our surface — they have no backing data and would adopt
+the DC's shape without its (nonexistent) substance. The one real provenance signal we have is the
+belief-closure audit; it stays a top-line verdict unless a future session deliberately builds the
+per-edge feature above and moves the pinned "top-line only" scoping with it.
