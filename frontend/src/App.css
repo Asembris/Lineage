@@ -96,10 +96,44 @@
 
 /* --- Three-region body ---------------------------------------------------- */
 
+/* THE THREE-STATE GRID (decision-feed handoff §5). One 3-column grid whose track widths TRANSITION
+   between three states, so the feed can yield width to the Inspector on selection and collapse to a
+   rail — without ever remounting a region (which would jank the tree and drop scroll position).
+   The state is carried by `data-layout` on this element, set in App.tsx.
+
+   All states use fixed lengths, deliberately: `grid-template-columns` only interpolates track-for-
+   track between compatible values, so a `minmax()` default would SNAP into the fixed focus/collapsed
+   states instead of easing. Fixed-px everywhere buys the smooth transition the handoff calls for.
+   The middle (genealogy) is always `1fr` and simply absorbs the width the feed gives up. */
 .console__body {
   display: grid;
-  grid-template-columns: minmax(280px, 22rem) 1fr minmax(300px, 24rem);
+  grid-template-columns: 320px 1fr 344px;
   min-height: 0; /* let children shrink so their bodies can scroll */
+  transition: grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus mode — a decision is under investigation. The feed narrows (its rows are no longer the
+   subject; the selected one is), and the Inspector — now the Investigation surface — widens. */
+.console__body[data-layout="focus"] {
+  grid-template-columns: 250px 1fr 404px;
+}
+
+/* Collapsed — the feed is a 56px rail (its full panel is unmounted, see App.tsx). The reclaimed
+   width goes to the genealogy; the Inspector keeps its default unless a decision is also selected. */
+.console__body[data-layout="collapsed"] {
+  grid-template-columns: 56px 1fr 344px;
+}
+
+.console__body[data-layout="collapsed-focus"] {
+  grid-template-columns: 56px 1fr 404px;
+}
+
+/* Repo convention: every transition here degrades to its final frame. Under reduced motion the grid
+   SNAPS between states — the destination layout is byte-identical, only the interpolation is removed. */
+@media (prefers-reduced-motion: reduce) {
+  .console__body {
+    transition: none;
+  }
 }
 
 .console__region {

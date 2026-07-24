@@ -434,7 +434,7 @@ function App() {
       ) : view.kind === "ledger" ? (
         <HonestyLedger agents={agents} decisions={decisions} beliefs={beliefs} />
       ) : (
-        <div className="console__body">
+        <div className="console__body" data-layout="default">
           <div className="console__region">
             <Panel title="Decision feed" count={decisionCount}>
               <Loaded state={decisions} loadingLabel="Loading decisions…">
