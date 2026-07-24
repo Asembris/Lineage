@@ -83,7 +83,10 @@ function DecisionRow({
   onFocusReturned: () => void;
 }) {
   const { date, time } = splitInstant(d.decided_at);
-  const beliefDriven = d.driving_belief_id !== null;
+  // The driving belief, as its id fragment (fragId → first 6, the console's identity convention) —
+  // it NAMES which belief drove the decision, not merely THAT one did. Null for a card decision
+  // without a driving belief; the ternary narrows so no non-null assertion is needed.
+  const beliefFrag = d.driving_belief_id !== null ? fragId(d.driving_belief_id) : null;
 
   // The seam's focus handoff (return leg). When the feed remounts after the evidence view closes,
   // the row whose "see why" opened it takes focus back — so a keyboard user lands where they left,
@@ -170,9 +173,12 @@ function DecisionRow({
           <span className={`feed__conf${confKnown ? "" : " feed__conf--none"}`}>
             {formatConfidence(d.confidence)}
           </span>
-          {beliefDriven && (
-            <span className="feed__belief" title="belief-driven decision">
-              belief
+          {beliefFrag && (
+            <span
+              className="feed__belief"
+              title={`belief-driven decision · driving belief ${beliefFrag}`}
+            >
+              {beliefFrag}
             </span>
           )}
         </span>
