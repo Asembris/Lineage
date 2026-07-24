@@ -32,7 +32,12 @@ import type {
   LineageNode,
 } from "../api/types";
 import { getBeliefLineage } from "../api/client";
-import { closureView, witnessSeq, type ClosureView } from "../lib/closure";
+import {
+  changeIndices,
+  closureView,
+  witnessSeq,
+  type ClosureView,
+} from "../lib/closure";
 import { runConsistencyStream, type ConsistencyStreamController } from "../lib/consistencyStream";
 import { ConsistencyScene3D } from "./ConsistencyScene3D";
 import { RestoreCommands } from "./RestoreHint";
@@ -94,6 +99,107 @@ function DrainMeter({ view }: { view: ClosureView }) {
         const kind = isClosed ? "closed" : torn ? "split" : "rest";
         return <span key={i} className={`cx-meter__cell cx-meter__cell--${kind}`} />;
       })}
+    </div>
+  );
+}
+
+/** REPLAY, NOT SIMULATION — the scrubber over a run's recorded observer samples.
+ *
+ *  The DC spec (renderConsistency) scrubs `cT`, a requestAnimationFrame playhead over a hardcoded
+ *  `cTimeline()` of fabricated milliseconds, deriving holder state from `t >= T.EVH[i]`. There is no
+ *  stream behind it, so every position on its timeline is generated on demand.
+ *
+ *  Ours cannot work that way and must not look like it does. The control is a range over SAMPLE
+ *  INDEX with step=1: every reachable position IS a recorded sample, rendered verbatim. There is no
+ *  continuous domain, so there is no "between two samples" for the UI to invent a frame in — the
+ *  no-synthesized-samples rule is enforced by the control's shape, not by remembering to obey it.
+ *
+ *  Real cadence is not lost to even index spacing: the readout carries each sample's own
+ *  `elapsed_ms` off the wire, so the eventual path's multi-second gaps and the atomic path's
+ *  millisecond ones are both visible as you step.
+ *
+ *  `◀ prev change / next change ▶` seek to samples where the reader observed the closure differ
+ *  from the previous read. They are labelled CHANGES, never commits, and are deliberately never
+ *  counted — see changeIndices() in lib/closure.ts for why a count would contradict the wire. */
+function Scrubber({
+  samples,
+  index,
+  following,
+  live,
+  onInspect,
+  onFollow,
+}: {
+  samples: ConsistencySampleEvent[];
+  index: number;
+  following: boolean;
+  live: boolean;
+  onInspect: (i: number) => void;
+  onFollow: () => void;
+}) {
+  const last = samples.length - 1;
+  const current = samples[index];
+  const changes = changeIndices(samples);
+  const prev = [...changes].reverse().find((i) => i < index);
+  const next = changes.find((i) => i > index);
+
+  return (
+    <div className="cx-scrub">
+      <div className="cx-scrub__row">
+        <button
+          className="cx-scrub__step"
+          onClick={() => onInspect(prev ?? 0)}
+          disabled={prev === undefined}
+          aria-label="Seek to the previous observed change"
+        >
+          ◀ prev change
+        </button>
+        <input
+          className="cx-scrub__range"
+          type="range"
+          min={0}
+          max={last}
+          step={1}
+          value={index}
+          onChange={(e) => onInspect(Number(e.target.value))}
+          aria-label="Observer sample to inspect"
+          aria-valuetext={
+            current
+              ? `sample ${index + 1} of ${samples.length}, ${current.elapsed_ms} milliseconds, ${
+                  current.state
+                }, ${current.open_edges} of ${current.total_edges} edges open`
+              : undefined
+          }
+        />
+        <button
+          className="cx-scrub__step"
+          onClick={() => onInspect(next ?? last)}
+          disabled={next === undefined}
+          aria-label="Seek to the next observed change"
+        >
+          next change ▶
+        </button>
+      </div>
+
+      <div className="cx-scrub__readout">
+        <span className="cx-scrub__at mono">
+          sample <b>#{current?.seq}</b> · {current?.elapsed_ms} ms
+        </span>
+        <span className="cx-scrub__of mono">
+          {index + 1} of {samples.length} recorded
+        </span>
+        {live &&
+          (following ? (
+            <span className="cx-scrub__live mono">following live</span>
+          ) : (
+            <button className="cx-scrub__relive" onClick={onFollow}>
+              return to live
+            </button>
+          ))}
+      </div>
+
+      {/* EVENTUAL-ONLY BY MEASUREMENT, NOT BY CONFIGURATION. Enabled iff a real SPLIT sample exists
+          in what this run recorded — never `strategy === "strong"`. On the atomic path there is no
+          torn state to seek to, and the disabled note reports that as the counted result it is. */}
     </div>
   );
 }
@@ -190,8 +296,10 @@ function Observation({
   holders,
   hoveredHolder,
   selectedHolder,
+  inspected,
   onHover,
   onSelect,
+  onInspect,
 }: {
   samples: ConsistencySampleEvent[];
   live: boolean;
@@ -200,18 +308,27 @@ function Observation({
   holders: LineageNode[] | null;
   hoveredHolder: number | null;
   selectedHolder: number | null;
+  /** Which recorded sample is being inspected; null = follow the live tail. */
+  inspected: number | null;
   onHover: (i: number | null) => void;
   onSelect: (i: number | null) => void;
+  onInspect: (i: number | null) => void;
 }) {
   const logRef = useRef<HTMLOListElement>(null);
-  // Keep the newest sample in view as they arrive. useLayoutEffect so the scroll lands before paint.
+  const following = inspected === null;
+  // Keep the newest sample in view as they arrive — but NOT while the user has scrubbed back, or
+  // the log would yank itself away from the row they parked on.
   useLayoutEffect(() => {
-    if (live && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [samples.length, live]);
+    if (live && following && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [samples.length, live, following]);
 
   // THE single derivation of the closure state on screen (lib/closure.ts). Both the 2D meter and
-  // the 3D scene are handed THIS value, so they render one state and cannot drift apart.
-  const view = closureView(samples[samples.length - 1] ?? null);
+  // the 3D scene are handed THIS value, so they render one state and cannot drift apart. The
+  // scrubber only chooses WHICH recorded sample it derives from — never what is in it.
+  const index = following
+    ? samples.length - 1
+    : Math.min(Math.max(inspected, 0), samples.length - 1);
+  const view = closureView(samples[index] ?? null);
   const { total, open, state } = view;
 
   // Identity binding is live only in 3D once the lineage has loaded. The row a hovered node
@@ -244,6 +361,17 @@ function Observation({
             ? "drag to orbit · scroll to zoom · hover a holder to trace its closure · click for detail · pointer-driven — use the 2D view for keyboard access"
             : "drag to orbit · scroll to zoom · holder identity loads on run · pointer-driven — use the 2D view for keyboard access"}
         </p>
+      )}
+
+      {samples.length > 0 && (
+        <Scrubber
+          samples={samples}
+          index={index}
+          following={following}
+          live={live}
+          onInspect={onInspect}
+          onFollow={() => onInspect(null)}
+        />
       )}
 
       {selected && (
@@ -416,6 +544,11 @@ export function ConsistencyDemo() {
   const [hoveredHolder, setHoveredHolder] = useState<number | null>(null);
   const [selectedHolder, setSelectedHolder] = useState<number | null>(null);
 
+  // Which RECORDED sample the surface is parked on. null = follow the live tail (and, once a run
+  // ends, the final sample) — the Phase-4 behaviour. Scrubbing pins an index into `samples`; there
+  // is no other addressable position, so there is nothing between two samples to render.
+  const [inspected, setInspected] = useState<number | null>(null);
+
   // Leaving 3D drops the selection so a stale detail panel can't linger over the 2D meter.
   useEffect(() => {
     if (render !== "3d") {
@@ -444,6 +577,7 @@ export function ConsistencyDemo() {
     setHolders(null);
     setHoveredHolder(null);
     setSelectedHolder(null);
+    setInspected(null); // a new run replaces the recorded samples the old index pointed into
     ctrl.current = runConsistencyStream(
       {
         onStart: (start) => {
@@ -640,8 +774,10 @@ export function ConsistencyDemo() {
               holders={holders}
               hoveredHolder={hoveredHolder}
               selectedHolder={selectedHolder}
+              inspected={inspected}
               onHover={setHoveredHolder}
               onSelect={setSelectedHolder}
+              onInspect={setInspected}
             />
             <button className="cx__stop" onClick={stop}>
               Stop
@@ -659,8 +795,10 @@ export function ConsistencyDemo() {
               holders={holders}
               hoveredHolder={hoveredHolder}
               selectedHolder={selectedHolder}
+              inspected={inspected}
               onHover={setHoveredHolder}
               onSelect={setSelectedHolder}
+              onInspect={setInspected}
             />
             <Summary summary={phase.summary} strategy={phase.start.strategy as ConsistencyStrategy} />
             <button className="cx__run" onClick={arm}>
@@ -685,8 +823,10 @@ export function ConsistencyDemo() {
                 holders={holders}
                 hoveredHolder={hoveredHolder}
                 selectedHolder={selectedHolder}
+                inspected={inspected}
                 onHover={setHoveredHolder}
                 onSelect={setSelectedHolder}
+                onInspect={setInspected}
               />
             )}
             <button className="cx__run" onClick={arm}>

@@ -751,6 +751,105 @@
   box-shadow: inset 2px 0 0 var(--bone);
 }
 
+/* --- design-port S7: the replay scrubber over recorded samples --------------
+ *
+ * Every control here addresses a RECORDED SAMPLE INDEX — there is no continuous timeline and so no
+ * position between two samples for a frame to be invented at. Colours SNAP (no transitions on any
+ * state-carrying element); selection reads via box-shadow/outline, never a colour lerp.
+ *
+ * AA (measured, --void page background unless noted): --ghost 6.32:1, --bone 12.04:1,
+ * --alert 4.94:1. Disabled controls keep --ghost rather than taking the DC's --ash (3.32:1, below
+ * the floor) — the disabled affordance is carried by the border and the missing hover, not by
+ * dimming the words. Same substitution S4/S6 made wherever the DC put --ash on something readable.
+ */
+
+.cx-scrub {
+  margin: 0 0 1.1rem;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.cx-scrub__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.cx-scrub__range {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--bone); /* matches the strategy radios — native track/thumb, native keyboard */
+  cursor: pointer;
+}
+
+.cx-scrub__range:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 3px;
+}
+
+.cx-scrub__step,
+.cx-scrub__relive,
+.cx-scrub__torn {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ghost);
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.cx-scrub__step {
+  flex: 0 0 auto;
+  padding: 0.32rem 0.6rem;
+}
+
+.cx-scrub__step:hover:not(:disabled),
+.cx-scrub__relive:hover,
+.cx-scrub__torn:hover:not(:disabled) {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+.cx-scrub__step:disabled,
+.cx-scrub__torn:disabled {
+  cursor: default;
+  border-color: var(--line);
+}
+
+.cx-scrub__step:focus-visible,
+.cx-scrub__relive:focus-visible,
+.cx-scrub__torn:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+.cx-scrub__readout {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+  font-size: 0.74rem;
+  color: var(--ghost);
+}
+
+.cx-scrub__at b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+.cx-scrub__of,
+.cx-scrub__live {
+  color: var(--ghost);
+}
+
+.cx-scrub__relive {
+  padding: 0.2rem 0.5rem;
+  margin-left: auto;
+}
+
 /* Clicked-holder forensic detail — every field is real lineage data. Cold, like Investigate. */
 .cx-detail {
   margin: 0 0 1.2rem;
