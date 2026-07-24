@@ -95,6 +95,25 @@ const DENY = [
   { label: "0.717 (DC-fabricated middle-curve confidence; real is 0.724)", mode: "decimal", re: /(?<![\d.])0\.717(?!\d)/ },
   // — Bare integer form of the fabricated amount (only inside a quoted string) —
   { label: "1904789 (bare fabricated amount; quoted)", mode: "quoted", re: /1904789/ },
+  // — The DC's fabricated consistency TIMELINE, matched as the ARRAY it is (design-port S7) —
+  //   The DC consistency surface is 100% simulation: its `cTimeline()` hardcodes fabricated
+  //   milliseconds (EVH:[640,820,1000,1180,1360,1540,1720,1900], END:2500, a TORN1-TORN0 = 1260ms
+  //   window) and drives a requestAnimationFrame playhead over them — there is no stream behind it.
+  //   Ours scrubs REAL recorded observer samples (elapsed_ms straight off the SSE wire), so none of
+  //   these numbers may enter src. This is the first slice whose DC source is a WHOLLY INVENTED
+  //   dataset, which makes it the highest-risk copy surface in the port — a porter reaching for
+  //   "the timeline" would paste the whole EVH array.
+  //   ANCHORED AS THE 8-NUMBER SEQUENCE, deliberately: a lone 640 or 2500 (a timeout, a px value,
+  //   an interval) is innocent and must NOT false-fail — the same anchoring discipline as the
+  //   numeric entries above, and the same reason (a guard that false-fails on correct work gets
+  //   deleted). The full ordered sequence, on the other hand, is an unambiguous DC fingerprint that
+  //   no unrelated arithmetic produces. 2500 and 1260 are intentionally NOT matched on their own.
+  {
+    label:
+      "640,820,1000,1180,1360,1540,1720,1900 (DC-fabricated consistency EVH timeline; ours is real SSE elapsed_ms)",
+    mode: "text",
+    re: /(?<!\d)640\s*,\s*820\s*,\s*1000\s*,\s*1180\s*,\s*1360\s*,\s*1540\s*,\s*1720\s*,\s*1900(?!\d)/,
+  },
 ];
 
 /** Spans of every quoted string on a line: '…', "…", `…`. Used by "quoted" mode. Good enough for a
@@ -170,6 +189,7 @@ const EXPECTED = [
   { line: 20, has: "0.803" },
   { line: 21, has: "0.717" },
   { line: 22, has: "1904789" },
+  { line: 23, has: "640,820,…,1900 (DC consistency timeline array)" },
 ];
 
 function selfTest() {
@@ -197,8 +217,9 @@ function selfTest() {
   }
   console.log(
     `self-test: the guard catches all ${EXPECTED.length} planted DC literals (ids, dates, name, ` +
-      `IBANs, HLC, ledger id, amount, curve middles, bare int) and leaves the 6 anchoring ` +
-      `negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556) alone.`,
+      `IBANs, HLC, ledger id, amount, curve middles, bare int, consistency-timeline array) and ` +
+      `leaves the 8 anchoring negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, ` +
+      `bare 2500, bare 640) alone.`,
   );
   return true;
 }
