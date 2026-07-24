@@ -148,6 +148,68 @@
   border-right: none;
 }
 
+/* --- The collapse control + the 56px rail (handoff §5) -------------------- */
+
+/* The « / » toggle. 22×22, line border — cold, like every chip on this surface. Shared by the
+   header collapse button and the rail's expand button (they are the same affordance in two states). */
+.console__feedtoggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ghost);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.console__feedtoggle:hover {
+  color: var(--bone);
+  border-color: var(--ash);
+}
+
+.console__feedtoggle:focus-visible {
+  outline: 2px solid var(--ghost);
+  outline-offset: -2px;
+}
+
+/* The collapsed feed: a 56px rail (the grid column enforces the width). It keeps the feed's live
+   count visible as a vertical label so the collapse never hides how much of the record is loaded. */
+.console__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+  padding: 12px 0;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* Space Grotesk, vertical (handoff §5). --ghost (5.83:1 on --surface — AA): a section label is a
+   fact the reader must read to know what the rail is. */
+.console__rail-label {
+  writing-mode: vertical-rl;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ghost);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 100%;
+}
+
 /* --- Panel chrome (shared by all three regions) --------------------------- */
 
 .panel {
@@ -183,6 +245,14 @@
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--ghost);
+}
+
+/* The trailing header cluster: the count (a fact) and an optional control (the feed collapse). */
+.panel__head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 0 0 auto;
 }
 
 .panel__body {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConsoleData } from "./hooks/useConsoleData";
 import { Loaded, Panel } from "./components/Panel";
 import { DecisionFeed } from "./components/DecisionFeed";
@@ -139,6 +139,34 @@ function App() {
   // focusing the evidence surface's heading on open — lives in AmlConsole.
   const [returnFocusTxn, setReturnFocusTxn] = useState<UUID | null>(null);
   const clearReturnFocus = useCallback(() => setReturnFocusTxn(null), []);
+
+  // The feed collapse (decision-feed handoff §5). App owns it because the grid template it drives
+  // lives on .console__body below. Collapsing swaps the feed's panel for a 56px rail — and, exactly
+  // like the full feed, that rail is rendered ONLY inside the console arm of the body ternary, so an
+  // open witness (view.kind==='aml') unmounts it. The state persists across the seam, but nothing
+  // renders it there: a collapsed rail is never co-visible with a witness. (See the oracle-boundary
+  // note at the body ternary.)
+  const [feedCollapsed, setFeedCollapsed] = useState(false);
+  const collapseBtnRef = useRef<HTMLButtonElement>(null);
+  const expandBtnRef = useRef<HTMLButtonElement>(null);
+  // Keyboard focus follows the toggle instead of dropping to <body>: collapsing lands on the rail's
+  // expand control, expanding lands back on the header's collapse control. The intent flag gates it
+  // to real toggles (never on mount, never when feedCollapsed is reset by something else).
+  const feedToggleIntent = useRef(false);
+  const collapseFeed = () => {
+    feedToggleIntent.current = true;
+    setFeedCollapsed(true);
+  };
+  const expandFeed = () => {
+    feedToggleIntent.current = true;
+    setFeedCollapsed(false);
+  };
+  useEffect(() => {
+    if (!feedToggleIntent.current) return;
+    feedToggleIntent.current = false;
+    if (feedCollapsed) expandBtnRef.current?.focus();
+    else collapseBtnRef.current?.focus();
+  }, [feedCollapsed]);
 
   // Investigate: which decision is under investigation (null = none). Clicking a
   // selected row again clears it. State lives here because the feed (left) and the
@@ -290,6 +318,22 @@ function App() {
     decisions.status === "ready"
       ? `${formatCount(decisions.data.decisions.length)} / ${formatCount(decisions.data.total)}`
       : undefined;
+  // The collapsed rail keeps the feed's live count visible (handoff §5). Same numerator/denominator
+  // as the header count, phrased for the vertical label.
+  const railStatus =
+    decisions.status === "ready"
+      ? `showing ${formatCount(decisions.data.decisions.length)} of ${formatCount(
+          decisions.data.total,
+        )}`
+      : null;
+
+  // The grid state (App.css keys .console__body[data-layout] off this). Collapsed wins over focus for
+  // the FEED column (56px either way); an also-selected decision still widens the Inspector (404).
+  const bodyLayout = feedCollapsed
+    ? selectedId
+      ? "collapsed-focus"
+      : "collapsed"
+    : "default";
   // While a decision is under investigation the Inspector is taken over, so its
   // header count (active beliefs) is dropped to keep that surface clean.
   const beliefCount =
@@ -434,30 +478,65 @@ function App() {
       ) : view.kind === "ledger" ? (
         <HonestyLedger agents={agents} decisions={decisions} beliefs={beliefs} />
       ) : (
-        <div className="console__body" data-layout="default">
+        <div className="console__body" data-layout={bodyLayout}>
           <div className="console__region">
-            <Panel title="Decision feed" count={decisionCount}>
-              <Loaded state={decisions} loadingLabel="Loading decisions…">
-                {(data) => (
-                  <DecisionFeed
-                    data={data}
-                    selectedId={selectedId}
-                    onSelect={onSelect}
-                    onInterrogate={openInterrogation}
-                    kind={kind}
-                    onKind={onKind}
-                    counts={counts}
-                    witness={witness}
-                    onWitness={onWitness}
-                    witnessCounts={witnessCounts}
-                    loadMore={loadMore}
-                    loadingMore={loadingMore}
-                    returnFocusTxn={returnFocusTxn}
-                    onFocusReturned={clearReturnFocus}
-                  />
-                )}
-              </Loaded>
-            </Panel>
+            {/* Collapsed → a 56px rail; expanded → the full feed panel with a collapse control. BOTH
+                live here, inside the console arm, so an open witness never renders either. */}
+            {feedCollapsed ? (
+              <div className="console__rail">
+                <button
+                  type="button"
+                  ref={expandBtnRef}
+                  className="console__feedtoggle"
+                  aria-label="Expand the decision feed"
+                  aria-expanded={false}
+                  onClick={expandFeed}
+                >
+                  <span aria-hidden="true">»</span>
+                </button>
+                <span className="console__rail-label">
+                  Decision feed{railStatus ? ` · ${railStatus}` : ""}
+                </span>
+              </div>
+            ) : (
+              <Panel
+                title="Decision feed"
+                count={decisionCount}
+                action={
+                  <button
+                    type="button"
+                    ref={collapseBtnRef}
+                    className="console__feedtoggle"
+                    aria-label="Collapse the decision feed"
+                    aria-expanded={true}
+                    onClick={collapseFeed}
+                  >
+                    <span aria-hidden="true">«</span>
+                  </button>
+                }
+              >
+                <Loaded state={decisions} loadingLabel="Loading decisions…">
+                  {(data) => (
+                    <DecisionFeed
+                      data={data}
+                      selectedId={selectedId}
+                      onSelect={onSelect}
+                      onInterrogate={openInterrogation}
+                      kind={kind}
+                      onKind={onKind}
+                      counts={counts}
+                      witness={witness}
+                      onWitness={onWitness}
+                      witnessCounts={witnessCounts}
+                      loadMore={loadMore}
+                      loadingMore={loadingMore}
+                      returnFocusTxn={returnFocusTxn}
+                      onFocusReturned={clearReturnFocus}
+                    />
+                  )}
+                </Loaded>
+              </Panel>
+            )}
           </div>
 
           <div className="console__region">
