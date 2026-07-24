@@ -10,9 +10,14 @@ export function Panel(props: {
   title: string;
   count?: ReactNode;
   children: ReactNode;
+  /** Marks this panel as the genealogy graph the startup loader's transfer line aligns to (and whose
+   *  living node it pulses) at the console-ownership beat — Loader §8's `[data-lin-graph]` hook. A
+   *  colourless, audit-neutral attribute: the loader reads this element's DOM bounds only, never any
+   *  data, so it stays invisible to the composition/geometry guards. */
+  graphAnchor?: boolean;
 }) {
   return (
-    <section className="panel">
+    <section className="panel" {...(props.graphAnchor ? { "data-lin-graph": "" } : {})}>
       <div className="panel__head">
         <h2 className="panel__title">{props.title}</h2>
         {props.count !== undefined && <span className="panel__count">{props.count}</span>}
