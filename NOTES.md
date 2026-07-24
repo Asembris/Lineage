@@ -9815,3 +9815,57 @@ renders while `view.kind==='aml'`, and (b) covered by "the header oracle boundar
 ENCODE state (geometry, no fact-bearing text); the capsule must carry no audit TEXT onto the witness. If a
 future session adds header state that can reach a Decision, extend that test — do NOT assume the composition
 guard covers the header. It structurally cannot.
+
+## DECISION FEED — the DC handoff port (grid transition + collapse rail + focus mode + belief-id chip)
+
+Ported `LINEAGE_DECISION_FEED_HANDOFF.md` §5/§8's STRUCTURE (the visual row/chip/confidence design was
+already shipped and more honest — real counts, --ghost-not---ash facts). Four commits: (1) `.console__body`
+becomes a 3-state grid keyed on `data-layout` — default `320/1fr/344`, focus `250/1fr/404`, collapsed
+`56/1fr/{344|404}` — with a `grid-template-columns` transition; (2) a « control collapses the feed to a 56px
+rail (vertical Space Grotesk "DECISION FEED · SHOWING N of TOTAL" + » expand, keyboard focus follows the
+toggle); (3) focus mode = selecting a decision narrows the feed / widens the Inspector, derived from
+selectedId; (4) the belief chip shows the real `fragId(driving_belief_id)` (e.g. `ea4f91`), not the word
+"belief". §4's `genFeed()` seeded data was NOT ported — it is the DC's fabrication and `guard:data` denies
+its literals (`txn_5f2c81`, `DE89·3704`, …); our feed is real-data-driven.
+
+**GRID WIDTHS — fixed-px in EVERY state, decided by screenshot, not the spec.** `grid-template-columns` only
+interpolates track-for-track between compatible values, so a `minmax()` default would SNAP into the fixed
+focus/collapsed tracks instead of easing — fixed-px everywhere buys the smooth transition. The handoff's
+320/344 default read cleanly at 1280 AND 1440 against real content (no chip wrap, Inspector holds fleet+
+catalog, the tree absorbs reclaimed width), so it was kept — no fallback to our old minmax. One content-driven
+adjustment: at the 250px focus width our 11px kind chips no longer fit one line, so `.feed__filter` now wraps
+(like the basis filter) rather than clipping the `aml 1,500` count. "The transition behaviour is the design;
+the pixel counts serve our content." [[dc-handoff-port-method]]
+
+**REDUCED MOTION — byte-identical destination, proven by computed style (S6 idiom).** `.console__body` gets
+`transition: none` under `prefers-reduced-motion`. Measured: normal → `transition-duration 0.35s` /
+`transition-property grid-template-columns`; reduced → `~0s` / `none`; and the settled tracks are IDENTICAL
+across both modes (default `320px 616px 344px`, focus `250px 626px 404px` at 1280). Snaps to the same final
+frame; only the interpolation is removed.
+
+### RULE — colourless CONSOLE-BODY chrome is ALSO outside both guards; the collapse rail is the 3rd instance
+Same load-bearing class as the persistent-header rule above, one shell element over. The 56px collapse rail is
+COLOURLESS — it takes only counts, never a Decision — so it is invisible to BOTH static guards:
+composition-guard colours nothing (there is no audit type to reach through, census unchanged 99/25), and the
+`.aml` sweep scopes inside the evidence surface, not the console shell. Its ONLY protection is the render-site:
+the rail lives inside the console arm of App's body ternary, so `view.kind==='aml'` unmounts it exactly as it
+unmounts the full feed. The full feed's unmount is covered by the seam test (it opens the witness FROM a feed
+row); the collapsed RAIL is a SEPARATE render branch, so it needed its own render-time assertion —
+**`geometry.spec.ts:465` "the collapsed rail oracle boundary"**: collapse the feed, select an AML decision,
+open the witness from the Inspector, assert `.console__rail` (and `.console__body`) are gone while `.aml` is
+up; proven RED against a planted persist-the-rail bug (rail rendered in the aml view → "A COLLAPSED FEED RAIL
+IS ON SCREEN BESIDE THE WITNESS", count 1≠0), then reverted. THE GENERAL RULE (header capsule = instance 1,
+feed rail = instance 3, and this is the rule = instance 2): ANY persistent or colourless chrome added beside
+the evidence surface — header OR console-body — is invisible to the static guards and must be (a) rendered so
+`view.kind==='aml'` cannot mount it, and (b) covered by a render-time assertion. Do NOT assume a static guard
+covers it; they structurally cannot.
+
+**VERIFICATION.** geometry **48/48** (was 44; +1 new test × 4 projects); the reduced-motion proof above.
+tsc / oxlint(exit 0) / vite build clean. guard:composition PASS (99 components / 25 reaching a layer, EVIDENCE
+13 / AUDIT 12 — unchanged, the rail is colourless). guard:data PASS (23/12). `.venv` `pytest -m doc_guard`
+**66 passed**. No new sub-AA pairs: rail label / toggle / chip are all --ghost (5.83:1 on --surface), never
+--ash; the only "colour" change was dropping the belief chip's uppercase (a hex id, not a word). Screenshots
+(offline, mock + committed fixtures, temp `zzz-shots.spec.ts` DELETED after — no cluster, no scratch server,
+so the :8123 rule didn't apply): default (feed 320, chips one line), collapsed (56px rail + vertical count,
+tree fills reclaimed width), focus (feed 250 with wrapped chips + selected bone bar, Inspector 404 with the
+full Investigation), belief chip `ea4f91` matching the catalog.
