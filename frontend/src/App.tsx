@@ -329,11 +329,16 @@ function App() {
 
   // The grid state (App.css keys .console__body[data-layout] off this). Collapsed wins over focus for
   // the FEED column (56px either way); an also-selected decision still widens the Inspector (404).
+  // FOCUS MODE (handoff §8): with the feed open, selecting a decision narrows the feed (its rows are
+  // no longer the subject — the selected one is) and widens the Inspector, now the Investigation
+  // surface. Derived from selectedId; no extra state. Deselecting eases back to default.
   const bodyLayout = feedCollapsed
     ? selectedId
       ? "collapsed-focus"
       : "collapsed"
-    : "default";
+    : selectedId
+      ? "focus"
+      : "default";
   // While a decision is under investigation the Inspector is taken over, so its
   // header count (active beliefs) is dropped to keep that surface clean.
   const beliefCount =

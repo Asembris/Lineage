@@ -275,6 +275,7 @@
    there — the whole reason this filter exists (see DecisionFeed.tsx). */
 .feed__filter {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0 0 10px;
   border-bottom: 1px solid var(--line);
