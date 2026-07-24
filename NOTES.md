@@ -9542,3 +9542,19 @@ leave the default DOM and both guards (geometry navigation + oracle sweep) weake
 a redesign is the tail wagging the dog. (2) Never merge the per-witness figures into one unified
 diagram: the geometry guard counts one `.geo` per matching witness, and a merged ring invents a
 combined structure no witness claims (the same lie as the DC's fabricated census "why").
+
+### The gloss guard caught the census — and a CI-routing gap worth knowing
+First push (bfdae66) went RED on **docs-ci**: `test_no_surface_describes_conclusive_no_as_463_searches`
+(the same-breath gloss guard) flagged the census phase for calling all **1,500 "searches"** while
+naming CONCLUSIVE_NO, without naming the self-loops in that paragraph. It was RIGHT: 447 of the
+CONCLUSIVE_NO rows are self-loops where no search ever ran, so "1,500 searches" is the exact gloss the
+four-way split exists to correct. Fixed in 1dd6bab — the 1,500 are **subjects**, and the census foot
+names the self-loop/closed-search split in the same breath. `pytest -m doc_guard` 63/63 offline.
+
+THE ROUTING GAP, banked: the gloss guard **sweeps `frontend/src/**`** but only **executes** in
+`docs-ci` (`*.md` pushes) and `ci.yml` (backend pushes) — NEVER in `frontend-ci` (Node-only, no
+pytest). So a **purely-frontend push can introduce a frontend/src gloss that no CI on that push
+catches**; it only surfaces on the next `*.md` or backend push. Here the S8 push happened to carry
+NOTES.md, so docs-ci ran and caught it before it could hide. A frontend-only session touching this
+surface should run `pytest -m doc_guard` locally (offline, dead-host) rather than trust that
+frontend-ci covers the prose invariants — it does not.
