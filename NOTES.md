@@ -9439,3 +9439,106 @@ THE RULE, for the next session spinning up any local server:
    (decisions/agents/beliefs counts + the real belief_performance curve) to prove no wipe.
 
 This is the cross-session-surfaced form of memory `scratchpad-server-never-port-8000`.
+
+## Frontend design-port S8 — the 5-phase interrogation, ported into the evidence surface (2026-07-24)
+
+The highest-risk slice: a genuine new feature on the one surface protected by BOTH the composition
+guard (the oracle boundary) and the geometry guard. Ported the DC's `renderEvidence` 5-phase
+procedure (SUBJECT LOCK → WITNESS INSPECTOR → CENSUS → EVIDENCE VACUUM → FINDING) into `AmlConsole`.
+**Zero edits to either guard.** All new code co-located in already-pinned EVIDENCE_MODULES
+(`AmlConsole.tsx`, `basis.ts`) so `composition-guard.mjs` needed no touch; it now inspects
+**EVIDENCE 13 / AUDIT 12** (was 8/12 — five new EVIDENCE-coloured phase components, none reaching AUDIT).
+
+**ARCHITECTURE — STACKED, not the DC's mutually-exclusive rail/chamber/panel.** Decisive, and not for
+convenience: a mutually-exclusive view defaulting to phase 0 would hide `.geo`/`.aml__witnesses` behind
+a phase click, forcing an edit to the geometry guard's `interrogate()` navigation (adapting the guard
+to the redesign — backwards), and would put only the *mounted* phase under the oracle sweep, blinding
+the label check on the surface it matters most. Stacked = a sticky step rail + five anchored phase
+sections all mounted; the rail and a "next →" affordance drive an active step + scroll, never an
+unmount. So `.geo` and `.aml__witnesses` stay in the DOM by default and the whole surface stays under
+the sweep. Geometry **40/40 before AND after**; the three witness-geometry tests and BOTH
+oracle-boundary sweeps (no-geometry subject + ring subject) pass untouched.
+
+**THE CHAMBER IS OUR PER-WITNESS `.geo`, NEVER THE DC'S MERGED RING.** The geometry guard asserts one
+`.geo` per MATCHING witness with `edge count == transaction_ids.length` and the subject-marker rule —
+a competing/parallel subject draws multiple figures. The DC's single unified ring-with-census-band
+would collapse that. So phase 1's drawing is the EXISTING `WitnessGeometrySection`, its DOM unchanged;
+the new ring hop-inspector (◄►/keyboard over the real ordered hops, `ringHops()` in basis.ts) sits
+BESIDE it and touches no `.geo` count. Rings only (57/1,500); it does not render otherwise.
+
+**THE DOMINANT CASE IS THE PRODUCT (built + screenshot FIRST).** 1,287 of 1,500 subjects (85.8%) have
+no ring. Phase 1 degrades to "No structure to draw" as the finding (the existing `.geo__none` +
+BasisBlock's boundary account), never a broken inspector. Verified on `aml_transaction_id` (the
+INCONCLUSIVE zero-witness subject): every phase reads as a result.
+
+**THE ONE CUT — the label leak (not a port, a removal). READ THIS BEFORE "restoring the punchline."**
+The DC's single most rhetorically powerful line on this surface — phase-3's "operational consequence"
+block ("252 of 300 **labelled laundering** rows silently approved") and its twin phase-4 finding line —
+is **label-derived**. You cannot compute "252 of the 300 that were laundering" without reading
+`is_laundering`, the ground-truth ANSWER KEY. It is CUT, not ported, for three converging reasons:
+  1. It puts the answer key on the exam — the exact oracle-boundary collapse this whole surface exists
+     to prevent. CYCLE's honest 75.4% dev precision is only meaningful if the reader cannot already see
+     which subjects are laundering; this line tells them.
+  2. It would trip the oracle-boundary sweep — `geometry.spec.ts` scans the whole `.aml` surface's
+     innerText + aria for `/launder/i` and `/fraud/i`. The word "laundering" anywhere on it fails CI.
+  3. It is the SAME leak the project has already been burned by once: **NOTES:5141** ("docs(demo): the
+     label is the oracle, not something /interrogate returns") records Beats 2–3 of a demo quoting the
+     `/interrogate` response and then stating `is_laundering` in the next breath — "the label is the
+     oracle, not something /interrogate returns. It does not." Same mistake, same surface.
+**So phases 3 and 4 are deliberately QUIETER than the DC mockup, and that is correct, not unfinished.**
+If a future session reads "phases 3/4 feel thin next to the mockup" and reaches to restore the 252/300
+line, STOP: that line is the leak, its absence is the point, and restoring it fails CI and the thesis
+at once. Phase 3 keeps its two STRUCTURAL, label-free meters: could-not-determine (980/1,500) and
+zero-witness (1,287/1,500 — our real reviewed figure, which `no-fabricated-data.mjs` deliberately
+allows). Phase 4 keeps four structural finding lines + the "no structure is the finding" closing card.
+The honest exposure of the unresolved majority lives on the ledger/feed (the AUDIT surface), where
+`is_laundering` legitimately IS the scorecard — never here, on the witness.
+
+**THE DC'S CENSUS "WHY" STRINGS ARE FABRICATED AND WRONG — replaced, not copied.** The DC invents
+INCONCLUSIVE = "12-hop / node-visit budget exhausted, 1,024 nodes visited" and self-loop = "origin
+out-degree = 0". Both CONTRADICT our real semantics (INCONCLUSIVE = ran off the edge of the extract to
+a boundary account; self-loop = `from==to`, excluded from adjacency). Census renders `BASIS_HEADLINE`/
+`BASIS_DETAIL` from basis.ts, counts from the vetted `BASIS_COUNT`, percentages DERIVED (`basisPct`),
+never the DC literals. No new endpoint, no new fetch — `/interrogate` per-subject + the vetted census
+constants, exactly the boundary the flat surface already used.
+
+**COLOUR — the DC diverges twice from this cold surface, corrected both times:**
+- `--alive` (DC's MATCH/witnessed/reconcile-OK green) → `--bone`. Semantic, not AA: `--alive` means
+  "living agent"; the evidence surface stays cold ("no --alert … the world here stays cold",
+  AmlConsole.css). MATCH is emphasis, not a signal.
+- `--ash` on any FACT → `--ghost` (the S4/S6/S7 substitution). `--ash` is <4.5:1 everywhere (2.74–3.32)
+  and carries no text here; `--ghost` is 5.22–6.32:1. Kept our type sizes, not the DC's 8.5–9.5px.
+- **The census self-check colour fix (the one mandated defect):** the DC turns "57+980+447+16=1,500"
+  `C.alert` on mismatch (template.html:1753). `--alert` on the evidence surface is forbidden, in any
+  form incl. a failure state. It reconciles in `--bone`; a mismatch reads `--ghost`. No `--alert`, and
+  no `--alive` for the OK state either.
+- AA ratios (all text ≥4.5): bone 9.94–12.04:1, ghost 5.22–6.32:1; non-text bar fills bone 12.04 / ash
+  3.32 (≥3:1 floor). `--alert`-on-`--alert-dim` = 4.13:1 (<4.5) — a second reason beyond the boundary.
+
+**MOTION** — tweens only, transform/opacity/pathLength, colours snap; census/vacuum bars reveal via
+`transform:scaleX` (DUR.sweep), finding lines opacity/translateY (DUR.reveal), pane fade opacity-only
+(dropped the translateY so a lingering container transform can't become the sticky rail's containing
+block). The ring's own edge-by-edge closure is UNTOUCHED (WitnessGeometry). Named lib/motion.ts
+constants; no bare literals.
+
+**REDUCED-MOTION — final frame proven identical (S6/S7 method, PIL byte-diff).** No infinite pulses on
+this surface, so a settled frame exists. Full-motion (2.6s settle) vs reduced: dominant differs by
+**9 px at max channel delta 2/255** (rail text AA off the opacity-reveal layer), ring by **21 px at
+delta 8/255** (one ring edge's pathLength-vs-instant AA) — 0.0004% of 4.88M px, no content/layout/
+colour difference. `initial={false}` on every reveal renders the reduced frame at the settled state.
+
+**GUARDS (before → after):** geometry 40/40 → 40/40; composition PASS (8/12 → 13/12, no guard edit);
+guard:data PASS; tsc/oxlint/vite build clean. Screenshots at 1460×3400, dominant + ring, motion +
+reduced (dark only — the console has no light theme by design). Screenshot harness was a temp
+`tests-e2e/zzshot.spec.ts` driving the built preview through the committed geometry fixtures (mock.ts);
+DELETED after (it hardcodes an absolute scratch path and would fail CI). No cluster contact —
+`/interrogate` is a read-only GET and the shots ran against the offline fixtures, so the :8123 harness
+rule did not apply, but no scratch server was bound at all.
+
+### RULE — a phased evidence surface stays STACKED, and the chamber stays per-witness `.geo`
+Banking S8's two load-bearing choices. (1) If a future session deepens the interrogation, keep it a
+stacked single-scroll procedure: the moment phases become mutually-exclusive, `.geo`/`.aml__witnesses`
+leave the default DOM and both guards (geometry navigation + oracle sweep) weaken — adapting a guard to
+a redesign is the tail wagging the dog. (2) Never merge the per-witness figures into one unified
+diagram: the geometry guard counts one `.geo` per matching witness, and a merged ring invents a
+combined structure no witness claims (the same lie as the DC's fabricated census "why").
