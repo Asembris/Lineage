@@ -427,6 +427,10 @@ function Observation({
   const interactive = render === "3d" && identified;
   const witnessOfHovered =
     interactive && hoveredHolder !== null ? witnessSeq(hoveredHolder, samples, total) : null;
+  // Holder → sample, the reverse of clicking a row: the sample that recorded THIS holder's edge
+  // closing. Works in both renders, since selection is shared.
+  const witnessOfSelected =
+    identified && selectedHolder !== null ? witnessSeq(selectedHolder, samples, total) : null;
   const selected = selectedHolder !== null ? (holders?.[selectedHolder] ?? null) : null;
 
   return (
@@ -489,22 +493,33 @@ function Observation({
         )}
       </div>
 
+      {/* THE SAMPLE LOG IS THE OTHER HALF OF THE SCRUBBER, NOT A SECOND CONTROL. Selecting a row
+          writes the SAME `inspected` index the range writes, so the log, the meter/scene and the
+          counts cannot drift out of step — there is one value, addressed two ways. (The DC needs
+          two fields, `cT` and `cObsSel`, because its playhead is continuous fake time and its
+          twelve observer marks are separate fake events; a real sample is both at once.)
+          The reverse direction is the witness link: a selected holder lights the row that recorded
+          its edge closing — a real temporal event, not a decoration. */}
       <div className="cx-obs__log-wrap">
         <span className="cx-obs__log-head">observer samples · real timing{live ? " · live" : ""}</span>
         <ol className="cx-obs__log" ref={logRef}>
-          {samples.map((s) => (
-            <li
-              key={s.seq}
-              className={`cx-obs__row cx-obs__row--${s.state}${
-                witnessOfHovered === s.seq ? " is-witness" : ""
-              }`}
-            >
-              <span className="cx-obs__seq mono">#{s.seq}</span>
-              <span className="cx-obs__t mono">{s.elapsed_ms} ms</span>
-              <span className="cx-obs__st mono">{s.state}</span>
-              <span className="cx-obs__oe mono">
-                {s.open_edges}/{s.total_edges} open
-              </span>
+          {samples.map((s, i) => (
+            <li key={s.seq}>
+              <button
+                type="button"
+                className={`cx-obs__row cx-obs__row--${s.state}${
+                  witnessOfHovered === s.seq || witnessOfSelected === s.seq ? " is-witness" : ""
+                }${i === index ? " is-inspected" : ""}`}
+                aria-current={i === index ? "true" : undefined}
+                onClick={() => onInspect(i)}
+              >
+                <span className="cx-obs__seq mono">#{s.seq}</span>
+                <span className="cx-obs__t mono">{s.elapsed_ms} ms</span>
+                <span className="cx-obs__st mono">{s.state}</span>
+                <span className="cx-obs__oe mono">
+                  {s.open_edges}/{s.total_edges} open
+                </span>
+              </button>
             </li>
           ))}
         </ol>

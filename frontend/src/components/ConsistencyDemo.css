@@ -438,15 +438,40 @@ button.cx-meter__cell:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+/* S7: the row is a button — selecting it writes the SAME `inspected` index the scrubber writes, so
+   the log and the closure visual are two addresses for one value. Reset the native button chrome and
+   keep the existing grid; `width:100%` + `text-align:left` so it still reads as a log line. */
 .cx-obs__row {
   display: grid;
   grid-template-columns: 3rem 5.5rem 9rem auto;
   gap: 0.75rem;
+  width: 100%;
   padding: 0.2rem 0.2rem;
   font-size: 0.76rem;
+  font-family: inherit;
   color: var(--ghost);
+  background: transparent;
+  border: none;
   border-left: 2px solid transparent;
   padding-left: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cx-obs__row:hover {
+  background: color-mix(in srgb, var(--bone) 7%, transparent);
+}
+
+.cx-obs__row:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
+}
+
+/* The sample currently on screen. A --bone rule, not a state colour: it says "you are here", and
+   must not compete with the --alert/--alive state rule the same row already carries. Snaps. */
+.cx-obs__row.is-inspected {
+  background: color-mix(in srgb, var(--bone) 10%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ash);
 }
 
 .cx-obs__row--SPLIT {
