@@ -19,6 +19,8 @@
  * The `data-capsule` attribute is not decoration: it is the marker the header guard keys on. Keep it.
  */
 
+import "./ContextCapsule.css";
+
 /** The capsule's rendered content — computed in App from live state, handed here as plain strings.
  *  `kind` drives the `data-capsule` marker the header oracle guard asserts on. */
 export interface CapsuleDescriptor {
@@ -41,9 +43,10 @@ export function ContextCapsule({
   if (!descriptor) return null;
   return (
     <div className="rail__capsule" data-capsule={descriptor.kind}>
-      {/* A single --bone tone dot. There is deliberately no --alert tone: the handoff's two alert
-          triggers (an anomalous ledger claim, a torn consistency fleet) are both CUT/unlifted, so an
-          --alert dot here would be decorative — which the handoff itself forbids. */}
+      {/* A teal status dot (--alive) per Claude Design's capsule spec — a steady "carried investigation
+          active" marker. There is no --alert tone: the handoff's two alert triggers (an anomalous
+          ledger claim, a torn consistency fleet) are both CUT/unlifted, so an --alert dot here would be
+          decorative, which the handoff forbids. */}
       <span className="rail__capsule-dot" aria-hidden="true" />
       <span className="rail__capsule-text">
         <span className="rail__capsule-label">{descriptor.label}</span>

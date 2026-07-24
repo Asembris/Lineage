@@ -1,15 +1,17 @@
 /*
- * ContextCapsule — the carried-investigation pill (navbar port §7). Cold: a single --bone tone dot,
- * mono label/sub, a quiet clear control. No signal colour (see ContextCapsule.tsx for why there is no
- * --alert tone). AA: label --bone (11.09:1 on --surface), sub --ghost (5.83:1); the dot is non-text.
+ * ContextCapsule — the carried-investigation pill (navbar port §7), styled per Claude Design's spec:
+ * a mono pill with a leading teal status dot and a ghost × button. The dot is --alive (teal), a steady
+ * "carried investigation active" marker; there is no --alert tone (the handoff's two alert triggers —
+ * anomalous ledger claim, torn consistency fleet — are both CUT/unlifted, so an --alert dot here would
+ * be decorative). AA: label --bone (11.09:1 on --surface), sub --ghost (5.83:1); the dot is non-text.
  */
 
 .rail__capsule {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 9px;
   max-width: 20rem;
-  padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+  padding: 5px 6px 5px 11px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--surface);
@@ -19,7 +21,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--bone);
+  background: var(--alive);
   flex: 0 0 auto;
 }
 
@@ -33,7 +35,7 @@
 }
 
 .rail__capsule-label {
-  font-size: 0.7rem;
+  font-size: 10.5px;
   color: var(--bone);
   white-space: nowrap;
   overflow: hidden;
@@ -41,7 +43,7 @@
 }
 
 .rail__capsule-sub {
-  font-size: 0.62rem;
+  font-size: 9.5px;
   letter-spacing: 0.02em;
   color: var(--ghost);
   white-space: nowrap;
