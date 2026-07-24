@@ -5,7 +5,9 @@
  * vocabulary the decision feed and closure state use, so the ledger never reads as a
  * second alert system. --alert appears on exactly one value, and only when earned:
  * a genuinely ANOMALOUS provenance verdict (a real tamper signal). No amber/orange
- * (that stays Trace's). Motion is a single opacity reveal, disabled under reduced-motion.
+ * (that stays Trace's). Motion: a staggered enter (each disclosure rises into place) and
+ * one cold LIVE pulse (--bone, never --alive) — both gated behind no-preference, collapsing
+ * to the same final frame under reduced-motion.
  */
 
 .ledger {
@@ -16,18 +18,31 @@
   background: var(--void);
 }
 
+/* Enter — a staggered rise (design-port S9), replacing the flat surface fade. Each
+   disclosure lifts 6px into place; the per-row stagger is capped at index 12 so a
+   ~20-row ledger still settles quickly. Gated behind no-preference: the rest state
+   (opacity 1, no translate) IS the reduced-motion final frame. Timing mirrors
+   lib/motion.ts — keep in sync: DUR.reveal 0.2s, EASE.out. */
 @media (prefers-reduced-motion: no-preference) {
-  .ledger {
-    animation: ledger-reveal 0.2s ease both;
+  .ledger__intro {
+    animation: ledger-enter 0.2s ease-out both;
+  }
+
+  .ledger-row--live,
+  .ledger-row--static {
+    animation: ledger-enter 0.2s ease-out both;
+    animation-delay: calc(var(--row-i, 0) * 30ms);
   }
 }
 
-@keyframes ledger-reveal {
+@keyframes ledger-enter {
   from {
     opacity: 0;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -111,6 +126,15 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* Hover — a subtle surface lift on the disclosure under the cursor: a reading aid on a
+   dense record, NOT a click cue (rows are not interactive; selection is deliberately
+   absent — the DC's selection existed only to open an attestation drawer we have no data
+   for). The colour SNAPS (no transition), per the console's colour-snap law. */
+.ledger-row--live:hover,
+.ledger-row--static:hover {
+  background: var(--surface);
+}
+
 .ledger-row--head {
   position: sticky;
   top: 0;
@@ -149,6 +173,9 @@
   font-size: 0.74rem;
   color: var(--bone);
   line-height: 1.4;
+  /* True tabular figures on every live count/percentage — the typographic identity the
+     self-hosted JetBrains Mono exists for (FRONTEND.md type roles). */
+  font-variant-numeric: tabular-nums;
 }
 
 /* The one earned alert on the surface: a genuinely ANOMALOUS provenance verdict. */
@@ -203,9 +230,12 @@
   justify-self: start;
 }
 
-/* The provenance marker — cold, quiet, never the --alive/--alert vocabulary. */
+/* The provenance marker — cold, quiet, never the --alive/--alert vocabulary. The ::before
+   glyphs render in BOTH the legend and every row, since both use these classes. */
 .ledger__mode {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
   font-family: var(--font-mono);
   font-size: 0.62rem;
   font-weight: 600;
@@ -214,14 +244,52 @@
   border-radius: 3px;
 }
 
-/* LIVE — read from the cluster now: bright cold, a thin outline pill. */
+/* LIVE — read from the cluster now: bright cold, a thin outline pill, led by a cold pulsing
+   dot that marks a value which is never frozen. The dot is --bone, deliberately NOT --alive,
+   so the marker cannot read as a second state/alert channel — the rule the whole surface keeps. */
 .ledger__mode--live {
   color: var(--bone);
   border: 1px solid var(--ash);
 }
 
-/* STATIC — permanent fact: dim cold, no outline. */
+.ledger__mode--live::before {
+  content: "";
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: var(--bone);
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ledger__mode--live::before {
+    animation: ledger-live 1.5s ease-in-out infinite; /* keep in sync with lib/motion.ts DUR.pulse */
+  }
+}
+
+@keyframes ledger-live {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+/* STATIC — permanent fact: dim cold, no outline, led by a filled square (sealed, fixed).
+   No motion — the visual asymmetry with the pulsing LIVE dot IS the live-vs-frozen meaning. */
 .ledger__mode--static {
   color: var(--ghost);
   border: 1px solid transparent;
+}
+
+.ledger__mode--static::before {
+  content: "\25A3"; /* ▣ */
+  color: var(--ghost);
+  font-size: 0.7rem;
+  line-height: 1;
+  flex: 0 0 auto;
 }
