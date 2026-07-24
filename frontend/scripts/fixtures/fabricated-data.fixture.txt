@@ -25,6 +25,8 @@ const seal = "blake3·a1b2c3d4";
 const writerKey = "wk_1a2b";
 const rootTrust = "rt_01 · valid";
 const certPath = "s3://lineage-certs/898ad0e5/2026-07-19.json";
+const claimId01 = "clm_0112";
+const certHash = "1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff";
 
 --- ANCHORING NEGATIVES (legit math / real values; must NOT be caught) ---
 const opacity = 10.717;
@@ -37,3 +39,4 @@ const timeoutMs = 2500;
 const barePx = 640;
 const chartName = "part_01";
 const mohawkBird = "mohawk_style";
+const adjacentClaim = "clm_0200";

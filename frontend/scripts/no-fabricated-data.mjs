@@ -86,7 +86,11 @@ const DENY = [
   { label: "DE89·3704 (DC-fabricated IBAN prefix)", mode: "text", re: /DE89[^0-9A-Za-z]?3704/ },
   { label: "GB29·NWBK (DC-fabricated IBAN prefix)", mode: "text", re: /GB29[^0-9A-Za-z]?NWBK/ },
   { label: "7f3c·001a4b2e (DC-fabricated HLC)", mode: "text", re: /7f3c[^0-9A-Za-z]?001a4b2e/ },
-  { label: "clm_00… (DC-fabricated ledger claim id prefix; our ledger reads live rows)", mode: "text", re: /clm_00/ },
+  // clm_0[01] deliberately, NOT clm_00: the ledger-handoff spec's §4 ids run clm_00a1…clm_00f5 AND
+  // clm_0101/0108/0112/0120/0131 — the old /clm_00/ let the five clm_01xx ids paste clean. Widened to
+  // the [01] class (verified `clm_0` absent from frontend/src, so no real literal false-fails), and
+  // NOT to [0-9]: the spec uses only the 00xx/01xx banks, and [0-9] would over-widen past the evidence.
+  { label: "clm_0[01]… (DC-fabricated ledger claim id prefix, clm_00xx/clm_01xx; our ledger reads live rows)", mode: "text", re: /clm_0[01]/ },
   { label: "1,904,789 (DC-fabricated transaction amount)", mode: "text", re: /1,904,789/ },
   // — The DC LEDGER's fabricated ATTESTATION CHAIN (design-port S9) —
   //   The DC ledger (`buildClaims()`, `renderLedger()`) is a hardcoded claims registry that dresses
@@ -101,6 +105,14 @@ const DENY = [
   { label: "wk_ (DC-fabricated attestation writer-key prefix; we have no per-claim attestation)", mode: "text", re: /(?<![A-Za-z0-9])wk_/ },
   { label: "rt_01 (DC-fabricated root-of-trust id; we have no per-claim attestation)", mode: "text", re: /(?<![A-Za-z0-9])rt_01/ },
   { label: "s3://lineage-certs/ (DC-fabricated per-claim cert path; a real cert key is a runtime API value, never a src literal)", mode: "text", re: /s3:\/\/lineage-certs\// },
+  //   The spec's §4 cert.hash — a 64-char sha256 it presents as "the real certificate hash." A
+  //   certificate content_hash is a RUNTIME API value, never a source literal: hardcoding it freezes a
+  //   claim into the code instead of reading it from the live system — forbidden EVEN IF the literal
+  //   happens to match our real cert (the same principle the s3://lineage-certs/ entry documents). A
+  //   hardcoded hash IS a fabricated claim the moment it stops being read. Text-mode exact match: a
+  //   64-hex literal has no innocent-substring collision class, so — like the other id/name entries —
+  //   it needs no anchoring.
+  { label: "1e40b7a7…c393ff (DC-presented cert sha256; a content_hash is a runtime API value, never a src literal)", mode: "text", re: /1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff/ },
   // — Wrong middle-curve confidences (bare decimals; digit-boundary-anchored) —
   { label: "0.902 (DC-fabricated middle-curve confidence; real gen-1 rises to 0.952)", mode: "decimal", re: /(?<![\d.])0\.902(?!\d)/ },
   { label: "0.861 (DC-fabricated middle-curve confidence; real is 0.876)", mode: "decimal", re: /(?<![\d.])0\.861(?!\d)/ },
@@ -207,6 +219,8 @@ const EXPECTED = [
   { line: 25, has: "wk_ (DC writer key)" },
   { line: 26, has: "rt_01 (DC root-of-trust)" },
   { line: 27, has: "s3://lineage-certs/ (DC cert path)" },
+  { line: 28, has: "clm_0112 (clm_01xx id — exercises the widened clm_0[01] pattern)" },
+  { line: 29, has: "1e40b7a7…c393ff (DC-presented cert sha256)" },
 ];
 
 function selfTest() {
@@ -234,10 +248,10 @@ function selfTest() {
   }
   console.log(
     `self-test: the guard catches all ${EXPECTED.length} planted DC literals (ids, dates, name, ` +
-      `IBANs, HLC, ledger id, amount, curve middles, bare int, consistency-timeline array, blake3 ` +
-      `seal, wk_ writer key, rt_01 root-of-trust, s3 cert path) and leaves the 10 anchoring ` +
-      `negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, bare 2500, bare 640, ` +
-      `"part_01"≠rt_01, "mohawk_style"≠wk_) alone.`,
+      `IBANs, HLC, clm_00xx + clm_01xx ledger ids, amount, curve middles, bare int, consistency-timeline ` +
+      `array, blake3 seal, wk_ writer key, rt_01 root-of-trust, s3 cert path, cert sha256) and leaves ` +
+      `the 11 anchoring negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, bare 2500, ` +
+      `bare 640, "part_01"≠rt_01, "mohawk_style"≠wk_, "clm_0200"≠clm_0[01]) alone.`,
   );
   return true;
 }
