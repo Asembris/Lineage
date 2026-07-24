@@ -9721,3 +9721,97 @@ through the venv — `.venv/Scripts/python.exe -m pytest -m doc_guard` → **63 
 Why it matters: `frontend-ci` can't run the doc/gloss guards (S8), so `pytest -m doc_guard` locally is the
 ONLY pre-push check for prose invariants — a half-broken run silently degrades that net. If a doc_guard run
 is not 63 passed, suspect the interpreter FIRST (`python -c "import sys;print(sys.executable)"`), not the code.
+(The count is now **66** — the navbar slice below added test_composition_guard/console_fixtures coverage
+that collects under doc_guard; 66 passed is the current green.)
+
+## Frontend navbar port — the global command rail, and the header oracle guard the composition guard couldn't be (2026-07-24)
+
+The third Claude-Design handoff (`LINEAGE_NAVBAR_HANDOFF.md`, the "global command rail"). Triaged in
+`NAVBAR_TRIAGE.md` (read-only) BEFORE any code: unlike the loader (fully buildable) and the ledger
+(mostly cut), this one is mostly honest presentation over real state with ONE structural change and ONE
+buried oracle-boundary risk. The user ruled three things; all three shipped.
+
+**THE BUILD ORDER WAS GUARD-FIRST, AND THAT WAS THE POINT.** The subtle risk: the header is PERSISTENT
+across every view including evidence (`App.tsx` renders `<header>` outside the body ternary), and a
+context capsule there showing "decision · txn_… · ✓ invalidated" while INTERROGATION is open puts the
+audit answer key beside the witness — and **neither existing guard catches it:**
+  - composition-guard check C computes the evidence mount's "arm" as the nearest conditional consequent
+    (`(<AmlConsole/>)`); the header is a SIBLING of that ternary, never inside the arm. Verified from the
+    guard's own `arm`-walk (`composition-guard.mjs:388-402`), not intuition.
+  - the Playwright oracle sweep is scoped to `page.locator(".aml")`; the header is `.console__header`.
+So the invariant has NO static enforcement here. The fix (the user picked option (b), render-time) is a
+new test in `geometry.spec.ts` "the header oracle boundary": it selects an AML decision (capsule renders
+on the console — LEGAL, the audit surface — asserted count 1 for non-vacuity), opens the witness, and
+asserts `.console__header [data-capsule="decision"]` is GONE (count 0) while `.aml` is up, plus a
+fraud/launder text+aria sweep of the header. **Why the leak is the DEFAULT, not a corner case:**
+`selectedId` is RETAINED across the seam (see-why calls onInterrogate, never onSelect), so a capsule
+keyed on "is a decision selected?" leaks for the whole time the witness is up. The invariant that saves
+it: **App branches the capsule on the ACTIVE VIEW, never on retained selection** — while `view.kind==='aml'`
+only the evidence branch (label-free) renders. PROVEN non-vacuous out-of-band: planted the exact bug
+(decision branch keyed on `investigation` instead of view), REBUILT (Playwright serves `dist/` via
+`vite preview` — a source edit alone does nothing; this bit once), test went RED (`data-capsule="decision"`
+resolved to 1 while `.aml` up); reverted + rebuilt → GREEN 4/4.
+
+**THE INTERROGATION TAB REFLECTS, IT NEVER ORIGINATES (ruling 1).** The handoff's `goSurface('interro')`
+would synthesize "the first AML row" and open it. CUT for four converging reasons (NAVBAR_TRIAGE Part 1):
+fabricated supervisor intent, broken ordered reveal, broken focus handoff (no originating row to return
+to), and it pairs with the unguarded capsule. Built instead as a tab that is ACTIVE only while
+`view.kind==='aml'` (closing a real wayfinding gap — before this NO nav item was pressed while the witness
+was up) and ENABLED only when a real AML subject is already carried (in evidence, or an AML decision
+selected); App hands down that already-chosen id. `aria-disabled` (not `disabled`) so it stays in the
+roving tab order; the descriptor points at the honest entry.
+
+**azure-5 IS A SPEC FABRICATION (ruling 3).** The handoff names the living roster crimson-7 / crimson-5b /
+azure-5. Two are real; **`azure-5` is WRONG — our only living azure agent is azure gen 7** (fixture
+`console.json`: azure gen 7 alive, azure gen 5 DEAD; `seed.py` `alive = g == 7`). Added to
+`no-fabricated-data.mjs` (token-boundary-anchored so `azure-5b`/`azure-50` don't false-fail), fixture
+self-test 23 planted / 12 negatives. **crimson-5b stays OFF the denylist** (real — same rule the guard
+already documents). GOTCHA banked: the denylist scans `frontend/src` INCLUDING COMMENTS, so a docstring
+that literally names the denied literal false-fails the build — `FleetPopover.tsx`'s comment had to be
+reworded off the `azure-5` token. The ROSTER IS DERIVED as "<bloodline> · gen N" from `/agents`, never a
+pasted handle (screenshot-confirmed: azure gen 7 / crimson gen 5 / crimson gen 7).
+
+**WHAT SHIPPED, colourless by construction.** `CommandRail.tsx` (tablist + traveling indicator),
+`ContextCapsule.tsx`, `FleetPopover.tsx` — none takes a `Decision`; App (the composition root) does all the
+audit-reading and hands down STRINGS/booleans. So composition-guard is unchanged (**EVIDENCE 13 / AUDIT 12**,
+no new coloured component in the header) and the header's only real risk lives in the capsule, held by the
+render-time guard above. Capsule branches: decision (console only), evidence (aml only, label-free);
+**ledger + consistency branches CUT** (S9 removed ledger selection; consistency run-state is internal to
+ConsistencyDemo and not worth lifting), which means **there is no --alert trigger left, so the capsule tone
+is always --bone** — no decorative alert. `⟲ present-day` dropped rather than lifting time-travel state.
+
+**MOTION — the RAIL is a documented scoped exception, same class as the loader/3D rAF.** The traveling
+indicator eases toward the active tab's MEASURED geometry with a per-frame asymptotic lerp (0.22, snap
+<0.5px) — the SAME idiom S6 CUT for the genealogy camera. Admissible HERE where the camera wasn't: it
+animates a 2px underline's x/width ONLY (geometry, never colour) and crops no meaning. Named in
+`lib/motion.ts` `RAIL` (no bare literals — the Phase-6 discipline). Reduced-motion NEVER runs the loop: the
+indicator snaps (useLayoutEffect) to the exact geometry the ease converges to, so the settled frame is
+identical BY CONSTRUCTION — and the header has no infinite animation at all (the fleet dot is STEADY, not a
+pulse), so a settled frame exists. Both reduced-motion Playwright projects pass.
+
+**AA — the --ash→--ghost substitution again (S4-S9 pattern).** The handoff sets inactive tab text in --ash
+(#5A6678 ≈ 3.06:1 on --surface) — below our 4.5:1 floor and "--ash carries no fact". Inactive tab labels are
+--ghost (5.83:1); active --bone (11.09:1); subtitle --ghost on --void (6.32:1); capsule label --bone / sub
+--ghost; fleet --alive (8.8:1) for the live dot + alive count (the one legitimate signal on the header —
+"a living agent" is exactly what it means). --ash is kept ONLY for the non-text top bracket and the genuinely
+DISABLED Interrogation tab (tokens.css designates --ash "muted / disabled", and WCAG 1.4.3 exempts inactive
+components) — never for a readable fact. No --trace/--origin anywhere; brand/loader tokens stay scoped.
+
+**VERIFICATION.** geometry **44/44** (was 40; +4 = the new header-oracle test × 4 projects; one `page.goto`
+flake on the first full run — the documented S6 `vite preview` flake, re-ran governed-write 4/4 green, then a
+clean full 44/44). tsc / oxlint(exit 0) / vite build clean. guard:composition PASS (EVIDENCE 13/AUDIT 12).
+guard:data PASS (23/12). `.venv` `pytest -m doc_guard` **66 passed**. Screenshots (offline, mock + committed
+fixtures, temp `zzhdr.spec.ts` DELETED after — no cluster, no scratch server, so the :8123 rule didn't apply):
+console (indicator under Console, subtitle, capsule "decision · txn 045adf", interro relation dot, fleet 3/24),
+fleet popover (3 alive / 24 / 5,500 / 2 of 2, roster azure gen 7 · crimson gen 5 · crimson gen 7), evidence
+(subtitle → "graph evidence · one edge", Interrogation active + indicator traveled, capsule flipped to the
+label-free evidence branch, Console+Ledger relation dots).
+
+### RULE — the persistent header is OUTSIDE both guards' reach; audit content there is held ONLY at render time
+Banking the load-bearing finding. composition-guard check C stops at the aml arm (the header is a sibling);
+the .aml sweep stops at .aml. So ANY audit-derived content added to the header (a capsule, a badge, a count
+tied to a Decision) is invisible to both static guards and must be (a) branched on the ACTIVE VIEW so it never
+renders while `view.kind==='aml'`, and (b) covered by "the header oracle boundary" render-time test. A dot may
+ENCODE state (geometry, no fact-bearing text); the capsule must carry no audit TEXT onto the witness. If a
+future session adds header state that can reach a Decision, extend that test — do NOT assume the composition
+guard covers the header. It structurally cannot.
