@@ -283,6 +283,57 @@
   background: var(--surface);
 }
 
+/* --- design-port S7: identified, selectable holder cells -------------------
+ *
+ * A cell only becomes a button once GET /beliefs/{id}/lineage has resolved; until then it stays the
+ * plain unlabelled square above. The labels are the real agent fragment + generation, never a
+ * stand-in. This is the KEYBOARD-COMPLETE path (the 3D scene is the pointer-driven enhancement).
+ *
+ * AA on the two washes a label can sit on, measured: --bone is 7.08:1 over the closed cell
+ * (mix(--alive 20%, --surface) = #1b403c) and 8.99:1 over the split cell (#3c222a). --ghost is
+ * 3.72:1 over the closed cell and FAILS, so both label lines are --bone — one rule that passes on
+ * every cell state rather than a per-state exception.
+ */
+button.cx-meter__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  width: 4rem;
+  height: 3.1rem;
+  padding: 0;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+button.cx-meter__cell:hover {
+  border-color: var(--bone);
+}
+
+button.cx-meter__cell:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+/* Selection reads as a --bone ring — a box-shadow, so it SNAPS. No colour transition anywhere on a
+   state-carrying element: an --alert → --alive lerp would pass through reserved amber. */
+.cx-meter__cell.is-selected {
+  box-shadow: 0 0 0 1px var(--void), 0 0 0 3px var(--bone);
+}
+
+.cx-meter__id {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  color: var(--bone);
+}
+
+.cx-meter__gen {
+  font-size: 0.62rem;
+  line-height: 1.1;
+  color: var(--bone);
+}
+
 /* corrected (edge closed / invalidated) — --alive, exactly as Invalidate's correction. */
 .cx-meter__cell--closed {
   border-color: var(--alive);
@@ -955,6 +1006,17 @@
   color: var(--ghost);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Which clock a fact is on: "as of #N" (moves with the scrubber) vs "whole run" (does not).
+   Captioned rather than left implicit, so the two can never be read as one claim. */
+.cx-detail__asof {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ghost);
 }
 
 .cx-detail__facts dd {
