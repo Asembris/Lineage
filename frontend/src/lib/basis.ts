@@ -108,7 +108,8 @@ export const BASIS_LABEL: Record<Basis, string> = {
  *   THE CENSUS, AS A PROCEDURE READS IT (design-port S8 · the 5-phase interrogation)
  * ============================================================================================
  * The interrogation surface's phase 2 (census) and phase 3 (evidence vacuum) reconcile all 1,500
- * searches into the four legitimate read-states. Everything below is derived from the SAME vetted
+ * subjects into the four legitimate read-states (never "searches" — 447 CONCLUSIVE_NO rows are
+ * self-loops where no search ever ran). Everything below is derived from the SAME vetted
  * `BASIS_COUNT` the current surface already renders ("57 of 1,500") — no new endpoint, no new fetch.
  * `/interrogate` is per-subject; the census is these backend-asserted constants, and the DC's own
  * census "why" strings are NOT used (they invent a "12-hop budget" and "out-degree = 0" that
