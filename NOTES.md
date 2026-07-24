@@ -9711,3 +9711,13 @@ reversed path and you keep +1.** Change one without the other and the line draws
 the origin OUT to the decision), which reads as the exact opposite of the belief-trace-to-origin the beat
 means. This port adopted the spec path + −1 together. Anyone touching the trace geometry needs this
 pairing named — it is invisible until it renders, and it renders wrong silently.
+
+## GOTCHA — `pytest -m doc_guard` mass collection errors = WRONG INTERPRETER, not a code defect (2026-07-24)
+Symptom: `python -m pytest -m doc_guard` reports ~28 `ERROR … during collection` + a failed
+`test_holdout_artifact` Wilson test, every one `sqlalchemy.exc.NoSuchModuleError: Can't load plugin:
+sqlalchemy.dialects:cockroachdb.psycopg`. That is the bare `python` resolving to the system/Roaming
+interpreter, which lacks `sqlalchemy-cockroachdb` (same trap as the seed-script note above). Fix: run
+through the venv — `.venv/Scripts/python.exe -m pytest -m doc_guard` → **63 passed**, offline, no cluster.
+Why it matters: `frontend-ci` can't run the doc/gloss guards (S8), so `pytest -m doc_guard` locally is the
+ONLY pre-push check for prose invariants — a half-broken run silently degrades that net. If a doc_guard run
+is not 63 passed, suspect the interpreter FIRST (`python -c "import sys;print(sys.executable)"`), not the code.
