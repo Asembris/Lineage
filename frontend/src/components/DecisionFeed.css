@@ -203,11 +203,12 @@
   color: var(--ghost);
 }
 
-/* Belief-driven subset marker — quiet, cold. Flags that a real driving_belief_id is present. */
+/* The driving belief's id fragment — quiet, cold. NAMES the real driving_belief_id rather than just
+   flagging one is present. NOT uppercased: it is a hex id, and it reads in the same lowercase
+   register as the txn fragment on line 2 and the context capsule, never as a shouted word. */
 .feed__belief {
   font-size: 9px;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--ghost);
   border: 1px solid var(--line);
   border-radius: 2px;
