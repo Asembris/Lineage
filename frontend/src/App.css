@@ -13,102 +13,85 @@
   background: var(--void);
 }
 
-/* --- Header bar ----------------------------------------------------------- */
+/* --- Header bar (the global command rail, navbar port) -------------------- */
+/* Three flex regions: brand + cluster both grow equally from a 250px floor, so the rail (natural
+   width) stays OPTICALLY CENTERED between them regardless of tab-label widths. */
 
 .console__header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1.25rem;
+  min-height: 58px;
+  padding: 0 1.25rem;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--void);
 }
 
+/* The brand is a button (→ Console). Reset its chrome; it reads as the wordmark lockup, not a control. */
 .console__brand {
+  flex: 1 1 0;
+  min-width: 250px;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
 }
 
-/* The real emblem mark (design-port S2). Sized to the wordmark's cap-height so the two read as one
-   lockup; its colours come from the scoped --brand-* tokens inside the SVG, never from here. */
+.console__brand:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* The real emblem mark (design-port S2). Its colours come from the scoped --brand-* tokens inside
+   the SVG, never from here. */
 .console__mark {
   display: block;
-  height: 1.4rem;
+  height: 1.9rem;
   width: auto;
   flex: 0 0 auto;
 }
 
+.console__wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
 .console__title {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1rem;
-  letter-spacing: 0.06em;
-  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
   color: var(--bone);
 }
 
-.console__tagline {
-  font-size: 0.72rem;
+/* Route-aware subtitle: mono, uppercase, --ghost (5.83:1 on --void — AA). Colour eases per surface. */
+.console__subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ghost);
+  transition: color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* View toggle — Console vs the standalone Consistency demo. A quiet segmented control;
-   the pressed view reads --bone on --surface-2, the rest stay muted. */
-.console__views {
+.console__cluster {
+  flex: 1 1 0;
+  min-width: 250px;
   display: flex;
-  gap: 0.25rem;
-  padding: 0.15rem;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-}
-
-.console__view {
-  padding: 0.3rem 0.7rem;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  font-family: var(--font-body);
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ghost);
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.console__view:hover {
-  color: var(--bone);
-}
-
-.console__view[aria-pressed="true"] {
-  background: var(--surface-2);
-  color: var(--bone);
-}
-
-.console__view:focus-visible {
-  outline: 2px solid var(--bone);
-  outline-offset: 1px;
-}
-
-.console__fleet {
-  display: flex;
-  align-items: baseline;
-  gap: 0.85rem;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--ghost);
-}
-
-.console__fleet .alive {
-  color: var(--alive);
-}
-
-.console__fleet-sep {
-  color: var(--line);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 /* --- Three-region body ---------------------------------------------------- */

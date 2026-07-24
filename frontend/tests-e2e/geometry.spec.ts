@@ -354,6 +354,99 @@ test.describe("the oracle boundary", () => {
 });
 
 /*
+ * THE HEADER ORACLE BOUNDARY — the persistent command rail must not carry the answer key onto the witness.
+ *
+ * ===================== WHY THE COMPOSITION GUARD IS BLIND HERE =====================
+ * The `.aml` sweep above proves the label is absent from the EVIDENCE surface. But the header is
+ * PERSISTENT across every view, including evidence (`App.tsx` renders `<header>` outside the body
+ * ternary), and BOTH static guards are structurally blind to it — proven in NAVBAR_TRIAGE.md Part 2:
+ *
+ *   - composition-guard.mjs check C computes the evidence mount's "arm" as the nearest conditional
+ *     consequent — `(<AmlConsole/>)` — and the header is a SIBLING of that ternary, never inside the
+ *     arm. A context capsule in the header that renders a selected Decision beside the mounted witness
+ *     passes check C with every colour green.
+ *   - the `.aml` sweep is scoped to `page.locator(".aml")`; the header is `.console__header`, outside it.
+ *
+ * So the invariant "the answer key is never beside the witness" has NO automated enforcement on the
+ * header EXCEPT this test — a render-time check, which is where the leak would actually appear (the
+ * `view.kind !== 'aml'` conditional has already been evaluated by the time the DOM exists).
+ *
+ * ===================== WHY THE LEAK IS THE DEFAULT, NOT A CORNER CASE =====================
+ * `selectedId` is RETAINED across the seam ("see why" calls onInterrogate, never onSelect — see the
+ * justification-seam tests below). So a capsule keyed on "is a decision selected?" would render
+ * "decision · txn_… · ✓ invalidated" in the header for the ENTIRE time the witness is up. The invariant
+ * that makes it safe is that the capsule branches on the ACTIVE VIEW, not on retained selection: while
+ * `view.kind === 'aml'`, only the evidence branch (label-free) or nothing may render. The capsule's
+ * decision branch carries `data-capsule="decision"`; this asserts that marker is GONE from the header
+ * once the witness is up, having first proven it PRESENT on the console (non-vacuity).
+ *
+ * A dot may ENCODE state — a 5px relation marker with no fact-bearing text is geometry, not a label —
+ * but the capsule must carry no audit TEXT onto the witness. Both are swept: the structural decision
+ * marker and the header's rendered text + accessible names.
+ */
+test.describe("the header oracle boundary", () => {
+  test("the persistent rail carries no decision capsule onto the evidence surface", async ({ page }) => {
+    const misses = installMock(page);
+    await page.goto("/");
+    const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+    await filter.getByRole("button", { name: /^aml/ }).click();
+
+    const ring = SUBJECTS.aml_ring_txn_id;
+    const item = page.locator(".feed__item", {
+      has: page.locator(".feed__row", { hasText: ring.slice(0, 6) }),
+    });
+
+    // Select the decision. On the CONSOLE — the audit surface — the capsule carrying it is LEGAL: a
+    // decision's outcome is an audit fact, attached to a decision already made without it.
+    await item.locator(".feed__row").first().click();
+
+    // LIVENESS. The decision capsule really does render on the console, so the "absent during
+    // evidence" assertion below is not vacuously true over a capsule that never appears. `selectedId`
+    // (set here) is exactly what a naive capsule would keep reading across the seam.
+    const decisionCapsule = page.locator('.console__header [data-capsule="decision"]');
+    await expect(
+      decisionCapsule,
+      "the context capsule does not carry a selected decision on the console, so this guard would " +
+        'measure nothing — the capsule\'s decision branch must render `data-capsule="decision"`.',
+    ).toHaveCount(1);
+
+    // Open the witness for the SAME decision. `selectedId` is retained across the seam by design.
+    await item.getByRole("button", { name: /See the witness/ }).click();
+    await expect(page.locator(".aml")).toBeVisible();
+    await page.waitForSelector(".aml__witnesses", { state: "visible" });
+
+    // THE INVARIANT. The persistent header must not carry the decision/audit branch onto the witness.
+    await expect(
+      decisionCapsule,
+      "THE ANSWER KEY IS BESIDE THE WITNESS, IN THE HEADER. The context capsule renders a selected\n" +
+        "decision while INTERROGATION is open — audit context beside the exam, on the one surface the\n" +
+        "whole evidence layer exists to keep clean. The composition guard cannot see this (the header\n" +
+        "is outside the aml arm) and the .aml sweep cannot (the header is outside .aml). The capsule\n" +
+        "must branch on the ACTIVE VIEW: while view.kind==='aml', only the evidence branch may render.\n",
+    ).toHaveCount(0);
+
+    // And the header's text + accessible names must be clean of the label too — the same discipline
+    // as the `.aml` sweep, in case a future capsule renders a verdict/label word rather than a marker.
+    const headerRendered = await page.locator(".console__header").evaluate((root) => {
+      const text = (root as HTMLElement).innerText;
+      const labels = [...root.querySelectorAll("*")]
+        .flatMap((el) => ["aria-label", "title", "alt"].map((a) => el.getAttribute(a)))
+        .filter((v): v is string => v !== null);
+      return [text, ...labels].join("\n");
+    });
+    for (const forbidden of [/fraud/i, /launder/i]) {
+      expect(
+        headerRendered,
+        "THE HEADER RENDERS THE GROUND-TRUTH LABEL while the witness is up. The persistent rail must\n" +
+          "carry no audit label onto the evidence surface.\n",
+      ).not.toMatch(forbidden);
+    }
+
+    expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+  });
+});
+
+/*
  * THE JUSTIFICATION SEAM (Rung 4) — the mirror of the oracle-boundary sweep above.
  *
  * That sweep proves the label is never on the EVIDENCE surface. This proves the witness is never on

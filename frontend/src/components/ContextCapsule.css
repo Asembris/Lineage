@@ -1,0 +1,78 @@
+/*
+ * ContextCapsule — the carried-investigation pill (navbar port §7). Cold: a single --bone tone dot,
+ * mono label/sub, a quiet clear control. No signal colour (see ContextCapsule.tsx for why there is no
+ * --alert tone). AA: label --bone (11.09:1 on --surface), sub --ghost (5.83:1); the dot is non-text.
+ */
+
+.rail__capsule {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 20rem;
+  padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.rail__capsule-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--bone);
+  flex: 0 0 auto;
+}
+
+.rail__capsule-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0; /* let the label ellipsize instead of pushing the clear control off */
+  font-family: var(--font-mono);
+  line-height: 1.25;
+}
+
+.rail__capsule-label {
+  font-size: 0.7rem;
+  color: var(--bone);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rail__capsule-sub {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: var(--ghost);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rail__capsule-clear {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--ghost);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.rail__capsule-clear:hover {
+  color: var(--bone);
+  background: var(--surface-2);
+}
+
+.rail__capsule-clear:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 1px;
+}
