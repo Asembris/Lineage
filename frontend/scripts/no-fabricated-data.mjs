@@ -88,6 +88,19 @@ const DENY = [
   { label: "7f3c·001a4b2e (DC-fabricated HLC)", mode: "text", re: /7f3c[^0-9A-Za-z]?001a4b2e/ },
   { label: "clm_00… (DC-fabricated ledger claim id prefix; our ledger reads live rows)", mode: "text", re: /clm_00/ },
   { label: "1,904,789 (DC-fabricated transaction amount)", mode: "text", re: /1,904,789/ },
+  // — The DC LEDGER's fabricated ATTESTATION CHAIN (design-port S9) —
+  //   The DC ledger (`buildClaims()`, `renderLedger()`) is a hardcoded claims registry that dresses
+  //   every claim in an invented attestation chain: a blake3 seal, a `wk_…` writer key, a `rt_01`
+  //   root-of-trust, and a per-claim s3 certificate path. NONE of it has an endpoint — our real
+  //   HonestyLedger reads live cluster rows and surfaces the ONE real provenance signal (the
+  //   /beliefs/{id}/provenance-audit verdict) as a top-line fact, not a per-claim seal. These are
+  //   exactly the literals a porter re-skinning the ledger would paste. `wk_`/`rt_01` are
+  //   lookbehind-anchored to a token boundary so innocent substrings ("part_01", "mohawk_") cannot
+  //   false-fail — the same anchoring discipline the numeric entries use.
+  { label: "blake3 (DC-fabricated ledger seal; our certificates are sha256, never blake3)", mode: "text", re: /blake3/ },
+  { label: "wk_ (DC-fabricated attestation writer-key prefix; we have no per-claim attestation)", mode: "text", re: /(?<![A-Za-z0-9])wk_/ },
+  { label: "rt_01 (DC-fabricated root-of-trust id; we have no per-claim attestation)", mode: "text", re: /(?<![A-Za-z0-9])rt_01/ },
+  { label: "s3://lineage-certs/ (DC-fabricated per-claim cert path; a real cert key is a runtime API value, never a src literal)", mode: "text", re: /s3:\/\/lineage-certs\// },
   // — Wrong middle-curve confidences (bare decimals; digit-boundary-anchored) —
   { label: "0.902 (DC-fabricated middle-curve confidence; real gen-1 rises to 0.952)", mode: "decimal", re: /(?<![\d.])0\.902(?!\d)/ },
   { label: "0.861 (DC-fabricated middle-curve confidence; real is 0.876)", mode: "decimal", re: /(?<![\d.])0\.861(?!\d)/ },
@@ -190,6 +203,10 @@ const EXPECTED = [
   { line: 21, has: "0.717" },
   { line: 22, has: "1904789" },
   { line: 23, has: "640,820,…,1900 (DC consistency timeline array)" },
+  { line: 24, has: "blake3·" },
+  { line: 25, has: "wk_ (DC writer key)" },
+  { line: 26, has: "rt_01 (DC root-of-trust)" },
+  { line: 27, has: "s3://lineage-certs/ (DC cert path)" },
 ];
 
 function selfTest() {
@@ -217,9 +234,10 @@ function selfTest() {
   }
   console.log(
     `self-test: the guard catches all ${EXPECTED.length} planted DC literals (ids, dates, name, ` +
-      `IBANs, HLC, ledger id, amount, curve middles, bare int, consistency-timeline array) and ` +
-      `leaves the 8 anchoring negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, ` +
-      `bare 2500, bare 640) alone.`,
+      `IBANs, HLC, ledger id, amount, curve middles, bare int, consistency-timeline array, blake3 ` +
+      `seal, wk_ writer key, rt_01 root-of-trust, s3 cert path) and leaves the 10 anchoring ` +
+      `negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, bare 2500, bare 640, ` +
+      `"part_01"≠rt_01, "mohawk_style"≠wk_) alone.`,
   );
   return true;
 }
