@@ -90,16 +90,65 @@ const STATE_LABEL: Record<ConsistencyState, string> = {
 
 /** The closure drain: `total` cells, `total - open` shown corrected (--alive); open cells read
  *  --alert while the closure is torn (a laggard still live on the dead belief), quiet otherwise.
- *  Renders the SAME derived ClosureView the 3D scene does — one derivation, two presentations. */
-function DrainMeter({ view }: { view: ClosureView }) {
+ *  Renders the SAME derived ClosureView the 3D scene does — one derivation, two presentations.
+ *
+ *  HOLDER INSPECTION, AND WHY IT LANDS HERE FIRST (design-port S7). The DC's holder rail is
+ *  hover-only (`onMouseEnter`/`onMouseLeave`, no click, no key handler) over eight hardcoded agent
+ *  handles. Ours is the KEYBOARD-COMPLETE path, per FRONTEND.md: the 3D scene is the gated
+ *  enhancement and stays pointer-driven, so the 2D meter is where a holder must be reachable by tab
+ *  and enter. Cells become buttons only once `holders` has loaded, and identity is the same REAL
+ *  binding the 3D scene uses — GET /beliefs/{id}/lineage ordered by `inherited_at`, which is
+ *  load-bearing because the fan-out closes edges ORDER BY inherited_at. Until that lineage resolves
+ *  the cells stay unlabelled and inert: no invented identity, ever. */
+function DrainMeter({
+  view,
+  holders = null,
+  selected = null,
+  onSelect,
+}: {
+  view: ClosureView;
+  holders?: LineageNode[] | null;
+  selected?: number | null;
+  onSelect?: (i: number | null) => void;
+}) {
   const { open, total, state, closed } = view;
   const torn = state === "SPLIT";
+  const seq = view.sample?.seq;
+  const identified = holders != null && onSelect != null;
+  const label = `${open} of ${total} closure edges open, ${state}`;
+
   return (
-    <div className="cx-meter" role="img" aria-label={`${open} of ${total} closure edges open, ${state}`}>
+    <div
+      className="cx-meter"
+      {...(identified ? { role: "group", "aria-label": label } : { role: "img", "aria-label": label })}
+    >
       {Array.from({ length: total }, (_, i) => {
         const isClosed = i < closed;
         const kind = isClosed ? "closed" : torn ? "split" : "rest";
-        return <span key={i} className={`cx-meter__cell cx-meter__cell--${kind}`} />;
+        const holder = holders?.[i] ?? null;
+        const cls = `cx-meter__cell cx-meter__cell--${kind}${selected === i ? " is-selected" : ""}`;
+
+        if (!identified || !holder) return <span key={i} className={cls} />;
+
+        return (
+          <button
+            key={i}
+            type="button"
+            className={cls}
+            aria-pressed={selected === i}
+            onClick={() => onSelect(selected === i ? null : i)}
+            // The edge's open/closed state here is AS OF the inspected sample, and the label says
+            // so — it is not the run-level "first observed closed at" fact HolderDetail also shows.
+            aria-label={`Holder edge ${i + 1} of ${total}, agent ${fragId(holder.agent_id)}, generation ${
+              holder.generation
+            }, ${isClosed ? "invalidated" : "still live on the belief"}${
+              seq !== undefined ? ` as of sample ${seq}` : ""
+            }`}
+          >
+            <span className="cx-meter__id mono">{fragId(holder.agent_id)}</span>
+            <span className="cx-meter__gen mono">gen {holder.generation}</span>
+          </button>
+        );
       })}
     </div>
   );
@@ -233,8 +282,13 @@ function Scrubber({
   );
 }
 
-/** Real forensic detail for one clicked holder edge — every field straight off the loaded
- *  GET /beliefs/{id}/lineage node (no placeholder). Shown only in 3D, only for a selected node. */
+/** Real forensic detail for one selected holder edge — every field straight off the loaded
+ *  GET /beliefs/{id}/lineage node (no placeholder). Shown in BOTH renders (S7): selection is one
+ *  shared state, so toggling 2D↔3D keeps the same holder open rather than dropping it.
+ *
+ *  TWO CLOCKS ON ONE CARD, LABELLED APART. "closure edge" is the edge's state AS OF the sample the
+ *  scrubber is parked on; "first observed closed at" is a RUN-LEVEL fact that does not move when
+ *  you scrub. They answer different questions and are captioned so they cannot be read as one. */
 function HolderDetail({
   holder,
   index,
@@ -288,14 +342,20 @@ function HolderDetail({
           <dd className="mono">{holder.inherited_at ? formatDate(holder.inherited_at) : "—"}</dd>
         </div>
         <div>
-          <dt>closure edge</dt>
+          <dt>
+            closure edge
+            {view.sample && <span className="cx-detail__asof mono">as of #{view.sample.seq}</span>}
+          </dt>
           <dd className={`mono ${isClosed ? "cx-detail__status--dead" : "cx-detail__status--alive"}`}>
             {isClosed ? "invalidated (corrected)" : "open (live on belief)"}
           </dd>
         </div>
-        {isClosed && wsample && (
+        {wsample && (
           <div>
-            <dt>closed at sample</dt>
+            <dt>
+              first observed closed at
+              <span className="cx-detail__asof mono">whole run</span>
+            </dt>
             <dd className="mono">
               #{wsample.seq} · {wsample.elapsed_ms} ms
             </dd>
@@ -314,9 +374,10 @@ function HolderDetail({
  *  sample log. Shared by streaming, done and stopped so the record stays on screen. The visual is
  *  the only thing the render toggle swaps; counts + log are identical in both modes.
  *
- *  Interaction (3D only): `holders` (from the lineage fetch) binds node i to a REAL holder. Hover
- *  a node → the observer-sample row that witnessed that holder's edge closing lights up; click →
- *  its forensic detail. The 2D meter is untouched — it never takes these props. */
+ *  Interaction: `holders` (from the lineage fetch) binds cell/node i to a REAL holder in BOTH
+ *  renders. 2D cells are buttons (the keyboard-complete path); the 3D scene stays pointer-driven
+ *  (hover a node → the sample that witnessed its edge closing lights up; click → detail). Selection
+ *  is ONE shared state, so the toggle preserves it and both renders show the same open holder. */
 function Observation({
   samples,
   live,
@@ -360,13 +421,13 @@ function Observation({
   const view = closureView(samples[index] ?? null);
   const { total, open, state } = view;
 
-  // Identity binding is live only in 3D once the lineage has loaded. The row a hovered node
+  // Identity binding goes live in BOTH renders once the lineage has loaded. The row a hovered node
   // lights is the sample that witnessed THAT holder's edge closing — a real temporal event.
-  const interactive = render === "3d" && holders !== null;
+  const identified = holders !== null;
+  const interactive = render === "3d" && identified;
   const witnessOfHovered =
     interactive && hoveredHolder !== null ? witnessSeq(hoveredHolder, samples, total) : null;
-  const selected =
-    render === "3d" && selectedHolder !== null ? (holders?.[selectedHolder] ?? null) : null;
+  const selected = selectedHolder !== null ? (holders?.[selectedHolder] ?? null) : null;
 
   return (
     <div className="cx-obs">
@@ -381,7 +442,12 @@ function Observation({
           onSelect={onSelect}
         />
       ) : (
-        <DrainMeter view={view} />
+        <DrainMeter
+          view={view}
+          holders={holders}
+          selected={selectedHolder}
+          onSelect={onSelect}
+        />
       )}
 
       {render === "3d" && (
@@ -578,12 +644,11 @@ export function ConsistencyDemo() {
   // is no other addressable position, so there is nothing between two samples to render.
   const [inspected, setInspected] = useState<number | null>(null);
 
-  // Leaving 3D drops the selection so a stale detail panel can't linger over the 2D meter.
+  // S7: leaving 3D no longer drops the SELECTION — the 2D meter inspects holders too, so the
+  // selected holder survives the toggle and both renders show the same open detail card. Only the
+  // 3D-only HOVER is cleared, since nothing in 2D can clear it once the pointer leaves the canvas.
   useEffect(() => {
-    if (render !== "3d") {
-      setSelectedHolder(null);
-      setHoveredHolder(null);
-    }
+    if (render !== "3d") setHoveredHolder(null);
   }, [render]);
 
   // Abort the stream on unmount (navigating back to the console). This is one of the two
