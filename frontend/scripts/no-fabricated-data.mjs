@@ -83,6 +83,16 @@ const DENY = [
   { label: "2025-12-14 (DC-invented formed date; real is 2024-05-12)", mode: "text", re: /2025-12-14/ },
   { label: "s.okonkwo (DC-invented supervisor name; ours is a UUID actor)", mode: "text", re: /s\.okonkwo/ },
   { label: "txn_5f2c81 (DC-invented loader txn id)", mode: "text", re: /txn_5f2c81/ },
+  // The navbar handoff (§8) names the living roster crimson-7 / crimson-5b / azure-5. TWO are real
+  // (crimson-7 gen 7; crimson-5b gen 5 — the branch holder, deliberately NOT denied, per the crimson-5b
+  // note above and below). `azure-5` is a FABRICATION: our only living azure agent is azure gen 7, and
+  // azure gen 5 is DEAD (frontend/tests-e2e/fixtures/console.json; seed/seed.py `alive = g == 7`). It is
+  // wrong "in a way that looks right" — the exact leak this guard exists for. The fleet roster is
+  // DERIVED from /agents as "<bloodline> · gen N", never a pasted handle, so `azure-5` cannot appear
+  // innocently. Token-boundary-anchored so it can't false-fail on `azure-5b`/`azure-50` (neither is in
+  // src regardless). DO NOT also add `crimson-5b`: it is REAL, and denying it turns this guard RED on
+  // correct code — the failure mode that gets a guard deleted (same rule as the crimson-5b note above).
+  { label: "azure-5 (spec-invented living azure handle; our only living azure agent is azure-7)", mode: "text", re: /(?<![A-Za-z0-9])azure-5(?![0-9A-Za-z])/ },
   { label: "DE89·3704 (DC-fabricated IBAN prefix)", mode: "text", re: /DE89[^0-9A-Za-z]?3704/ },
   { label: "GB29·NWBK (DC-fabricated IBAN prefix)", mode: "text", re: /GB29[^0-9A-Za-z]?NWBK/ },
   { label: "7f3c·001a4b2e (DC-fabricated HLC)", mode: "text", re: /7f3c[^0-9A-Za-z]?001a4b2e/ },
@@ -221,6 +231,7 @@ const EXPECTED = [
   { line: 27, has: "s3://lineage-certs/ (DC cert path)" },
   { line: 28, has: "clm_0112 (clm_01xx id — exercises the widened clm_0[01] pattern)" },
   { line: 29, has: "1e40b7a7…c393ff (DC-presented cert sha256)" },
+  { line: 30, has: "azure-5 (spec-invented living azure handle; real living azure is azure-7)" },
 ];
 
 function selfTest() {
@@ -249,9 +260,10 @@ function selfTest() {
   console.log(
     `self-test: the guard catches all ${EXPECTED.length} planted DC literals (ids, dates, name, ` +
       `IBANs, HLC, clm_00xx + clm_01xx ledger ids, amount, curve middles, bare int, consistency-timeline ` +
-      `array, blake3 seal, wk_ writer key, rt_01 root-of-trust, s3 cert path, cert sha256) and leaves ` +
-      `the 11 anchoring negatives (10.717, 0.7175, "19047890", bare 1904789, 0.924, 0.556, bare 2500, ` +
-      `bare 640, "part_01"≠rt_01, "mohawk_style"≠wk_, "clm_0200"≠clm_0[01]) alone.`,
+      `array, blake3 seal, wk_ writer key, rt_01 root-of-trust, s3 cert path, cert sha256, azure-5 ` +
+      `living-agent handle) and leaves the 12 anchoring negatives (10.717, 0.7175, "19047890", bare ` +
+      `1904789, 0.924, 0.556, bare 2500, bare 640, "part_01"≠rt_01, "mohawk_style"≠wk_, ` +
+      `"clm_0200"≠clm_0[01], "azure-5b"≠azure-5) alone.`,
   );
   return true;
 }
