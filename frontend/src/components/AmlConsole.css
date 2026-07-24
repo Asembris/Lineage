@@ -452,3 +452,526 @@
   color: var(--ghost);
   max-width: 84ch;
 }
+
+/* ============================================================================================
+ *   THE 5-PHASE PROCEDURE (design-port S8)
+ *
+ * STACKED, not mutually-exclusive: every phase section is always in the DOM, so the witness geometry
+ * (.geo) and the four-witness list (.aml__witnesses) are reachable with no phase-clicking and the
+ * whole surface stays under the oracle-boundary sweep. The rail and the "next" affordance drive an
+ * ACTIVE step (emphasis + scroll), never an unmount.
+ *
+ * AA IS UNCHANGED FROM THIS SURFACE'S LAW: no text below AA, --ash carries no words, no --alert, no
+ * --alive, no --trace/--origin. Emphasis on the active phase is a BORDER/rail colour, never dimmed
+ * text — an inactive phase is fully legible, only quieter in its chrome.
+ * ============================================================================================ */
+
+.aml__procedure {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+/* --- the step rail -------------------------------------------------------- */
+.aml__rail {
+  position: sticky;
+  top: 8px;
+  align-self: start;
+}
+.aml__rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aml__rail-step {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 10px 11px;
+  cursor: pointer;
+  /* Only chrome transitions; colours on TEXT snap (they do not lerp). */
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.aml__rail-step:hover {
+  border-color: var(--line);
+}
+.aml__rail-step:focus-visible {
+  outline: 2px solid var(--ash);
+  outline-offset: 1px;
+}
+.aml__rail-step--active {
+  background: var(--surface-2);
+  border-color: var(--ash);
+}
+/* The step number badge. Border is non-text (--ash / --line); the digit inside is a fact (--ghost),
+   --bone on the active step. */
+.aml__rail-num {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.6px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ghost);
+}
+.aml__rail-step--reached .aml__rail-num {
+  border-color: var(--ash);
+}
+.aml__rail-step--active .aml__rail-num {
+  border-color: var(--bone);
+  color: var(--bone);
+  background: var(--surface-2);
+}
+.aml__rail-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+/* The phase name is a FACT (which step). --ghost minimum, --bone on the active step. Never --ash. */
+.aml__rail-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+.aml__rail-step--active .aml__rail-name {
+  color: var(--bone);
+}
+.aml__rail-sub {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ghost);
+}
+
+/* --- the phase sections --------------------------------------------------- */
+.aml__phases {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  min-width: 0;
+}
+/* An inactive phase is fully legible; the ACTIVE one is marked by its header rule, not by dimmed
+   text. scroll-margin keeps the header clear of the sticky rail's top when scrolled to. */
+.aml__phase {
+  scroll-margin-top: 12px;
+}
+.aml__phase-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  border-left: 2px solid var(--line);
+  padding: 2px 0 2px 12px;
+  margin-bottom: 16px;
+}
+.aml__phase--active .aml__phase-head {
+  border-left-color: var(--bone);
+}
+.aml__phase-step {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+.aml__phase-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--bone);
+  margin: 0;
+}
+.aml__phase-hint {
+  font-size: 11.5px;
+  color: var(--ghost);
+}
+/* The lead/foot sentences of a phase — facts, --ghost, generous measure. */
+.aml__phase-lead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 76ch;
+}
+.aml__phase-lead strong {
+  color: var(--bone);
+  font-weight: 600;
+}
+.aml__phase-foot {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 76ch;
+}
+.aml__phase-next {
+  margin-top: 18px;
+}
+.aml__next-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--ash);
+  border-radius: 3px;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.aml__next-btn:hover,
+.aml__next-btn:focus-visible {
+  border-color: var(--bone);
+}
+
+/* --- phase 0 · subject lock ---------------------------------------------- */
+.aml__lock-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.aml__lock-card {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* The withheld card is DASHED — "not used" must not read like a solid stated fact. Border only; the
+   text inside stays --ghost (>= AA), never --ash. */
+.aml__lock-card--withheld {
+  border-style: dashed;
+  border-color: var(--ash);
+  background: transparent;
+}
+.aml__lock-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ghost);
+}
+
+/* --- phase 1 · the ring hop inspector ------------------------------------ */
+.aml__hop {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 14px 16px;
+  margin-top: 4px;
+}
+.aml__hop:focus-visible {
+  outline: 2px solid var(--ash);
+  outline-offset: 2px;
+}
+.aml__hop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.aml__hop-nav {
+  display: flex;
+  gap: 6px;
+}
+.aml__hop-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  width: 30px;
+  height: 30px; /* tap target */
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+.aml__hop-btn:hover,
+.aml__hop-btn:focus-visible {
+  border-color: var(--ash);
+}
+.aml__hop-card {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line);
+  border-radius: 2px;
+  background: var(--void);
+  padding: 12px 14px;
+}
+/* The subject hop — the transaction the reader actually clicked — takes the one emphasis: --bone. */
+.aml__hop-card--subject {
+  border-left-color: var(--bone);
+}
+.aml__hop-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.aml__hop-role {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ghost);
+}
+.aml__hop-note {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ghost);
+  max-width: 74ch;
+}
+
+/* --- phase 2 · the census ------------------------------------------------ */
+.aml__census {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* THE FOUR IDIOMS ARE PRESERVED — mirroring .aml__basis--* exactly. No two look alike; a self-loop
+   (447 never searched) must never render like a closed search (16 exhaustively searched). */
+.aml__census-row {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 12px 14px;
+}
+.aml__census-row--match {
+  border-left-color: var(--bone);
+}
+.aml__census-row--inconclusive {
+  border-left: 2px dashed var(--ghost);
+}
+.aml__census-row--self_loop {
+  border-left-color: var(--ash);
+  border-left-style: dotted;
+}
+.aml__census-row--closed_search {
+  border-left-color: var(--ash);
+}
+/* The active row is THIS subject's own state — a full border ring, not a colour change on text. */
+.aml__census-row--active {
+  border-color: var(--ash);
+}
+.aml__census-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.aml__census-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--bone);
+}
+.aml__census-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+.aml__census-track {
+  height: 5px;
+  border-radius: 2px;
+  background: var(--void);
+  overflow: hidden;
+}
+/* The fill is a non-text bar. MATCH is --bone (emphasis, NOT --alive — the DC's green is not on this
+   cold surface); the rest are --ash. Both clear the 3:1 non-text floor on --void. */
+.aml__census-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 2px;
+  background: var(--ash);
+}
+.aml__census-row--match .aml__census-fill {
+  background: var(--bone);
+}
+.aml__census-headline {
+  margin: 9px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ghost);
+  max-width: 78ch;
+}
+.aml__census-detail {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 78ch;
+}
+/* The reconciliation self-check. Reconciles in --bone; a mismatch reads --ghost. NEVER --alert (the
+   DC turns it C.alert — forbidden on this surface, in any form, including a failure state). */
+.aml__recon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+.aml__recon-sum {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+}
+.aml__recon-sum--off {
+  color: var(--ghost);
+}
+
+/* --- phase 3 · the evidence vacuum --------------------------------------- */
+.aml__vacuum {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.aml__vacuum-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.aml__vacuum-label {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  color: var(--bone);
+}
+.aml__vacuum-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+.aml__vacuum-track {
+  height: 6px;
+  border-radius: 2px;
+  background: var(--void);
+  overflow: hidden;
+}
+/* Draining, not alarming — --ash, with a dashed trailing edge to read as "unresolved", never red. */
+.aml__vacuum-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--ash);
+  border-right: 2px dashed var(--ash);
+  border-radius: 2px;
+}
+.aml__vacuum-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ghost);
+  max-width: 78ch;
+}
+
+/* --- phase 4 · the finding ----------------------------------------------- */
+.aml__finding {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.aml__finding-line {
+  border-left: 2px solid var(--line);
+  padding-left: 14px;
+  margin-bottom: 14px;
+}
+/* The last line is the load-bearing one (zero-witness prevalence) — its rule is --bone. */
+.aml__finding-line--last {
+  border-left-color: var(--bone);
+}
+.aml__finding-obs {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ghost);
+  margin-bottom: 3px;
+}
+.aml__finding-text {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--bone);
+  max-width: 80ch;
+}
+.aml__finding-src {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ghost);
+}
+.aml__finding-card {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  padding: 14px 16px;
+  margin-top: 6px;
+}
+.aml__finding-headline {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--bone);
+  max-width: 80ch;
+}
+.aml__finding-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ghost);
+  max-width: 80ch;
+}
+
+/* Narrow fallback (below the tested 1280/1440 widths): rail on top, phases below. */
+@media (max-width: 900px) {
+  .aml__procedure {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .aml__rail {
+    position: static;
+  }
+  .aml__rail-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
