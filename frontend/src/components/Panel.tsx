@@ -10,17 +10,26 @@ export function Panel(props: {
   title: string;
   count?: ReactNode;
   children: ReactNode;
+  /** An optional control rendered at the trailing edge of the header, beside the count (e.g. the
+   *  decision feed's collapse button). Presentational only — the count stays the fact. */
+  action?: ReactNode;
   /** Marks this panel as the genealogy graph the startup loader's transfer line aligns to (and whose
    *  living node it pulses) at the console-ownership beat — Loader §8's `[data-lin-graph]` hook. A
    *  colourless, audit-neutral attribute: the loader reads this element's DOM bounds only, never any
    *  data, so it stays invisible to the composition/geometry guards. */
   graphAnchor?: boolean;
 }) {
+  const hasRight = props.count !== undefined || props.action !== undefined;
   return (
     <section className="panel" {...(props.graphAnchor ? { "data-lin-graph": "" } : {})}>
       <div className="panel__head">
         <h2 className="panel__title">{props.title}</h2>
-        {props.count !== undefined && <span className="panel__count">{props.count}</span>}
+        {hasRight && (
+          <div className="panel__head-right">
+            {props.count !== undefined && <span className="panel__count">{props.count}</span>}
+            {props.action}
+          </div>
+        )}
       </div>
       <div className="panel__body">{props.children}</div>
     </section>
