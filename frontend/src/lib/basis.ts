@@ -31,7 +31,7 @@
  * frontend/scripts/composition-guard.mjs, not by this comment.
  */
 
-import type { AmlInterrogationResponse, AmlWitness } from "../api/types";
+import type { AmlAccount, AmlInterrogationResponse, AmlWitness, UUID } from "../api/types";
 
 /** The basis the laundering belief acted on. FOUR states, because CONCLUSIVE_NO is two. */
 export type Basis = "MATCH" | "INCONCLUSIVE" | "SELF_LOOP" | "CLOSED_SEARCH";
@@ -103,3 +103,83 @@ export const BASIS_LABEL: Record<Basis, string> = {
   SELF_LOOP: "CONCLUSIVE_NO · self-loop",
   CLOSED_SEARCH: "CONCLUSIVE_NO · closed search",
 };
+
+/* ============================================================================================
+ *   THE CENSUS, AS A PROCEDURE READS IT (design-port S8 · the 5-phase interrogation)
+ * ============================================================================================
+ * The interrogation surface's phase 2 (census) and phase 3 (evidence vacuum) reconcile all 1,500
+ * searches into the four legitimate read-states. Everything below is derived from the SAME vetted
+ * `BASIS_COUNT` the current surface already renders ("57 of 1,500") — no new endpoint, no new fetch.
+ * `/interrogate` is per-subject; the census is these backend-asserted constants, and the DC's own
+ * census "why" strings are NOT used (they invent a "12-hop budget" and "out-degree = 0" that
+ * contradict our real semantics — the boundary-account / self-loop reasons `BASIS_DETAIL` carries).
+ */
+
+/** The census display order: witnessed structure first, then the unresolved majority, then the two
+ *  CONCLUSIVE_NO states that must never look alike. */
+export const BASIS_ORDER: Basis[] = ["MATCH", "INCONCLUSIVE", "SELF_LOOP", "CLOSED_SEARCH"];
+
+/** Every AML search resolves into exactly one read-state. 57 + 980 + 447 + 16. */
+export const BASIS_TOTAL = 1500;
+
+/** The percentage of the extract in a state — DERIVED from the count, never a hardcoded DC literal
+ *  (the DC pins 3.8/65.3/29.8/1.1; these reproduce them from 57/980/447/16 ÷ 1,500). */
+export function basisPct(basis: Basis): string {
+  return `${((BASIS_COUNT[basis] / BASIS_TOTAL) * 100).toFixed(1)}%`;
+}
+
+/* ZERO-WITNESS is our real, reviewed census figure — 1,287 of 1,500 subjects (85.8%) have NO
+ * matching witness of any typology, so there is no structure to draw. It is stated in
+ * `WitnessGeometry.tsx`/`.css` and `NOTES.md` ("85.8% of transactions have NOTHING structural to
+ * draw"), and `scripts/no-fabricated-data.mjs` DELIBERATELY EXCLUDES it from the denylist as a REAL
+ * value (its own comment: "DO NOT RE-ADD 1,287 … They are REAL"). It is NOT a DC invention; the DC
+ * merely re-derived our own figure. It is the surface's MOST COMMON output, and the finding. */
+export const ZERO_WITNESS = 1287;
+export const ZERO_WITNESS_PCT = "85.8%";
+
+/** One ordered hop of a CYCLE ring, resolved to its real transaction row. The witness's
+ *  `transaction_ids` are ALREADY the ordered closed walk for a RING (aml_interrogate `ring_order`,
+ *  subject-first in 57/57), so a hop is just the i-th transaction resolved — no re-derivation, no
+ *  fabrication. The DC's per-hop "edge relation" ("nostro settlement"…), bank names and IBANs are
+ *  invented and are NOT here; we carry only what the row holds. */
+export interface RingHop {
+  index: number;
+  txnId: UUID;
+  fromId: UUID;
+  toId: UUID;
+  from: AmlAccount | undefined;
+  to: AmlAccount | undefined;
+  amount: number;
+  currency: string;
+  ts: string;
+  /** This hop IS the transaction the reader clicked. */
+  isSubject: boolean;
+  /** The last hop — the one that returns to the account hop 0 left. Closure is the only claim. */
+  isClosure: boolean;
+}
+
+/** The ordered hops of this subject's CYCLE ring, or null when there is no ring to close. Null is
+ *  the DOMINANT case (only 57 of 1,500 subjects have a ring); a caller must render that absence as a
+ *  result, never as a broken inspector. */
+export function ringHops(r: AmlInterrogationResponse): RingHop[] | null {
+  const cycle = cycleWitness(r);
+  if (!cycle || cycle.kind !== "RING") return null;
+  const rows = cycle.transaction_ids
+    .map((id) => r.transactions[id])
+    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+  if (rows.length === 0) return null;
+  const n = rows.length;
+  return rows.map((t, i) => ({
+    index: i,
+    txnId: t.id,
+    fromId: t.from_account_id,
+    toId: t.to_account_id,
+    from: r.accounts[t.from_account_id],
+    to: r.accounts[t.to_account_id],
+    amount: t.amount_paid,
+    currency: t.payment_currency,
+    ts: t.ts,
+    isSubject: t.id === r.subject.id,
+    isClosure: i === n - 1,
+  }));
+}
