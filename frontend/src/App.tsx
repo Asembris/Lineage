@@ -367,9 +367,16 @@ function App() {
       (inval.status === "error" && inval.closure)
     )
       modes.push("⚠ armed");
+    // "belief decision" reflects BELIEF-DRIVENNESS, not kind. The handoff keyed this on card/aml, but
+    // that was a proxy from the DC's fabricated data — OUR AML decisions ARE belief-driven (the azure
+    // laundering belief drives all 1,500), so a card-based prefix mislabels a belief-driven AML
+    // decision as a plain "decision". Key it on `driving_belief_id`, exactly as the feed's own `belief`
+    // tag and the Inspector's DRIVING BELIEF panel do. (`data-capsule` stays "decision" — this is the
+    // label only, so the header oracle guard is untouched.)
+    const beliefDriven = d.driving_belief_id !== null;
     capsule = {
       kind: "decision",
-      label: `${d.aml_transaction_id === null ? "belief decision · " : "decision · "}${txn}`,
+      label: `${beliefDriven ? "belief decision · " : "decision · "}${txn}`,
       sub: modes.length ? modes.join(" · ") : null,
       clearLabel: "close investigation",
     };
