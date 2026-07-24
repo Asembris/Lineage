@@ -88,7 +88,7 @@ const IV_PHASES = [
 const IV_SUBTITLES = [
   "lock the subject edge",
   "what the graph witnesses around it",
-  "reconcile all 1,500 searches",
+  "reconcile all 1,500 subjects",
   "absence as a measured finding",
   "assemble the conclusion",
 ];
@@ -96,7 +96,7 @@ const IV_SUBTITLES = [
 /** The advance affordance at the foot of each phase; the last phase has none. */
 const IV_NEXT = [
   "witness the structure →",
-  "reconcile all 1,500 searches →",
+  "reconcile all 1,500 subjects →",
   "the evidence vacuum →",
   "assemble the finding →",
   null,
@@ -431,9 +431,10 @@ function CensusBar({ basis, active }: { basis: Basis; active: boolean }) {
   );
 }
 
-/** Phase 2 — CENSUS. All 1,500 searches across the four legitimate read-states, counts from the
+/** Phase 2 — CENSUS. All 1,500 subjects across the four legitimate read-states, counts from the
  *  vetted BASIS_COUNT and reasons from BASIS_HEADLINE/BASIS_DETAIL — NOT the DC's "why" strings,
- *  which invent a "12-hop budget" and "out-degree = 0" that contradict our real semantics. */
+ *  which invent a "12-hop budget" and "out-degree = 0" that contradict our real semantics. Note the
+ *  1,500 are SUBJECTS, never "searches": 447 CONCLUSIVE_NO rows are self-loops where no search ran. */
 function CensusPhase({ r }: { r: AmlInterrogationResponse }) {
   const active = basisOf(r);
   const parts = BASIS_ORDER.map((b) => BASIS_COUNT[b]);
@@ -442,7 +443,7 @@ function CensusPhase({ r }: { r: AmlInterrogationResponse }) {
   return (
     <>
       <p className="aml__phase-lead">
-        Every AML search resolves into exactly one legitimate read-state.{" "}
+        Every AML subject resolves into exactly one legitimate read-state.{" "}
         {active ? (
           <>
             This subject resolved to <strong>{BASIS_LABEL[active]}</strong>; here is how all{" "}
@@ -469,7 +470,8 @@ function CensusPhase({ r }: { r: AmlInterrogationResponse }) {
       </div>
       <p className="aml__phase-foot">
         No population is hidden or discarded. INCONCLUSIVE is not a negative result — and the two
-        CONCLUSIVE_NO states failed for materially different structural reasons.
+        CONCLUSIVE_NO states are not one thing: 447 are self-loops, where an account paid itself and
+        no search was ever possible, and only 16 are closed searches that ran and found no return path.
       </p>
     </>
   );
@@ -520,7 +522,7 @@ function VacuumPhase() {
   return (
     <>
       <p className="aml__phase-lead">
-        Most searches never establish structure at all. This is not innocence — it is the graph
+        Most subjects never establish structure at all. This is not innocence — it is the graph
         declining to answer.
       </p>
       <VacuumMeter
@@ -570,7 +572,7 @@ function FindingPhase({ r }: { r: AmlInterrogationResponse }) {
   }
   lines.push({
     obs: "witness coverage",
-    text: `Only ${formatCount(BASIS_COUNT.MATCH)} of ${formatCount(BASIS_TOTAL)} searches (${basisPct(
+    text: `Only ${formatCount(BASIS_COUNT.MATCH)} of ${formatCount(BASIS_TOTAL)} subjects (${basisPct(
       "MATCH",
     )}) ever witness a closed structure at all.`,
     src: `MATCH · ${formatCount(BASIS_COUNT.MATCH)} / ${formatCount(BASIS_TOTAL)}`,
@@ -579,7 +581,7 @@ function FindingPhase({ r }: { r: AmlInterrogationResponse }) {
     obs: "unresolved majority",
     text: `${basisPct(
       "INCONCLUSIVE",
-    )} of searches return could-not-determine — the largest of the four read-states.`,
+    )} of subjects return could-not-determine — the largest of the four read-states.`,
     src: `INCONCLUSIVE · ${formatCount(BASIS_COUNT.INCONCLUSIVE)} / ${formatCount(BASIS_TOTAL)}`,
   });
   lines.push({
