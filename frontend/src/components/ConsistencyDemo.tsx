@@ -487,7 +487,14 @@ function Observation({
         <span className="cx-obs__count">
           closure <b className="mono">{open}/{total}</b> open
         </span>
-        <span className={`cx-obs__state cx-obs__state--${state}`}>{STATE_LABEL[state]}</span>
+        <span className={`cx-obs__state cx-obs__state--${state}`}>
+          {state === "SPLIT" && (
+            <span className="cx-obs__state-glyph" aria-hidden="true">
+              ▰
+            </span>
+          )}
+          {STATE_LABEL[state]}
+        </span>
         {state === "SPLIT" && (
           <span className="cx-obs__leak mono">{open} still live on the invalidated belief</span>
         )}
@@ -598,6 +605,23 @@ function Summary({
           </>
         )}
       </div>
+
+      {/* The DC's per-column verdict line, ported to the MEASURED column only. Rendering it under
+          the cited column too would assert a result this run did not measure. Derived from the
+          wire's own split_samples, so a strong run earns "no torn frame observed" by measuring 0 —
+          it is never printed because the strategy was strong. */}
+      <p
+        className={`cx-sum__verdict cx-sum__verdict--${
+          summary.split_samples > 0 ? "mixed" : "clean"
+        }`}
+      >
+        <span className="cx-sum__verdict-glyph" aria-hidden="true">
+          {summary.split_samples > 0 ? "▰" : "✓"}
+        </span>
+        {summary.split_samples > 0
+          ? "mixed state was externally visible"
+          : "no torn frame observed"}
+      </p>
 
       <p className="cx-sum__takeaway">
         {strong ? (

@@ -400,8 +400,21 @@ button.cx-meter__cell:focus-visible {
   color: var(--ghost);
 }
 
+/* The DC boxes the torn readout: --alert-dim wash, --alert rule. Its own colour choice for the
+   WORDS is --alert on --alert-dim = 4.13:1, below the floor — the exact defect S6 found on the
+   invalidate gate's micro-header. So the words take --ghost (5.28:1) and the signal is carried by
+   the --alert glyph and border. Before: --alert on --void 4.94:1. After: --ghost 5.28:1. */
 .cx-obs__state--SPLIT {
+  color: var(--ghost);
+  background: var(--alert-dim);
+  border: 1px solid var(--alert);
+  border-radius: 2px;
+  padding: 0.1rem 0.45rem;
+}
+
+.cx-obs__state-glyph {
   color: var(--alert);
+  margin-right: 0.4rem;
 }
 
 .cx-obs__state--ALL_INVALIDATED {
@@ -517,10 +530,14 @@ button.cx-meter__cell:focus-visible {
   margin-bottom: 1.2rem;
 }
 
+/* S7: the commit cards become --void insets, which is the DC's own lane-card background. This is
+   an AA fix, not decoration: the big --alert "9" sat on --surface-2 at 4.08:1. On --void it is
+   4.94:1 (--alive 11.46:1). Deliberately a LOCAL inset — this is NOT the banked whole-app --void
+   body layering, which stays its own item with its own contrast re-measure. */
 .cx-sum__col {
   padding: 0.9rem 1rem;
   border-radius: 5px;
-  background: var(--surface-2);
+  background: var(--void);
   border: 1px solid var(--line);
 }
 
@@ -623,6 +640,34 @@ button.cx-meter__cell:focus-visible {
 .cx-sum .mono {
   font-family: var(--font-mono);
   letter-spacing: 0.01em;
+  /* DC value. Load-bearing here rather than cosmetic: every mono figure on this surface changes as
+     the scrubber steps, and proportional digits make the whole record shift column by column. */
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-sum__n {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The DC's per-column verdict line, on the measured run only. On --surface: --alert 4.55:1,
+   --alive 10.56:1. */
+.cx-sum__verdict {
+  margin: 0 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.cx-sum__verdict-glyph {
+  margin-right: 0.5rem;
+}
+
+.cx-sum__verdict--mixed {
+  color: var(--alert);
+}
+
+.cx-sum__verdict--clean {
+  color: var(--alive);
 }
 
 /* Narrow widths: stack the commit comparison. */
