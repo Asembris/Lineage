@@ -347,7 +347,9 @@ function App() {
     capsule = {
       kind: "evidence",
       label: "interrogation",
-      sub: `txn ${fragId(view.txnId)}`,
+      // `txn_<frag>` per the handoff's capsule design. Its placeholder value is a DENIED DC loader
+      // literal, so we match the FORMAT ONLY, with the real id fragment — never that value.
+      sub: `txn_${fragId(view.txnId)}`,
       clearLabel: "return to console",
     };
     onClearCapsule = () => {
@@ -356,7 +358,9 @@ function App() {
     };
   } else if (view.kind === "console" && investigation) {
     const d = investigation.decision;
-    const txn = d.aml_transaction_id ? `txn ${fragId(d.aml_transaction_id)}` : d.txn_ref;
+    // `txn_<frag>` (underscore) to match the handoff's capsule design; a card decision already carries
+    // that shape in its real txn_ref. The AML fragment is the real aml_transaction_id, never a literal.
+    const txn = d.aml_transaction_id ? `txn_${fragId(d.aml_transaction_id)}` : d.txn_ref;
     const modes: string[] = [];
     if (trace.status === "ready") modes.push(trace.phase === "done" ? "◇ traced" : "◇ tracing");
     // Mirror the tree overlay's armed/corrected states (⟲ present-day is dropped, not lifted).
