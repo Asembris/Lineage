@@ -447,6 +447,68 @@ test.describe("the header oracle boundary", () => {
 });
 
 /*
+ * THE COLLAPSED FEED RAIL — the header capsule's leak class, one shell element over.
+ *
+ * The 56px rail is COLOURLESS: it takes only counts, never a Decision. So BOTH static guards are
+ * blind to it — the composition census never colours it (there is nothing to reach the audit layer
+ * THROUGH), and the `.aml` sweep scopes inside the evidence surface, not the console shell. Its
+ * safety rests ENTIRELY on the render-site: the rail lives inside the console arm of App's body
+ * ternary, so view.kind==='aml' unmounts it exactly as it unmounts the full feed.
+ *
+ * The full feed's unmount is covered by the seam test below (it opens the witness FROM a feed row).
+ * The collapsed RAIL is a SEPARATE render branch with no such coverage: a refactor that persisted
+ * feedCollapsed into the evidence view — a rail reading "showing N of 1,500" beside an open witness —
+ * would pass composition, data, AND the `.aml` sweep. This is the render-time assertion that closes
+ * it, the same shape as the header-capsule test above.
+ */
+test.describe("the collapsed rail oracle boundary", () => {
+  test("a collapsed feed rail is unmounted on the evidence surface", async ({ page }) => {
+    const misses = installMock(page);
+    await page.goto("/");
+    const filter = page.getByRole("group", { name: "Filter decisions by kind" });
+    await filter.getByRole("button", { name: /^aml/ }).click();
+
+    // Select an AML decision (so the Investigation offers the interrogate door), THEN collapse the
+    // feed. The rail carries no row and no "see why", so the witness is opened from the Inspector —
+    // the exact path that leaves feedCollapsed=true crossing into the evidence view.
+    const ring = SUBJECTS.aml_ring_txn_id;
+    const item = page.locator(".feed__item", {
+      has: page.locator(".feed__row", { hasText: ring.slice(0, 6) }),
+    });
+    await item.locator(".feed__row").first().click();
+    await page.getByRole("button", { name: "Collapse the decision feed" }).click();
+
+    // LIVENESS. The rail really renders on the console, so the "gone during evidence" assertion below
+    // is not vacuously true over a rail that never appears. feedCollapsed + selectedId both persist
+    // across the seam — exactly what a naive persist-the-rail refactor would keep rendering.
+    await expect(
+      page.locator(".console__rail"),
+      "the collapsed feed does not render its rail on the console, so this guard would measure " +
+        "nothing — the rail must be PRESENT here before we can prove it ABSENT on the witness.",
+    ).toHaveCount(1);
+
+    // Open the witness from the Inspector (the collapsed rail carries no control that could).
+    await page.getByRole("button", { name: /Interrogate the transaction/ }).click();
+    await expect(page.locator(".aml")).toBeVisible();
+    await page.waitForSelector(".aml__witnesses", { state: "visible" });
+
+    // THE INVARIANT. The whole console body — the rail with it — is unmounted while the witness is up.
+    // A rail reading "showing N of 1,500" beside a witness is the header-capsule leak, one shell
+    // element over: colourless, guard-blind, safe only by this render-site unmount.
+    await expect(
+      page.locator(".console__rail"),
+      "A COLLAPSED FEED RAIL IS ON SCREEN BESIDE THE WITNESS. feedCollapsed persisted into the\n" +
+        "evidence view and the 56px rail — 'showing N of <total>' — is co-mounted with the witness it\n" +
+        "must never sit beside. Both static guards are blind to it (the rail is colourless); its only\n" +
+        "protection is rendering inside the console arm of App's body ternary. Keep it there.\n",
+    ).toHaveCount(0);
+    await expect(page.locator(".console__body")).toHaveCount(0);
+
+    expect(misses, `the console made a request the fixtures do not cover:\n${misses.join("\n")}`).toEqual([]);
+  });
+});
+
+/*
  * THE JUSTIFICATION SEAM (Rung 4) — the mirror of the oracle-boundary sweep above.
  *
  * That sweep proves the label is never on the EVIDENCE surface. This proves the witness is never on
