@@ -35,6 +35,8 @@ import { getBeliefLineage } from "../api/client";
 import {
   changeIndices,
   closureView,
+  firstSplitIndex,
+  splitSampleCount,
   witnessSeq,
   type ClosureView,
 } from "../lib/closure";
@@ -141,6 +143,8 @@ function Scrubber({
   const changes = changeIndices(samples);
   const prev = [...changes].reverse().find((i) => i < index);
   const next = changes.find((i) => i > index);
+  const splitIdx = firstSplitIndex(samples);
+  const splits = splitSampleCount(samples);
 
   return (
     <div className="cx-scrub">
@@ -200,6 +204,31 @@ function Scrubber({
       {/* EVENTUAL-ONLY BY MEASUREMENT, NOT BY CONFIGURATION. Enabled iff a real SPLIT sample exists
           in what this run recorded — never `strategy === "strong"`. On the atomic path there is no
           torn state to seek to, and the disabled note reports that as the counted result it is. */}
+      <div className="cx-scrub__torn-wrap">
+        <button
+          className="cx-scrub__torn"
+          onClick={() => splitIdx !== null && onInspect(splitIdx)}
+          disabled={splitIdx === null}
+        >
+          <span className="cx-scrub__torn-glyph" aria-hidden="true">
+            ▰
+          </span>
+          seek to the torn window
+          {splitIdx !== null && (
+            <span className="cx-scrub__torn-at mono">
+              #{samples[splitIdx].seq} · {samples[splitIdx].elapsed_ms} ms
+            </span>
+          )}
+        </button>
+        {splitIdx === null && (
+          <p className="cx-scrub__no-torn">
+            no torn sample exists in this run — <b className="mono">{splits}</b> of{" "}
+            <b className="mono">{samples.length}</b> observer samples
+            {live ? " so far" : ""} were <span className="mono">SPLIT</span>. That absence is the
+            result, not a missing control.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
