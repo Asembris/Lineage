@@ -258,6 +258,7 @@ export function GenealogyTree({
                 className={cls}
                 transform={`translate(${n.x} ${n.y})`}
                 opacity={dimOf(id)}
+                {...(n.isAlive ? { "data-live-node": "" } : {})}
                 onMouseEnter={() => setHoverNode(id)}
                 onMouseLeave={() => setHoverNode(null)}
               >

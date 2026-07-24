@@ -379,7 +379,7 @@ function App() {
           </div>
 
           <div className="console__region">
-            <Panel title="Genealogy">
+            <Panel title="Genealogy" graphAnchor>
               <Loaded state={agents} loadingLabel="Loading genealogy…">
                 {(data) => (
                   <GenealogyTree data={data} trace={treeTrace} invalidation={treeInvalidation} />
