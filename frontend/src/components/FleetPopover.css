@@ -1,0 +1,238 @@
+/*
+ * FleetPopover — fleet-health button + popover (navbar port §8). --alive is the ONLY signal here, and
+ * it means exactly what it always means: a living agent (the live dot + the alive count). Everything
+ * else is cold structure. AA: --alive on --surface 8.8:1; --bone 11.09:1; --ghost 5.83:1; the dot is
+ * non-text. The dot is STEADY (no continuous pulse) — health is a resting fact, not an alarm.
+ */
+
+.fleet {
+  position: relative;
+}
+
+.fleet__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--ghost);
+  transition: background-color 0.15s ease;
+}
+
+.fleet__btn:hover,
+.fleet__btn--open {
+  background: var(--surface-2);
+}
+
+.fleet__btn:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}
+
+.fleet__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ash);
+  flex: 0 0 auto;
+}
+
+.fleet__dot--healthy {
+  background: var(--alive);
+  box-shadow: 0 0 0 3px rgba(63, 224, 168, 0.12);
+}
+
+.fleet__alive {
+  color: var(--alive);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet__sep {
+  color: var(--line);
+}
+
+.fleet__total {
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet__unit {
+  color: var(--ghost);
+}
+
+.fleet__caret {
+  color: var(--ghost);
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+}
+
+.fleet__btn--open .fleet__caret {
+  transform: rotate(180deg);
+}
+
+/* --- Popover --------------------------------------------------------------- */
+
+.fleet__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 264px;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fleet__pop {
+    animation: fleet-drawin 0.2s ease;
+  }
+}
+
+@keyframes fleet-drawin {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fleet__pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.fleet__pop-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  color: var(--bone);
+}
+
+.fleet__pop-sub {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--ghost);
+}
+
+.fleet__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.fleet__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.5rem 0.6rem;
+  background: var(--surface);
+}
+
+.fleet__metric-v {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--bone);
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet__metric-v--alive {
+  color: var(--alive);
+}
+
+.fleet__metric-k {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ghost);
+}
+
+.fleet__roster {
+  margin-bottom: 0.75rem;
+}
+
+.fleet__roster-head {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ghost);
+}
+
+.fleet__roster-empty {
+  font-family: var(--font-mono);
+  color: var(--ghost);
+}
+
+.fleet__roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fleet__roster-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.fleet__roster-name {
+  color: var(--bone);
+}
+
+.fleet__roster-gen {
+  margin-left: auto;
+  color: var(--ghost);
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet__foot {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ghost);
+  text-align: left;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.fleet__foot:hover {
+  color: var(--bone);
+}
+
+.fleet__foot:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+}

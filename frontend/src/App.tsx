@@ -9,6 +9,9 @@ import { HonestyLedger } from "./components/HonestyLedger";
 import { AmlConsole } from "./components/AmlConsole";
 import { LineageEmblem } from "./components/LineageEmblem";
 import { Loader } from "./components/Loader";
+import { CommandRail, type Surface } from "./components/CommandRail";
+import { ContextCapsule, type CapsuleDescriptor } from "./components/ContextCapsule";
+import { FleetPopover } from "./components/FleetPopover";
 import type { InvestigationTrace } from "./components/Investigation";
 import type { InvalidateHandlers, InvalidateUi } from "./components/Invalidate";
 import type { TreeInvalidation } from "./components/GenealogyTree";
@@ -16,7 +19,7 @@ import { resolveInvestigation } from "./lib/investigation";
 import { deriveChain } from "./lib/trace";
 import { SUPERVISOR_ACTOR } from "./lib/supervisor";
 import { ApiError, getBeliefLineage, invalidateBelief } from "./api/client";
-import { formatCount } from "./lib/format";
+import { formatCount, fragId } from "./lib/format";
 import type {
   DecisionKind,
   InvalidateResponse,
@@ -78,22 +81,14 @@ function deriveClosure(lineage: LineageResponse): Closure {
   };
 }
 
-function FleetSummary({ agents }: { agents: ReturnType<typeof useConsoleData>["agents"] }) {
-  if (agents.status !== "ready") {
-    return <span className="console__fleet">fleet · —</span>;
-  }
-  const total = agents.data.count;
-  const alive = agents.data.agents.filter((a) => a.status === "alive").length;
-  return (
-    <div className="console__fleet">
-      <span>
-        <span className="alive">{alive}</span> alive
-      </span>
-      <span className="console__fleet-sep">/</span>
-      <span>{total} agents</span>
-    </div>
-  );
-}
+/** The route-aware subtitle under the wordmark, one string per active surface (navbar port §5). Pure
+ *  presentation — no data — so it changes with `view` alone. */
+const ROUTE_SUBTITLE: Record<Surface, string> = {
+  console: "decision & lineage investigation",
+  interro: "graph evidence · one edge",
+  consistency: "split-state · atomic vs eventual",
+  ledger: "claims & provenance record",
+};
 
 /** Which surface fills the console body. "consistency" is the standalone fleet-level demo
  *  (Frontend Phase 4); "ledger" is the honesty ledger (Item 9). Both take over the whole body
@@ -300,39 +295,115 @@ function App() {
   const beliefCount =
     !investigation && beliefs.status === "ready" ? beliefs.data.count : undefined;
 
+  // ============================ THE COMMAND RAIL (navbar port) ============================
+  // The active surface: three views map to their kind; the evidence view maps to the Interrogation
+  // tab (which is why the header finally shows a pressed nav item while the witness is up).
+  const activeSurface: Surface = view.kind === "aml" ? "interro" : view.kind;
+
+  // The reflect-not-originate Interrogation tab. Enabled ONLY when a real AML subject is already
+  // carried — you are in evidence, or an AML decision is selected in the console — never by
+  // synthesizing "the first AML row" (NAVBAR_TRIAGE.md Part 1: fabricated intent, broken reveal,
+  // broken focus handoff). The already-chosen id is what it hands down.
+  const selectedAmlTxn =
+    investigation && investigation.decision.aml_transaction_id !== null
+      ? investigation.decision.aml_transaction_id
+      : null;
+  const interroEnabled = view.kind === "aml" || selectedAmlTxn !== null;
+
+  const goSurface = (s: Surface) => {
+    if (s === "console") setView({ kind: "console" });
+    else if (s === "consistency") setView({ kind: "consistency" });
+    else if (s === "ledger") setView({ kind: "ledger" });
+    else {
+      // interro — REFLECT, never originate. Already in evidence → no-op; else open the already-chosen
+      // AML subject's witness (a bare id). Unreachable without a carried subject (the tab is disabled).
+      if (view.kind === "aml") return;
+      if (selectedAmlTxn !== null) openInterrogation(selectedAmlTxn);
+    }
+  };
+
+  // Relation dots — real cross-surface links only (navbar port §7; the ledger-selection disjuncts
+  // drop out, S9 cut ledger selection). Booleans rendered as geometry, never audit text.
+  const inEvidence = view.kind === "aml";
+  const selectedIsCard = Boolean(
+    investigation && investigation.decision.aml_transaction_id === null,
+  );
+  const relMarker: Record<Surface, boolean> = {
+    console: inEvidence,
+    interro: selectedAmlTxn !== null,
+    consistency: false,
+    ledger: selectedIsCard || inEvidence,
+  };
+
+  // ============================ THE CONTEXT CAPSULE ============================
+  // THE INVARIANT (guarded by geometry.spec.ts "the header oracle boundary"): the branch is chosen by
+  // the ACTIVE VIEW, never by retained selection. While view.kind==='aml' ONLY the evidence branch may
+  // render — `selectedId` is retained across the seam, so a selection-keyed capsule would carry the
+  // decision onto the witness. The ledger + consistency branches are CUT (no lift), so the capsule is
+  // non-null only on the console (decision) and the evidence view (evidence).
+  let capsule: CapsuleDescriptor | null = null;
+  let onClearCapsule = () => {};
+  if (view.kind === "aml") {
+    capsule = {
+      kind: "evidence",
+      label: "interrogation",
+      sub: `txn ${fragId(view.txnId)}`,
+      clearLabel: "return to console",
+    };
+    onClearCapsule = () => {
+      setReturnFocusTxn(view.txnId);
+      setView({ kind: "console" });
+    };
+  } else if (view.kind === "console" && investigation) {
+    const d = investigation.decision;
+    const txn = d.aml_transaction_id ? `txn ${fragId(d.aml_transaction_id)}` : d.txn_ref;
+    const modes: string[] = [];
+    if (trace.status === "ready") modes.push(trace.phase === "done" ? "◇ traced" : "◇ tracing");
+    // Mirror the tree overlay's armed/corrected states (⟲ present-day is dropped, not lifted).
+    if (inval.status === "done") modes.push("✓ invalidated");
+    else if (
+      inval.status === "confirming" ||
+      inval.status === "invalidating" ||
+      (inval.status === "error" && inval.closure)
+    )
+      modes.push("⚠ armed");
+    capsule = {
+      kind: "decision",
+      label: `${d.aml_transaction_id === null ? "belief decision · " : "decision · "}${txn}`,
+      sub: modes.length ? modes.join(" · ") : null,
+      clearLabel: "close investigation",
+    };
+    onClearCapsule = () => setSelectedId(null);
+  }
+
   return (
     <div className="console">
       {intro && <Loader onComplete={dismissIntro} />}
       <header className="console__header">
-        <div className="console__brand">
+        <button
+          type="button"
+          className="console__brand"
+          aria-label="Lineage — return to Console"
+          onClick={() => goSurface("console")}
+        >
           <LineageEmblem className="console__mark" />
-          <h1 className="console__title">LINEAGE</h1>
-          <span className="console__tagline">supervisor console</span>
+          <span className="console__wordmark">
+            <span className="console__title">LINEAGE</span>
+            <span className="console__subtitle">{ROUTE_SUBTITLE[activeSurface]}</span>
+          </span>
+        </button>
+
+        <CommandRail
+          active={activeSurface}
+          interroEnabled={interroEnabled}
+          relMarker={relMarker}
+          onGo={goSurface}
+        />
+
+        <div className="console__cluster">
+          <ContextCapsule descriptor={capsule} onClear={onClearCapsule} />
+          <FleetPopover agents={agents} counts={counts} beliefs={beliefs} onGo={goSurface} />
         </div>
-        <nav className="console__views" aria-label="Console view">
-          <button
-            className="console__view"
-            aria-pressed={view.kind === "console"}
-            onClick={() => setView({ kind: "console" })}
-          >
-            Console
-          </button>
-          <button
-            className="console__view"
-            aria-pressed={view.kind === "consistency"}
-            onClick={() => setView({ kind: "consistency" })}
-          >
-            Consistency demo
-          </button>
-          <button
-            className="console__view"
-            aria-pressed={view.kind === "ledger"}
-            onClick={() => setView({ kind: "ledger" })}
-          >
-            Ledger
-          </button>
-        </nav>
-        <FleetSummary agents={agents} />
       </header>
 
       {/* EXACTLY ONE BODY ARM IS MOUNTED. The `aml` arm renders the evidence surface ALONE — no

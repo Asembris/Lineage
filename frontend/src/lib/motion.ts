@@ -46,6 +46,27 @@ export const DUR = {
  *  `times` prop accepts it without a readonly-tuple cast. */
 export const BLOOM_TIMES = [0, 0.5, 1];
 
+/*
+ * RAIL — the command rail's traveling route indicator (navbar port). A DELIBERATE, DOCUMENTED,
+ * SCOPED EXCEPTION to the DUR/EASE tween vocabulary above, exactly like the LOADER timeline below and
+ * the 3D scene's rAF loop: the underline eases toward the active tab's MEASURED geometry with a
+ * per-frame asymptotic lerp — the SAME idiom S6 CUT for the genealogy camera (`v += (target-v)*k`,
+ * NOTES.md "design-port S6"). It is admissible HERE where the camera was not, on two grounds:
+ *   1. it animates a 2px underline's x/width ONLY — geometry, never colour, and it crops no meaning
+ *      (the camera cropped the cold tree / generational span the two orchestrated moments depend on);
+ *   2. there is nothing to size it against but live DOM measurement — tab labels differ in width, so
+ *      a fixed-duration transform tween can't know where to land without the same measurement anyway.
+ * Reduced-motion NEVER runs this loop: the indicator snaps to the active tab's measured geometry (read
+ * post-layout in a useLayoutEffect), so its settled frame is identical to the full-motion end state.
+ * Named here rather than left as bare literals inside CommandRail.tsx — the exact drift Phase 6 fixed.
+ */
+export const RAIL = {
+  /** Per-frame lerp factor toward the target x/width. The DC's 0.22; keep it or the travel feels wrong. */
+  ease: 0.22,
+  /** Within this distance (px) of the target on BOTH x and width, snap exactly and stop the loop. */
+  snapPx: 0.5,
+} as const;
+
 /** Keyframe timing for a SETTLE — the DC's `lin-settle` (design-port S6): an element arrives large
  *  and shrinks into place while fading in, reaching full opacity at 60% and finishing the scale
  *  travel at 100%. Distinct from BLOOM_TIMES: a bloom is symmetric (peaks mid-way and eases back),

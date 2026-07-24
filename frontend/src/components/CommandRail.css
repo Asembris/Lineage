@@ -1,0 +1,120 @@
+/*
+ * CommandRail — the surface rail (navbar port §6). Assembled active state (traveling underline + ash
+ * top bracket), never a filled pill. Cold by default; no warmth, no signal colour — the rail carries
+ * no state that --alive/--trace/--origin/--alert mean.
+ *
+ * AA: every readable fact ≥4.5:1. The handoff sets inactive tab text in --ash (#5A6678 ≈ 3.06:1 on
+ * --surface) — BELOW our floor, and --ash "carries no fact" in this system (tokens.css). So inactive
+ * labels are --ghost (5.83:1); --ash is used only for the non-text top bracket. This is the same
+ * substitution S4–S9 made every time the DC put a fact in --ash.
+ */
+
+.rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+}
+
+.rail__tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.95rem;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  /* Inactive tab text: --ghost, NOT the handoff's --ash (3.06:1 fails our 4.5:1 floor). */
+  color: var(--ghost);
+  transition: color 0.18s ease;
+}
+
+.rail__tab:hover {
+  color: var(--bone);
+}
+
+.rail__tab--on {
+  color: var(--bone);
+  font-weight: 600;
+}
+
+/* aria-disabled, not the disabled attribute, so the Interrogation tab stays in the roving tab order
+   and its descriptor is reachable. Muted and inert; it reflects an unavailable action, not an error. */
+.rail__tab[aria-disabled="true"] {
+  color: var(--ash);
+  cursor: default;
+}
+
+.rail__tab:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* A relation dot: a cross-surface link marker, geometry not text. --ghost by default, --bone when the
+   tab is active. It NEVER uses a signal colour — a teal/red dot here would read as a fleet/alert state
+   the rail does not have. */
+.rail__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ghost);
+  flex: 0 0 auto;
+}
+
+.rail__dot--on {
+  background: var(--bone);
+}
+
+/* The hover descriptor drops just below the tab. Mono, uppercase, --ghost (5.83:1). Absolutely
+   positioned so it causes no reflow (the rail height is fixed). */
+.rail__desc {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ghost);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* The traveling route indicator — two absolutely-positioned bars driven by measured geometry
+   (CommandRail.tsx). Left/width are set inline; only those two properties change per frame, so the
+   travel is transform-cheap and causes no reflow. */
+.rail__underline {
+  position: absolute;
+  bottom: 3px;
+  height: 2px;
+  background: var(--bone);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.rail__bracket {
+  position: absolute;
+  top: 3px;
+  height: 2px;
+  background: var(--ash);
+  opacity: 0.5;
+  pointer-events: none;
+}
