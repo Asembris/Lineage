@@ -15,6 +15,14 @@
  *   - STRONG (the real atomic endpoint): open_edges jumps 8→0 in a single sample, so every node
  *     flips to --alive together — one commit, no torn frame ever.
  *
+ * ONE DERIVED STATE, NOT ONE ARRAY (design-port S7). This scene used to take the whole `samples`
+ * array and derive the shown sample itself (`samples[samples.length - 1]`) — the SAME derivation the
+ * 2D DrainMeter did separately. Two sites that agreed only because both always showed the tail. With
+ * a scrubber that agreement breaks immediately (scene on the latest sample, meter on the inspected
+ * one), so the scene now takes the already-derived `ClosureView` and renders it. The derivation
+ * exists in exactly one place (lib/closure.ts) and 2D/3D disagreement is unrepresentable rather than
+ * tested-for.
+ *
  * IDENTITY (Phase 5.1). The SSE stream carries COUNTS, not holder ids — so node i is bound to a
  * REAL holder via GET /beliefs/{id}/lineage, ordered by `inherited_at`. That order is not a guess:
  * the eventual fan-out (app/services/consistency.py) closes edges `ORDER BY inherited_at`, so the
@@ -34,7 +42,8 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls as OrbitControlsImpl } from "three/examples/jsm/controls/OrbitControls.js";
-import type { ConsistencySampleEvent, ConsistencyState } from "../api/types";
+import type { ConsistencyState } from "../api/types";
+import type { ClosureView } from "../lib/closure";
 
 // Token colours (mirrors tokens.css / FRONTEND.md — kept literal here because three needs hex,
 // not CSS custom properties, and these are the same values the 2D view resolves).
@@ -49,7 +58,6 @@ const COLOR = {
 const EMISSIVE = { rest: 0.12, torn: 0.9, corrected: 0.5 } as const;
 type Kind = keyof typeof COLOR;
 
-const TOTAL_FALLBACK = 8;
 const RADIUS = 2.05;
 const LERP = 0.14;
 
@@ -227,7 +235,7 @@ function BeliefCore() {
 }
 
 export function ConsistencyScene3D({
-  samples,
+  view,
   reducedMotion,
   interactive = false,
   hoveredIndex = null,
@@ -235,7 +243,8 @@ export function ConsistencyScene3D({
   onHover,
   onSelect,
 }: {
-  samples: ConsistencySampleEvent[];
+  /** The ONE derived closure state (lib/closure.ts) — the identical value the 2D meter renders. */
+  view: ClosureView;
   reducedMotion: boolean;
   interactive?: boolean;
   hoveredIndex?: number | null;
@@ -243,11 +252,7 @@ export function ConsistencyScene3D({
   onHover?: (i: number | null) => void;
   onSelect?: (i: number | null) => void;
 }) {
-  const latest = samples[samples.length - 1];
-  const total = latest?.total_edges ?? TOTAL_FALLBACK;
-  const open = latest?.open_edges ?? total;
-  const state: ConsistencyState = latest?.state ?? "ALL_ACTIVE";
-  const closed = total - open;
+  const { total, state, closed } = view;
 
   const positions = useMemo(() => holderPositions(total), [total]);
 

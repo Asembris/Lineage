@@ -32,6 +32,7 @@ import type {
   LineageNode,
 } from "../api/types";
 import { getBeliefLineage } from "../api/client";
+import { closureView, witnessSeq, type ClosureView } from "../lib/closure";
 import { runConsistencyStream, type ConsistencyStreamController } from "../lib/consistencyStream";
 import { ConsistencyScene3D } from "./ConsistencyScene3D";
 import { RestoreCommands } from "./RestoreHint";
@@ -54,17 +55,6 @@ function sortHolders(path: LineageNode[]): LineageNode[] {
     .sort((a, b) => (a.inherited_at ?? "").localeCompare(b.inherited_at ?? ""));
 }
 
-/** The observer SAMPLE that witnessed holder `i`'s edge closing: the first sample whose
- *  `open_edges` dropped to at most `total-(i+1)` (i.e. holder i and everything earlier is closed).
- *  For strong, open jumps 8→0 in one sample, so every holder resolves to that single commit
- *  sample — honest: they all closed at one commit. Returns the sample's seq, or null if that
- *  holder hasn't closed in the samples seen so far. */
-function witnessSeq(i: number, samples: ConsistencySampleEvent[], total: number): number | null {
-  const threshold = total - (i + 1);
-  const s = samples.find((x) => x.open_edges <= threshold);
-  return s ? s.seq : null;
-}
-
 type Phase =
   | { status: "idle" }
   | { status: "arming" } // confirm gate — nothing opened yet
@@ -80,6 +70,11 @@ type Phase =
   | { status: "busy"; detail: string }
   | { status: "error"; message: string };
 
+/** The closure at rest, shown BEFORE a run has produced any sample (the idle preview, so the
+ *  2D/3D toggle has a visible effect before the destructive gate is armed). Same derivation as the
+ *  live views, with no sample to render — never a stand-in for a number we lack. */
+const REST_VIEW = closureView(null);
+
 const STATE_LABEL: Record<ConsistencyState, string> = {
   ALL_ACTIVE: "all holders active",
   SPLIT: "SPLIT — torn closure, externally visible",
@@ -88,10 +83,9 @@ const STATE_LABEL: Record<ConsistencyState, string> = {
 
 /** The closure drain: `total` cells, `total - open` shown corrected (--alive); open cells read
  *  --alert while the closure is torn (a laggard still live on the dead belief), quiet otherwise.
- *  The stream gives only COUNTS, not holder identities, so the fill order is presentational —
- *  we never label a specific cell as a specific agent. */
-function DrainMeter({ open, total, state }: { open: number; total: number; state: ConsistencyState }) {
-  const closed = total - open;
+ *  Renders the SAME derived ClosureView the 3D scene does — one derivation, two presentations. */
+function DrainMeter({ view }: { view: ClosureView }) {
+  const { open, total, state, closed } = view;
   const torn = state === "SPLIT";
   return (
     <div className="cx-meter" role="img" aria-label={`${open} of ${total} closure edges open, ${state}`}>
@@ -109,18 +103,17 @@ function DrainMeter({ open, total, state }: { open: number; total: number; state
 function HolderDetail({
   holder,
   index,
-  total,
-  closed,
+  view,
   samples,
   onClose,
 }: {
   holder: LineageNode;
   index: number;
-  total: number;
-  closed: number;
+  view: ClosureView;
   samples: ConsistencySampleEvent[];
   onClose: () => void;
 }) {
+  const { total, closed } = view;
   const isClosed = index < closed;
   const wseq = witnessSeq(index, samples, total);
   const wsample = wseq != null ? samples.find((s) => s.seq === wseq) : null;
@@ -216,11 +209,10 @@ function Observation({
     if (live && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [samples.length, live]);
 
-  const latest = samples[samples.length - 1];
-  const total = latest?.total_edges ?? 8;
-  const open = latest?.open_edges ?? total;
-  const state: ConsistencyState = latest?.state ?? "ALL_ACTIVE";
-  const closed = total - open;
+  // THE single derivation of the closure state on screen (lib/closure.ts). Both the 2D meter and
+  // the 3D scene are handed THIS value, so they render one state and cannot drift apart.
+  const view = closureView(samples[samples.length - 1] ?? null);
+  const { total, open, state } = view;
 
   // Identity binding is live only in 3D once the lineage has loaded. The row a hovered node
   // lights is the sample that witnessed THAT holder's edge closing — a real temporal event.
@@ -234,7 +226,7 @@ function Observation({
     <div className="cx-obs">
       {render === "3d" ? (
         <ConsistencyScene3D
-          samples={samples}
+          view={view}
           reducedMotion={reducedMotion}
           interactive={interactive}
           hoveredIndex={hoveredHolder}
@@ -243,7 +235,7 @@ function Observation({
           onSelect={onSelect}
         />
       ) : (
-        <DrainMeter open={open} total={total} state={state} />
+        <DrainMeter view={view} />
       )}
 
       {render === "3d" && (
@@ -258,8 +250,7 @@ function Observation({
         <HolderDetail
           holder={selected}
           index={selectedHolder as number}
-          total={total}
-          closed={closed}
+          view={view}
           samples={samples}
           onClose={() => onSelect(null)}
         />
@@ -531,13 +522,14 @@ export function ConsistencyDemo() {
         {phase.status === "idle" && (
           <div className="cx__panel">
             <div className="cx__preview" aria-hidden="true">
+              {/* Pre-run preview: the closure at rest, from the same derivation with no sample yet. */}
               {render === "3d" ? (
-                <ConsistencyScene3D samples={[]} reducedMotion={reducedMotion} />
+                <ConsistencyScene3D view={REST_VIEW} reducedMotion={reducedMotion} />
               ) : (
-                <DrainMeter open={8} total={8} state="ALL_ACTIVE" />
+                <DrainMeter view={REST_VIEW} />
               )}
               <span className="cx__preview-cap mono">
-                closure at rest · 8/8 holders live
+                closure at rest · {REST_VIEW.open}/{REST_VIEW.total} holders live
                 {render === "3d" && " · drag to orbit · run the proof to inspect holders"}
               </span>
             </div>
