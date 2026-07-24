@@ -113,3 +113,23 @@ export function changeIndices(samples: ConsistencySampleEvent[]): number[] {
   });
   return out;
 }
+
+/**
+ * Index of the first sample the external reader saw in a torn (SPLIT) state, or null if no such
+ * sample exists in this run.
+ *
+ * This is the seek-to-torn control's ONLY input, deliberately. Gating that control on the strategy
+ * ("strong ⇒ hide it") would make the UI ASSERT the atomic claim; gating it on the recorded samples
+ * makes the UI TEST it — if the atomic path ever did commit an externally-visible torn closure, the
+ * control lights up and takes you straight to the sample that proves it. Its absence on the strong
+ * path is then a measurement, not a configuration.
+ */
+export function firstSplitIndex(samples: ConsistencySampleEvent[]): number | null {
+  const i = samples.findIndex((s) => s.state === "SPLIT");
+  return i === -1 ? null : i;
+}
+
+/** How many recorded samples caught the closure torn. 0 on the atomic path — that IS the result. */
+export function splitSampleCount(samples: ConsistencySampleEvent[]): number {
+  return samples.filter((s) => s.state === "SPLIT").length;
+}

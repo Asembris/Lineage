@@ -850,6 +850,51 @@
   margin-left: auto;
 }
 
+/* Seek-to-torn. Present on BOTH paths and enabled only where a real SPLIT sample exists, so its
+   disabled state is a measurement rather than a configuration. The --alert glyph and border carry
+   the torn signal; the words stay --bone/--ghost, both comfortably above the floor. */
+.cx-scrub__torn-wrap {
+  margin-top: 0.7rem;
+}
+
+.cx-scrub__torn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.36rem 0.7rem;
+}
+
+.cx-scrub__torn:not(:disabled) {
+  background: var(--alert-dim);
+  border-color: var(--alert);
+  color: var(--bone); /* 10.05:1 on --alert-dim */
+}
+
+.cx-scrub__torn-glyph {
+  color: var(--alert);
+}
+
+.cx-scrub__torn:disabled .cx-scrub__torn-glyph {
+  color: var(--ash); /* a glyph, never text — the sanctioned --ash use */
+}
+
+.cx-scrub__torn-at {
+  color: var(--ghost); /* 5.28:1 on --alert-dim */
+}
+
+.cx-scrub__no-torn {
+  margin: 0.5rem 0 0;
+  max-width: 44rem;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--ghost);
+}
+
+.cx-scrub__no-torn b {
+  color: var(--bone);
+  font-weight: 600;
+}
+
 /* Clicked-holder forensic detail — every field is real lineage data. Cold, like Investigate. */
 .cx-detail {
   margin: 0 0 1.2rem;
