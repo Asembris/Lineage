@@ -9635,3 +9635,79 @@ root-of-trust, search/filter-as-registry) onto our surface — they have no back
 the DC's shape without its (nonexistent) substance. The one real provenance signal we have is the
 belief-closure audit; it stays a top-line verdict unless a future session deliberately builds the
 per-edge feature above and moves the pinned "top-line only" scoping with it.
+
+## Frontend design-port loader-conformance — the startup cinematic ported 1:1 (2026-07-24)
+
+The loader was a *loose re-interpretation* of the DC's "Decision Autopsy" (LOADER_DIAGNOSIS.md audited
+it against LINEAGE_LOADER_HANDOFF.md and ranked 8 divergences). This session ported it to the spec's
+exact §6 composition + §7 millisecond timeline, in the diagnosis's rank order. The overlay is now built
+on the spec's **860×420 `preserve-3d` HUD** coordinate system: real `#loader-backdrop` radial layer,
+four planes fanned across shallow 3-D depth, rimmed subject/origin diamonds with inner cores, a
+`670×150` trace svg (dim base + amber active + glow), two-tier px-positioned labels, a 142×176 seal
+with the wordmark on its own beat, and a **measured** teal handoff line over the real genealogy panel.
+
+**WHAT SHIPPED — two commits (interdependent, so grouped not split by rank):**
+- **The overlay rewrite** (Ranks 1, 3–8 + the colour rule): `tokens.css` (the `--loader-*` palette),
+  `lib/motion.ts` (spec-exact `LOADER` timings + `traceEase`), `Loader.css` + `Loader.tsx`. Self-
+  contained — `alignHandoff()`/`reveal()` were written here and *degrade gracefully* (fall back to a
+  760px centred line + no node pulse) until the console hooks below exist.
+- **The §8 console-ownership hooks** (Rank 2): `data-lin-graph` on the Genealogy `<Panel>` (via a new
+  colourless `graphAnchor` prop), `data-live-node` on alive tree nodes (`GenealogyTree`). The first
+  loader change reaching OUTSIDE the self-contained overlay — re-ran guard:composition after (invisible
+  to it, as predicted; 95 components, 25 coloured, unchanged).
+
+**KEPT CONFORMANT (do not regress while porting):** the byte-equivalent emblem (`LineageEmblem`
+untouched), no red anywhere, the stable-key / stable-`onComplete` / effect-time-kick lifecycle, and the
+backward-to-origin trace direction.
+
+**GUARDS.** geometry **40/40 before AND after** (all four projects — the loader is pointer-events:none
+and not in geometry.spec, so this proves no regression; verified it still clicks THROUGH to the console);
+guard:composition PASS (before + after Rank 2); guard:data PASS (no `txn_5f2c81` — the fabricated loader
+txn stays dropped); tsc/oxlint/vite build clean; `pytest -m doc_guard` **63 passed** locally.
+
+**VERIFICATION — the six §11 frames, captured by SEEKING, not waiting.** §9 warns WAAPI freezes on an
+unfocused/headless capture, so a wall-clock screenshot of an intermediate beat is unreliable. Instead:
+`document.getAnimations().forEach(a => { a.pause(); a.currentTime = T })` seeks the whole timeline to an
+exact ms deterministically. All six frames matched: decision-lock (planes fanned, not one card), labels
+(two-tier), trace mid-path (amber drawing backward, dim base ahead), origin ignited (rimmed amber), seal
+(emblem + own-beat wordmark), console ownership (backdrop dissolved, console bright, measured line at the
+panel's vertical centre — x=703/y=479 vs panel centre 703/479, verified programmatically).
+
+### TRAP — a `fill:'forwards'` keyframe OVERWRITES the author CSS transform (general WAAPI, not loader-only)
+The Rank-1 bug, and the most reusable lesson here. Each plane had a resting per-plane offset in CSS
+(`translateY(±84/±28)` originally; the fan's `translate3d`+`rotateY` in the spec). The beat-1 keyframes
+animated `transform` to an **identical** `translate3d(0,0,0) rotateY(0)` for all four planes with
+`fill:'forwards'`. Because a forwards-fill animation's final value WINS over the author style rule for
+that property, the per-plane offsets were silently destroyed — all four planes converged to one centered
+rectangle. **The animation clobbered the very layout it was meant to arrive at.** The fix is the general
+rule: when you must animate `transform` on an element that also carries a base `transform` in CSS, DO NOT
+animate to an absolute transform. Store the base (here on a `data-base` attribute) and animate
+`<base> scale(.93)` → `<base> scale(1)` — i.e. keep the base in every keyframe and only vary what you
+mean to vary. (The same reason the compress beat uses `composite:'add'` for its `scale(.85)`: it
+concatenates onto each element's live transform instead of replacing it, so a plane's 3-D base and a
+diamond's `rotate(45deg)` survive the shrink.) Any future session animating transforms with
+`fill:'forwards'` over CSS-positioned elements should reach for this.
+
+### RULE — the loader palette is `--loader-*`, DEFINED ON THE `.loader` SELECTOR (stronger than `--brand-*`)
+`--brand-*` (S2) is *convention-scoped*: it lives in `:root` and a comment says "only the emblem/loader
+may use it." The loader palette goes further — `--loader-void/teal/teal2/amber/line/plane0/trace-base/
+muted/value` are defined in `tokens.css` **on the `.loader` selector, not `:root`**. This makes them
+LITERALLY invisible to the rest of the console: a rule anywhere outside the overlay that wrote
+`var(--loader-amber)` resolves to nothing. That is the guarantee the reserved-warmth rule needs — loader
+amber (`#f2a43a`, one hue for BOTH trace and origin) is not the console's belief trace (`--trace
+#e0a23f`) or origin ignite (`--origin #e07b3f`); loader teal (`#42ddb3`) is not `--alive #3fe0a8`. **Do
+not repoint any signal token to a loader hue, and do not lift `--loader-*` out of the `.loader` scope.**
+The emblem/wordmark keep `--brand-*` (their two hues render identically to the spec's), so inside the
+overlay the seal draws from `--brand-*` and everything else from `--loader-*`.
+
+### RULE — the trace's PATH-AUTHORING DIRECTION and its DASHOFFSET SIGN must change together (§note-B)
+The backward causal trace draws with `stroke-dasharray:1; pathLength=1` and an animated `strokeDashoffset`.
+Which END it draws from depends on TWO things that must agree:
+  - **spec form:** path authored origin→decision (`M0 0 … 670 84`), dashoffset **−1 → 0**.
+  - **our prior form:** path authored decision→origin (`M648 300 … 208 182`), dashoffset **+1 → 0**.
+Both draw the line the correct way — *backward, decision → origin* — because the sign flip is compensated
+by the reversed authoring. **If you adopt the spec's path you MUST also adopt its −1 sign; keep our
+reversed path and you keep +1.** Change one without the other and the line draws backward-backward (from
+the origin OUT to the decision), which reads as the exact opposite of the belief-trace-to-origin the beat
+means. This port adopted the spec path + −1 together. Anyone touching the trace geometry needs this
+pairing named — it is invisible until it renders, and it renders wrong silently.
