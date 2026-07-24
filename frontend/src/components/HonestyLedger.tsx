@@ -26,7 +26,7 @@
  * degrades to "—" on a not-ready/error slot, matching the Inspector's per-slot idiom.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { Loadable } from "../hooks/useConsoleData";
 import type { AgentsData, BeliefsData, DecisionsData } from "../hooks/useConsoleData";
 import type { ProvenanceAuditResponse, UUID, WitnessOutcome } from "../api/types";
@@ -648,10 +648,16 @@ export function HonestyLedger(props: {
             <span className="ledger-row__note">Note</span>
             <span className="ledger-row__mode-col">Provenance</span>
           </li>
-          {ROWS.map((row) => {
+          {ROWS.map((row, i) => {
             const value = row.liveKey ? live[row.liveKey] : undefined;
             return (
-              <li key={row.item} className={`ledger-row ledger-row--${row.mode}`}>
+              <li
+                key={row.item}
+                className={`ledger-row ledger-row--${row.mode}`}
+                // Per-row enter stagger (design-port S9); capped so late rows don't wait.
+                // Cosmetic only — no data, no reduced-motion effect (the CSS gates the motion).
+                style={{ "--row-i": Math.min(i, 12) } as CSSProperties}
+              >
                 <div className="ledger-row__item">
                   <span className="ledger-row__name">{row.item}</span>
                   {value && (
