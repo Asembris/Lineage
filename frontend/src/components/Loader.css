@@ -1,11 +1,17 @@
 /*
- * Loader — startup cinematic styling (design-port S3, DESIGN_PORT_DIAGNOSIS.md §6).
+ * Loader — startup cinematic styling ("The Decision Autopsy", LINEAGE_LOADER_HANDOFF.md §6).
  *
  * A fixed, pointer-events:none overlay above the app. Every child's INITIAL state here is the
  * hidden/pre-animation frame, so nothing flashes before its WAAPI beat runs (Loader.tsx drives the
- * reveals). Colours: warm trace/origin for the backward-trace beat (reserved warmth, honoured — it
- * IS a trace to an origin), the scoped --brand-* tokens for the emblem/seal/handoff. Nothing here
- * touches console hover/button styling.
+ * reveals). The composition is the spec's exact 860×420 preserve-3d HUD coordinate system: absolute
+ * px places the trace/labels/origin, and the four provenance planes fan across shallow 3-D depth via
+ * their per-plane translate3d + rotateY bases (set inline from Loader.tsx, animated scale-only so the
+ * fan is preserved).
+ *
+ * Colour: the forensic loader palette lives in --loader-* (tokens.css, SCOPED to this .loader
+ * selector — it cannot leak into the console's signal tokens). The one exception is the seal/wordmark,
+ * which keep the scoped --brand-* tokens (the emblem's two hues render identically to the spec's).
+ * Nothing here touches console hover/button styling, and there is no red anywhere.
  */
 
 .loader {
@@ -16,146 +22,198 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: var(--void);
+  /* No opaque fill on the root: the backdrop layer below is the opaque cover, and it DISSOLVES at the
+     reveal (beat 7) to hand the live console over BEFORE the root itself fades. */
 }
 
-/* --- The HUD (compresses away at beat 5) ---------------------------------- */
+/* The opaque backdrop — a radial glow over the deep void. Faded independently in reveal(). */
+.loader__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 500px at 50% 46%, rgba(22, 53, 70, 0.22), transparent 66%),
+    var(--loader-void);
+}
+
+/* --- The stage + HUD (the autopsy space) ---------------------------------- */
 
 .loader__stage {
   position: relative;
-  width: min(900px, 92vw);
-  height: min(520px, 62vh);
+  width: min(1120px, 94vw);
+  height: min(650px, 88vh);
   perspective: 1100px;
 }
 
-.loader__strata {
+.loader__hud {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  left: 50%;
+  top: 48%;
+  width: 860px;
+  height: 420px;
+  transform: translate(-50%, -50%);
   transform-style: preserve-3d;
 }
 
-/* Four provenance planes that register in 3-D. Faint, parchment-tinted, never a signal colour. */
+/* Four provenance planes across shallow 3-D depth. Each carries its own translate3d + rotateY base
+   inline (Loader.tsx data-base); the beat-1 animation only scales it, so the fan is preserved. */
 .loader__plane {
   position: absolute;
-  width: 46%;
-  height: 26%;
-  opacity: 0; /* beat-1 animation reveals to ~0.4 */
-  border: 1px solid color-mix(in srgb, var(--brand-parchment) 22%, transparent);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--brand-parchment) 4%, transparent);
-}
-.loader__plane:nth-child(1) { transform: translateY(-84px); }
-.loader__plane:nth-child(2) { transform: translateY(-28px); }
-.loader__plane:nth-child(3) { transform: translateY(28px); }
-.loader__plane:nth-child(4) { transform: translateY(84px); }
-
-.loader__svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.loader__trace-path {
-  fill: none;
-  stroke: var(--trace);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  stroke-dasharray: 1; /* with pathLength=1, one unit = full length */
-  stroke-dashoffset: 1; /* hidden until beat 3 draws it to 0 */
-  opacity: 0;
-}
-
-.loader__diamond {
-  opacity: 0; /* revealed by its beat */
-  transform-box: fill-box;
+  left: 50%;
+  top: 50%;
+  width: 520px;
+  height: 260px;
   transform-origin: center;
+  opacity: 0; /* beat-1 graduates each plane to [.26,.32,.38,.42] */
+  border: 1px solid var(--loader-line);
+  background: linear-gradient(135deg, rgba(15, 31, 45, 0.14), rgba(7, 16, 25, 0.02));
 }
-.loader__diamond--subject {
-  fill: var(--brand-teal);
-}
-.loader__diamond--origin {
-  fill: var(--origin);
+/* The nearest plane carries the coherent teal edge; the deeper three stay cold. */
+.loader__plane:first-child {
+  border-color: var(--loader-plane0);
 }
 
-.loader__labels {
+/* The selected decision — a rimmed teal diamond with an inner core (not a flat fill). */
+.loader__subject {
   position: absolute;
-  left: 4%;
-  bottom: 6%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  left: 50%;
+  top: 49%;
+  width: 86px;
+  height: 86px;
+  transform: translate(-50%, -50%) rotate(45deg) scale(0.7);
+  border: 1px solid rgba(66, 221, 179, 0.8);
+  background: rgba(8, 25, 31, 0.78);
+  opacity: 0; /* beat-1 reveal */
+}
+.loader__subject-core {
+  position: absolute;
+  inset: 25px;
+  background: var(--loader-teal);
 }
 
+/* The backward causal trace: a dim companion base under an amber active path that draws to origin. */
+.loader__trace {
+  position: absolute;
+  left: 154px;
+  top: 251px;
+  width: 670px;
+  height: 150px;
+  opacity: 0; /* beat-3 flashes the svg in */
+  overflow: visible;
+}
+.loader__trace-base {
+  fill: none;
+  stroke: var(--loader-trace-base);
+  stroke-width: 1.2;
+}
+.loader__trace-active {
+  fill: none;
+  stroke: var(--loader-amber);
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(242, 164, 58, 0.35));
+  stroke-dasharray: 1; /* with pathLength=1, one unit = full length */
+  stroke-dashoffset: -1; /* hidden until beat 3 draws it to 0 (backward: decision → origin) */
+}
+
+/* Projected fact labels — two-tier (mono kicker + bright value), pinned beside their nodes. */
 .loader__label {
-  opacity: 0; /* beat-2 fade-up */
+  position: absolute; /* left/top set inline per label */
+  opacity: 0; /* beat-2 rise + fade */
   font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: var(--ghost);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--loader-muted);
+  white-space: nowrap;
+}
+.loader__label strong {
+  display: block;
+  color: var(--loader-value);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+  font-weight: 600;
 }
 
-/* --- Identity seal (beat 6) ----------------------------------------------- */
+/* The origin ancestor — a small rimmed amber diamond that ignites at beat 4. */
+.loader__origin {
+  position: absolute;
+  left: 154px;
+  top: 252px;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%) rotate(45deg) scale(0.5);
+  border: 1px solid var(--loader-amber);
+  background: #17130d; /* a near-black amber-tinted well; loader-only, single use */
+  opacity: 0; /* beat-4 bloom */
+}
+.loader__origin-core {
+  position: absolute;
+  inset: 4px;
+  background: var(--loader-amber);
+}
+
+/* --- Identity seal + brand (beat 6) --------------------------------------- */
 
 .loader__seal {
   position: absolute;
+  left: 50%;
+  top: 47%;
+  width: 142px;
+  height: 176px;
+  transform: translate(-50%, -50%) scale(0.88);
   opacity: 0; /* beat-6 reveal */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
+  user-select: none;
 }
-
 .loader__emblem {
   display: block;
-  height: 4.25rem;
-  width: auto;
-}
-
-.loader__wordmark {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
+  width: 100%;
+  height: 100%; /* viewBox 120×150; preserveAspectRatio meet keeps it centred without stretch */
 }
 
 .loader__brand {
+  position: absolute;
+  left: 50%;
+  top: 66%;
+  transform: translate(-50%, 8px);
+  text-align: center;
+  opacity: 0; /* beat-6b rise + fade (its own beat, after the emblem) */
+  /* the wordmark is brand chrome, not signal text — scoped brand parchment (== spec bone) */
+  color: var(--brand-parchment);
+}
+.loader__brand-name {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.5rem;
-  letter-spacing: 0.28em;
-  /* the wordmark is brand chrome, not signal text — scoped brand parchment, not --bone */
-  color: var(--brand-parchment);
-  /* the tracking pushes the last glyph off-centre; nudge it back under the emblem */
-  padding-left: 0.28em;
+  font-size: 26px;
+  letter-spacing: 0.26em;
+  padding-left: 0.26em; /* the tracking pushes the last glyph off-centre; nudge it back */
 }
-
-.loader__sub {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.34em;
-  color: var(--ghost);
-  padding-left: 0.34em;
+.loader__brand-sub {
+  margin-top: 12px;
+  color: #7d90a8; /* the spec's muted sub-label blue-grey; loader-only, single use */
+  font-size: 8px;
+  letter-spacing: 0.42em;
+  padding-left: 0.42em;
 }
 
 /* --- Console-ownership handoff line (beat 7) ------------------------------ */
 
+/* A thin teal transfer line, measured over and centred on the real genealogy panel at runtime
+   (Loader.tsx alignHandoff). Fixed, so it aligns to viewport coordinates from getBoundingClientRect. */
 .loader__handoff {
-  position: absolute;
-  bottom: 20%;
-  width: min(420px, 46vw);
-  height: 2px;
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  height: 1px;
+  width: 0;
+  transform: translate(-50%, -50%);
   opacity: 0;
-  transform: scaleX(0);
-  transform-origin: left center;
   background: linear-gradient(
     90deg,
     transparent,
-    var(--brand-teal),
+    var(--loader-teal2),
+    var(--loader-teal),
+    var(--loader-teal2),
     transparent
   );
+  box-shadow: 0 0 12px rgba(83, 184, 198, 0.35);
 }

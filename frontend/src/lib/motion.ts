@@ -68,42 +68,59 @@ export const SETTLE_TIMES = [0, 0.6, 1];
  * All values in MILLISECONDS (WAAPI's unit), unlike DUR above (framer-motion seconds).
  */
 export const LOADER = {
-  // Beat 1 — decision lock: the four provenance strata register in 3-D; the subject diamond scales in.
-  strataDur: 700,
-  strataStagger: 90,
-  diamondInDur: 500,
-  // Beat 2 — provenance separation: the three real labels fade up.
+  // Beat 1 — decision lock: the four provenance strata register in 3-D (each keeps its own translate3d/
+  // rotateY base and only scales .93→1, per-plane opacity graded); the subject diamond scales .55→.74.
+  strataStagger: 55, // i*55
+  strataDur: 620,
+  subjectDelay: 120,
+  subjectDur: 460,
+  // Beat 2 — provenance separation: the three real labels rise (translateY 5px→0) and fade up.
   labelStart: 680,
-  labelStagger: 150,
-  labelDur: 360,
-  // Beat 3 — backward trace to origin: an amber path draws via strokeDashoffset.
-  traceStart: 1200,
-  traceDur: 1200,
-  // Beat 4 — origin resolved: the origin diamond blooms in.
+  labelStagger: 120, // i*120
+  labelDur: 340,
+  // Beat 3 — backward trace to origin: the svg flashes in, then the amber active path draws
+  // strokeDashoffset −1→0 (backward, decision→origin) under its own steeper ease.
+  traceSvgStart: 1200,
+  traceSvgDur: 180,
+  tracePathStart: 1300,
+  tracePathDur: 1120,
+  // Beat 4 — origin resolved: the origin diamond blooms (scale .4→1).
   originAt: 2340,
-  originDur: 460,
-  // Beat 5 — evidence compresses away: the HUD fades and scales to 0.85.
+  originDur: 520,
+  // Beat 5 — evidence compresses away: the ~10 autopsy elements each fade + scale .85, staggered i*8.
   compressAt: 2550,
-  compressDur: 500,
-  // Beat 6 — identity seal: the emblem scales in, the wordmark fades up.
+  compressStagger: 8, // i*8
+  compressDur: 380,
+  // Beat 6 — identity seal + brand: the emblem scales .88→1, then the wordmark rises (its OWN beat).
   sealAt: 2820,
-  sealDur: 620,
-  // Beat 7 — console ownership: the handoff line sweeps, then the overlay fades and disposes.
+  sealDur: 520,
+  brandAt: 3090,
+  brandDur: 380,
+  // Beat 7 — console ownership: the measured handoff line sweeps (width 0→W*.68@.65→W, opacity
+  // 0→1→0), the backdrop dissolves + living node pulses (reveal), then seal/brand/root fade out.
   handoffAt: 3460,
-  handoffDur: 620,
-  fadeAt: 3900,
-  fadeDur: 330,
+  handoffDur: 720,
+  revealAt: 3650,
+  brandOutAt: 3740,
+  brandOutDur: 260,
+  sealOutAt: 3750,
+  sealOutDur: 340,
+  fadeAt: 3860,
+  fadeDur: 340,
   completeAt: 4230,
   // Safety — a watchdog that guarantees the loader never traps the user even if a beat stalls.
   watchdog: 5200,
-  // Reduced-motion path (~500 ms): logo → transfer line → ownership, no camera travel, same final frame.
-  reducedSealDur: 260,
-  reducedHandoffAt: 220,
-  reducedHandoffDur: 200,
-  reducedFadeAt: 380,
-  reducedFadeDur: 160,
-  reducedCompleteAt: 520,
-  // Tween eases — cubic-bezier equivalents of EASE.out / EASE.inOut (no springs, ever).
-  ease: "cubic-bezier(0.22, 1, 0.36, 1)",
-  easeInOut: "cubic-bezier(0.65, 0, 0.35, 1)",
+  // Reduced-motion path (~560 ms): seal → brand → transfer line → reveal, no camera/depth travel,
+  // collapsing to the same final frame (the console, revealed).
+  reducedSealDur: 220,
+  reducedBrandAt: 60,
+  reducedBrandDur: 200,
+  reducedHandoffAt: 200,
+  reducedHandoffDur: 300,
+  reducedRevealAt: 360,
+  reducedCompleteAt: 560,
+  // Tween eases — the spec's default cubic-bezier(.2,.8,.2,1) on every beat, plus the trace's steeper
+  // draw curve. Both are tweens (no springs, ever), and no colour is ever interpolated.
+  ease: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+  traceEase: "cubic-bezier(0.55, 0, 0.15, 1)",
 } as const;
