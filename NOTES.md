@@ -9869,3 +9869,121 @@ tsc / oxlint(exit 0) / vite build clean. guard:composition PASS (99 components /
 so the :8123 rule didn't apply): default (feed 320, chips one line), collapsed (56px rail + vertical count,
 tree fills reclaimed width), focus (feed 250 with wrapped chips + selected bone bar, Inspector 404 with the
 full Investigation), belief chip `ea4f91` matching the catalog.
+
+## CLUSTER ROTATION — the canonical state rebuilt from zero on a NEW account (2026-08-10)
+
+The 07-30 trial cluster expired and went restricted. A new CockroachDB Cloud account + cluster (Basic,
+**AWS eu-central-1**, v26.2.5) replaced it. This entry banks what the rotation PROVED, because it was
+an accidental and unusually strong reproducibility experiment: the entire canonical world was rebuilt
+from an empty cluster and compared field-by-field against the committed docs.
+
+**EVERY CITED ID REGENERATED IDENTICALLY — and that is by construction, not luck.** belief `898ad0e5`
+(origin crimson-0 `108cf7f4`, formed 2024-05-12), belief `ea4f9135` (origin azure-0 `5aa71f6d`),
+crimson-7 `3fb55cf8`, crimson-5b `cd75b330`, azure-7 `426137f2`, hero ring `045adfd2` (CYCLE instance 6,
+10 hops, oracle laundering). The mechanism, from the code and not from the observation:
+`seed/seed.py` `_NS = uuid5(NAMESPACE_DNS, "lineage.hackathon")` → `aid()`/`bid()`; `scripts/ingest_aml.py`
+`_NS = uuid5(NAMESPACE_DNS, "lineage.aml")` → `txn_id = uuid5(_NS, "txn:" + raw_key)`; corpus ids
+`uuid5(source, typology)`; AML decision ids `uuid5(NAMESPACE_OID, f"aml-decision:{txn_id}")`. Dates are
+equally pinned — `BASE = 2026-07-01` is a CONSTANT, not `now()`, so `formed_at = BASE - 780d = 2024-05-12`
+regenerates exactly, and AML `DECIDED_AT` is the literal `2026-07-12T12:00Z`.
+
+**NOTE WHAT THAT MAKES THE CSV HASH GATE.** `045adfd2` is `uuid5` of the transaction's ten CSV columns.
+A different HI-Small revision would have silently produced a DIFFERENT hero id, and every doc quoting it
+would have gone quietly wrong with no error anywhere. Hash the dataset BEFORE the ingest, always. (Both
+files verified: `Trans.csv` 475,664,283 b `b19d39f5…6c5b040`, `Patterns.txt` 328,161 b `7c5029d7…ef3cb37`.
+`data/raw/` IS gitignored via `.gitignore` `data/*` — confirmed with `git check-ignore`, the only thing
+that settles it. Patterns.txt is required by the INGEST, not just the hold-out verifier: it is the
+primary driver, and the CSV is only streamed to confirm the join and sample benign noise.)
+
+### THERE ARE TWO HASHES, AND ONLY ONE IS QUOTABLE — the correction that matters
+
+A session traced `beliefs.invalidated_at` / `belief_inheritance.invalidated_at` into the hashed column
+set (`replay.py` `_BELIEF_SQL` / `_CLOSURE_SQL`), saw `invalidation.py` bind them from
+`dt.datetime.now(dt.timezone.utc)`, and concluded the famous
+`sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` could not survive a rotation
+and the docs would have to stop quoting it. **THAT WAS WRONG, and the way it was wrong is worth keeping.**
+
+The closure hash is only ever computed over the **PRE-invalidation** world. `db_snapshot_hlc` is
+"Pre-invalidation MVCC version — the AOST cross-check oracle" (`certificate.py`), and the certifier
+replays `AS OF SYSTEM TIME` that HLC. At that snapshot the belief is still `active` and every
+`invalidated_at` is **NULL**. The wall-clock columns are in the payload but PRESENT-AND-NULL, which is
+stable. No clock ever enters the digest.
+
+| | reproducible? | quoted in docs? |
+|---|---|---|
+| **closure content-hash** `canonical_digest(closure_world(...))` | **YES** — uuid5 ids, `formed_at` from fixed `BASE`, all `invalidated_at` NULL at the pinned snapshot | yes — this is `1e40b7a7…` |
+| **certificate `content_hash`** `_digest(cert)` | **NO** — covers `certificate_id: str(uuid.uuid4())` and `issued_at: now()` | **never** |
+
+**NOTES:3986 ("the closure hash is UNCHANGED") was CORRECT and had already stated the reason** — it calls
+the stability "the *confirmation* that `staleness_evidence` sits OUTSIDE the cross-checked closure hash."
+The volatile material lives in the certificate, not in the closure world. Read the entry before doubting it.
+
+**RE-DERIVED READ-ONLY, TWICE, ON THE NEW CLUSTER — no invalidation performed.** Because the rebuilt
+world has the belief `active` with every edge `invalidated_at IS NULL`, it *is* byte-for-byte the pre-kill
+world; `closure_snapshot()` through the shared canonicalizer returns the recorded value directly. This is
+the technique to use: **the closure hash is checkable WITHOUT spending the invalidation.** Never run an
+invalidation just to check a hash — it moves `beliefs invalidated 0→1` and `audit_log 0→1` and burns the
+canonical fingerprint. Confirmed a second time AFTER the full suite wiped and reseeded, i.e. after all 15
+`belief_inheritance` rows were re-inserted with fresh `gen_random_uuid()` ids — direct empirical
+confirmation that edge ids are excluded from `closure_world`, exactly as its column list says.
+
+**The claim is now STRONGER than the docs state.** They assert cross-*machine* agreement (endpoint vs
+Lambda). The value has now also reproduced across two accounts, two clusters and two AWS regions.
+`DEMO.md` §514 was retitled "Cross-machine **closure** content-hash" to match §415 and ARCHITECTURE
+§414-417, which were already precise; the loose word was only in that one table cell.
+
+**guard:data's denylist entry stands unchanged.** `no-fabricated-data.mjs` blocks the literal from
+frontend SOURCE; its rationale ("a content_hash is a runtime API value, never a src literal") is
+orthogonal to reproducibility. Reproducibility makes the guard MORE valuable, not less: a hardcoded
+literal that is correct today is precisely the kind that survives review and rots silently.
+
+### What genuinely does NOT reproduce (the real inventory)
+
+- **`certificate_id` + the S3 object key** `certificates/<belief_id>/<certificate_id>.json` — belief half
+  stable, `certificate_id` is `uuid4`. Every S3 object from the dead cluster is orphaned.
+- **`audit_log`** — `gen_random_uuid()` ids, wall-clock `created_at`. **0 rows on the new cluster**; the
+  atomic-invalidation money-shot has NOT been re-run here.
+- **The 4,000 card decision ids** — `uuid4`, regenerate every backfill (already known: mock.ts resolves
+  them from the fixture). The 1,500 AML decision ids are `uuid5` and ARE stable.
+- **The 15 `belief_inheritance.id`s** — `seed.py` inserts without an explicit id, so they take the
+  `gen_random_uuid()` server default. Easy to assume uuid5 like everything around them; they are not.
+
+**AUDITED: no judge-facing doc, fixture or test quotes a card decision id or an inheritance-edge id.**
+Docs quote COUNTS (15 edges = 8 crimson + 7 azure; 5,500 = 4,000 card + 1,500 AML) — all verified. The only
+decision-id-shaped literals (`txn_5f2c81`) are the invented DC demo values that guard:data DENIES; they are
+denylist rationale, not claims. Nothing to fix.
+
+### Rotation runbook (verified end-to-end, in this order)
+
+    alembic upgrade head                      # 10 migrations, ~140s
+    scripts/ingest_aml.py                     # 1500 txns / 648 accts / 20 instances, ~42s
+    python -m seed.backfill_decisions         # RESEEDS, then 4,000 card rows, ~4-5min (Cloud bulk insert)
+    python -m seed.backfill_aml_decisions     # APPENDS 1,500, never reseeds, ~15s
+    scripts/ingest_corpus.py                  # typology_corpus = 4,   ~21s,  4 embedding calls
+    scripts/ingest_regulatory.py              # regulatory_corpus = 233, ~93s, 233 embedding calls
+
+Total OpenAI cost for the corpus pair: **237 `text-embedding-3-small` calls, ~20k tokens, well under a cent.**
+
+**THE CORPUS TABLES SURVIVE A RESEED — the two ingests do NOT belong in the restore chain.** Confirmed from
+the code and then measured: `seed.seed()` DELETEs only `belief_inheritance, decisions, belief_performance,
+audit_log, beliefs, agents` — no corpus table, no `aml_*`. The only test that writes a corpus table
+(`test_corpus.py`) scopes its DELETE to the sentinel `SRC = "__test_corpus__"`, never the real
+`altman-2306.16424`. After a full 253-test suite run plus a full reseed, `typology_corpus` was still 4 and
+`regulatory_corpus` still 233. So the post-suite restore stays the two backfills, as documented.
+
+`regulatory_corpus = 233` matches the count banked at the `ix_regulatory_corpus_embedding` entry, with the
+per-document census reproducing exactly (ffiec 129 / fatf-va 59 / fatf-egmont 33 / fincen-2010 7 /
+fincen-2014 5). **`typology_corpus = 4` had no recorded baseline anywhere — recording it here as the
+baseline.** Both verifiers pass, including the one that matters: the C-SPANN index IS selected for the
+cosine query (`vector search` node, not a full scan), and 0010's two dead indexes are confirmed absent.
+
+### Suite count: the banked figure was three sessions stale
+
+**253 collected, 253 passed, 4m29s, on the rebuilt cluster.** NOTES' last banked figure was **217**
+(`--collect-only -q | tail -1 -> 217`); the +36 landed across the hold-out artifact guard, the
+intra-document anchor guard, the `.env.example` field guard, the seam reverse-lookup guard, the `doc_guard`
+marker + safety-pin, `POST /decisions/aml/{id}` and `/health/ready`, none of which re-banked the total.
+**Zero failures of the "written against the old cluster's ids" shape** — unsurprising in hindsight, since
+every id any test hard-codes (`045adfd2`, `898ad0e5`, `ea4f9135`) is uuid5-stable, and nothing hard-codes a
+card decision id or an edge id. Re-bank the count when it moves; a figure that goes stale for three
+sessions is how "248" ends up in a prompt when the truth is 253.
