@@ -511,7 +511,7 @@ Every ⬤ LIVE beat above was run this session; the captured results:
 
 | Artifact | Value cited | Source / when |
 |---|---|---|
-| Cross-machine certificate hash | `sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` | Real AWS Lambda invocation, `scripts/demo_certifier.py`, 2026-07-10 (README §Core innovations #2). Not re-invoked per plan. |
+| Cross-machine closure content-hash | `sha256:1e40b7a72fe1796cc91fa49bd119e1f239c889c651fc7dbaa70963eb38c393ff` | Real AWS Lambda invocation, `scripts/demo_certifier.py`, 2026-07-10 (README §Core innovations #2). Not re-invoked per plan. *(The **closure** hash — `canonical_digest(closure_world(...))`, §415 — not the certificate's own `content_hash`, which covers a `uuid4` `certificate_id` and `issued_at` and is deliberately not reproducible. Re-derived read-only on the rebuilt cluster 2026-08-10: unchanged.)* |
 | Faithfulness guard scores | SUPPORTED 1.00 / UNSUPPORTED 0.40 / UNAVAILABLE; GEval 0.287 vs built-in 0.771 on 8 authored negatives; 8/10 labeled | Item 8 full run + Item E live gemma demo, 2026-07-11. Needs Ollama + scoped-TLS; not re-run. |
 | LLM FLAG verdict | gpt-4o-mini FLAG citing the origin belief / a real cycle | `scripts/demo_grounded_agent.py`. Paid + non-deterministic; referenced, not re-fired. |
 | Consistency 1-vs-9 | eventual 9 commit points vs atomic 1; SPLIT window | SSE capture (Frontend Phase 4) + `app/services/consistency.py`. Live-safe (isolated `demo` db); not re-run this session. |
